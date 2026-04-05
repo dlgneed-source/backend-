@@ -56,7 +56,7 @@ const Index: React.FC = () => {
             {activePanel === 'profile' && <ProfilePanel />}
           </motion.div>
         </AnimatePresence>
-        {isMobile && <BottomNav activePanel={activePanel} onNavigate={setActivePanel} />}
+        <BottomNav activePanel={activePanel} onNavigate={setActivePanel} />
       </div>
     </div>
   );
