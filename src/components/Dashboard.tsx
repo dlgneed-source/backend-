@@ -225,7 +225,7 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
   const [showDetails, setShowDetails] = useState(false);
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1, duration: 0.4 }} className="group relative">
-      <div className="absolute -inset-1 rounded-[1.5rem] sm:rounded-[2rem] opacity-40 blur-lg transition-all group-hover:opacity-70" style={{ background: `linear-gradient(135deg, ${plan.theme.glow}, transparent 60%)` }} />
+      <div className="absolute -inset-1 rounded-[1.5rem] sm:rounded-[2rem] opacity-25 blur-md transition-all group-hover:opacity-40" style={{ background: `linear-gradient(135deg, ${plan.theme.glow}, transparent 60%)` }} />
       <div className="relative overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: `${plan.theme.primary}30`, background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.2) 100%)', boxShadow: `0 8px 32px ${plan.theme.glow}15` }}>
         <div className="absolute inset-x-0 top-0 h-0.5 sm:h-1" style={{ background: `linear-gradient(90deg, transparent, ${plan.theme.primary}, ${plan.theme.secondary}, transparent)` }} />
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -613,7 +613,7 @@ const WithdrawalPageContent = ({ balance }: { balance: number }) => {
         <h3 className="text-xl font-bold text-white">Withdrawal Initiated!</h3>
         <p className="text-sm text-slate-300">${amount} will be credited instantly after blockchain reaches at height</p>
         <div className="flex items-center gap-2 text-xs text-emerald-400">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />Processing on blockchain...
+          <div className="h-2 w-2 rounded-full bg-emerald-400" />Processing on blockchain...
         </div>
       </motion.div>
     );
