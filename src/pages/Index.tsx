@@ -33,7 +33,7 @@ const Index: React.FC = () => {
     <div className="flex min-h-screen bg-background">
       <InternalSidebar
         activePanel={activePanel}
-        onSelect={(p: PanelId) => { setActivePanel(p); setSidebarOpen(false); }}
+        onNavigate={(p: PanelId) => { setActivePanel(p); setSidebarOpen(false); }}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onLogout={() => setIsLoggedIn(false)}
@@ -41,7 +41,7 @@ const Index: React.FC = () => {
       <div className="flex-1 flex flex-col min-h-screen">
         {activePanel === 'dashboard' && (
           <InternalHeader
-            onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             sidebarOpen={sidebarOpen}
           />
         )}
@@ -56,7 +56,7 @@ const Index: React.FC = () => {
             {activePanel === 'profile' && <ProfilePanel />}
           </motion.div>
         </AnimatePresence>
-        {isMobile && <BottomNav activePanel={activePanel} onSelect={setActivePanel} />}
+        {isMobile && <BottomNav activePanel={activePanel} onNavigate={setActivePanel} />}
       </div>
     </div>
   );
