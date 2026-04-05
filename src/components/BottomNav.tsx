@@ -25,12 +25,12 @@ const BottomNav: React.FC<BottomNavProps> = ({ activePanel, onNavigate }) => {
         background: 'linear-gradient(180deg, rgba(10,10,20,0) 0%, rgba(5,5,10,0.6) 40%, rgba(2,2,5,0.98) 100%)',
       }}
     >
-      {/* Ambient Glow Background */}
+      {/* Subtle Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div 
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[500px] h-[100px] opacity-30 blur-[80px]"
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[400px] h-[60px] opacity-20"
           style={{
-            background: 'radial-gradient(ellipse at center bottom, rgba(56,189,248,0.3) 0%, rgba(99,102,241,0.1) 40%, transparent 70%)'
+            background: 'radial-gradient(ellipse at center bottom, rgba(56,189,248,0.2) 0%, transparent 70%)'
           }}
         />
       </div>
@@ -68,7 +68,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activePanel, onNavigate }) => {
                 // Reduced height to h-12/14 for a thinner look
                 className="group relative flex flex-col items-center justify-center flex-1 h-[3.25rem] outline-none"
               >
-                {/* Active Liquid Background */}
+                {/* Active Background */}
                 {isActive && (
                   <motion.div
                     layoutId="premium-active-bg"
@@ -80,39 +80,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ activePanel, onNavigate }) => {
                       damping: 35,
                       mass: 1.2
                     }}
-                    style={{
-                      boxShadow: `
-                        0 0 30px -10px rgba(99,102,241,0.5),
-                        inset 0 1px 2px rgba(255,255,255,0.2),
-                        inset 0 -1px 2px rgba(0,0,0,0.1)
-                      `
-                    }}
-                  >
-                    {/* Animated gradient overlay */}
-                    <motion.div
-                      className="absolute inset-0 rounded-xl opacity-40"
-                      style={{
-                        background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%)',
-                        backgroundSize: '200% 200%',
-                      }}
-                      animate={{
-                        backgroundPosition: ['200% 200%', '-200% -200%'],
-                      }}
-                      transition={{
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: 'linear'
-                      }}
-                    />
-                  </motion.div>
-                )}
-
-                {/* Glowing Orb Behind Icon */}
-                {isActive && (
-                  <motion.div
-                    layoutId="glowing-orb"
-                    className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gradient-to-r ${item.gradient} blur-lg opacity-50`}
-                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                   />
                 )}
 

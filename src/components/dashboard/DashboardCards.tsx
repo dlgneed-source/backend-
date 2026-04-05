@@ -603,7 +603,6 @@ export const PremiumReferralCard: React.FC<{ refMode: 'Level 1' | 'Downline'; se
 
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-300">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
             </span>
             Live Updates
