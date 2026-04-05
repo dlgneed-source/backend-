@@ -36,9 +36,9 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
     <div className="min-h-screen bg-background text-foreground font-sans flex flex-col relative overflow-hidden">
       {/* Background Elements */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/15 rounded-full blur-[140px]" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-accent/20 rounded-full blur-[120px]" />
-        <video autoPlay loop muted playsInline className="w-full h-full object-cover opacity-[0.15]">
+        <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[100px]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[300px] bg-accent/15 rounded-full blur-[80px]" />
+        <video autoPlay loop muted playsInline className="w-full h-full object-cover opacity-[0.1]">
           <source src="https://res.cloudinary.com/da9zypkoj/video/upload/v1774124881/1774124802516_i64wyo.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-background/70" />

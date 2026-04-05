@@ -228,22 +228,14 @@ export default function AIStudio() {
     <div className="min-h-screen flex flex-col relative overflow-x-hidden" style={{ background: 'linear-gradient(180deg, hsl(270 60% 5%), hsl(270 50% 3%))' }}>
       {/* Glowing Background Effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] opacity-25">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] opacity-15">
           <div className="absolute inset-0" 
                style={{ 
-                 background: 'radial-gradient(ellipse at center, hsl(270 80% 50% / 0.35) 0%, hsl(270 60% 30% / 0.15) 40%, transparent 70%)',
-                 filter: 'blur(80px)'
+                 background: 'radial-gradient(ellipse at center, hsl(270 80% 50% / 0.25) 0%, transparent 70%)',
+                 filter: 'blur(60px)'
                }} 
           />
         </div>
-        <div className="absolute top-1/4 -left-32 w-48 h-48 rounded-full blur-[100px]" style={{ background: 'hsl(270 70% 40% / 0.15)' }} />
-        <div className="absolute bottom-1/4 -right-32 w-48 h-48 rounded-full blur-[100px]" style={{ background: 'hsl(280 60% 40% / 0.12)' }} />
-        <div className="absolute inset-0 opacity-[0.015]" 
-             style={{ 
-               backgroundImage: 'linear-gradient(hsl(270 60% 50% / 0.4) 1px, transparent 1px), linear-gradient(90deg, hsl(270 60% 50% / 0.4) 1px, transparent 1px)',
-               backgroundSize: '50px 50px'
-             }} 
-        />
       </div>
 
       {/* Header */}
