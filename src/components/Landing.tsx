@@ -96,7 +96,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
           transition={{ duration: 0.8 }}
           className="relative w-full max-w-md"
         >
-          <div className="absolute -inset-1 rounded-[3rem] bg-gradient-to-r from-accent via-primary to-accent opacity-40 blur-xl animate-pulse pointer-events-none" />
+          <div className="absolute -inset-1 rounded-[3rem] bg-gradient-to-r from-accent via-primary to-accent opacity-30 blur-xl pointer-events-none" />
           <div className="relative z-10 w-full p-8 sm:p-10 rounded-[2.5rem] glass-strong text-center overflow-hidden">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-primary-foreground tracking-wide drop-shadow-lg">𝐞＠𝐀𝐤𝐡𝐮𝐰𝐚𝐭</h1>
             <p className="text-accent text-[11px] font-bold tracking-[0.2em] uppercase mt-1">A Digital Learn &amp; Earn Eco System</p>

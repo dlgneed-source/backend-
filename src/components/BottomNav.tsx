@@ -25,12 +25,12 @@ const BottomNav: React.FC<BottomNavProps> = ({ activePanel, onNavigate }) => {
         background: 'linear-gradient(180deg, rgba(10,10,20,0) 0%, rgba(5,5,10,0.6) 40%, rgba(2,2,5,0.98) 100%)',
       }}
     >
-      {/* Ambient Glow Background */}
+      {/* Subtle Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div 
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[500px] h-[100px] opacity-30 blur-[80px]"
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[400px] h-[60px] opacity-20"
           style={{
-            background: 'radial-gradient(ellipse at center bottom, rgba(56,189,248,0.3) 0%, rgba(99,102,241,0.1) 40%, transparent 70%)'
+            background: 'radial-gradient(ellipse at center bottom, rgba(56,189,248,0.2) 0%, transparent 70%)'
           }}
         />
       </div>
