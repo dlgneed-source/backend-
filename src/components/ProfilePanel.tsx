@@ -50,12 +50,12 @@ const ProfilePanel: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.18),_transparent_26%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.12),_transparent_24%),linear-gradient(180deg,#0b1220_0%,#111827_45%,#0f172a_100%)] px-3 py-3 text-slate-100 sm:px-4 sm:py-4 md:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-3xl flex-col gap-5 pb-20">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.18),_transparent_26%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.12),_transparent_24%),linear-gradient(180deg,#0b1220_0%,#111827_45%,#0f172a_100%)] px-3 py-3 text-slate-100 sm:px-4 sm:py-4 md:px-6 lg:px-8 overflow-x-hidden">
+      <div className="mx-auto flex max-w-3xl flex-col gap-5 pb-20 w-full">
         
         {/* Header - Profile Card */}
-        <motion.div initial="hidden" animate="visible" custom={0} variants={fadeUp} className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.04] shadow-[0_24px_80px_rgba(2,6,23,0.55)] backdrop-blur-2xl">
-          <div className="p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6">
+        <motion.div initial="hidden" animate="visible" custom={0} variants={fadeUp} className="relative rounded-[26px] border border-white/10 bg-white/[0.04] shadow-[0_24px_80px_rgba(2,6,23,0.55)] backdrop-blur-2xl overflow-hidden">
+          <div className="p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 relative">
             
             {/* Avatar Section */}
             <div className="relative shrink-0">

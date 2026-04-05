@@ -225,7 +225,7 @@ export default function AIStudio() {
   const currentModel = activeMode === 'text' ? selectedTextModel : selectedImageModel;
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(180deg, hsl(270 60% 5%), hsl(270 50% 3%))' }}>
+    <div className="min-h-screen flex flex-col relative overflow-x-hidden" style={{ background: 'linear-gradient(180deg, hsl(270 60% 5%), hsl(270 50% 3%))' }}>
       {/* Glowing Background Effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] opacity-25">

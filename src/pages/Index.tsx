@@ -38,7 +38,7 @@ const Index: React.FC = () => {
         onClose={() => setSidebarOpen(false)}
         onLogout={() => setIsLoggedIn(false)}
       />
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
         {activePanel === 'dashboard' && (
           <InternalHeader
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}

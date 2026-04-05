@@ -95,7 +95,7 @@ const EdTechSpace: React.FC = () => {
   /* ─── COURSE DETAIL VIEW ─── */
   if (activeCourse && activeLevel) {
     return (
-      <div className="flex-1 flex flex-col pb-16 overflow-hidden bg-slate-950 text-white min-h-screen">
+      <div className="flex-1 flex flex-col pb-16 overflow-x-hidden bg-slate-950 text-white min-h-screen">
         {/* Compact header */}
         <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/60">
           <div className="flex items-center gap-3 px-4 py-3">
@@ -285,7 +285,7 @@ const EdTechSpace: React.FC = () => {
 
   /* ─── CATALOG VIEW (Mobile-First) ─── */
   return (
-    <div className="flex-1 flex flex-col pb-16 overflow-hidden bg-slate-950 text-white min-h-screen">
+    <div className="flex-1 flex flex-col pb-16 overflow-x-hidden bg-slate-950 text-white min-h-screen">
       {/* Header — compact mobile */}
       <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/60">
         <div className="flex items-center justify-between px-4 py-3">
