@@ -571,7 +571,7 @@ const ReferralNetworkCard = () => {
           </div>
           <div><h2 className="text-sm font-semibold text-slate-200">Referral Network</h2><p className="text-[10px] text-slate-500">Your downline tree</p></div>
         </div>
-        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] text-emerald-300"><span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex h-full w-full rounded-full bg-emerald-400"></span></span>Live</span>
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] text-emerald-300"><span className="relative flex h-1.5 w-1.5"><span className="relative inline-flex h-full w-full rounded-full bg-emerald-400"></span></span>Live</span>
       </div>
       <div className="mb-4">
         <div className="flex gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1 w-fit">
@@ -622,7 +622,7 @@ const WithdrawalPageContent = ({ balance }: { balance: number }) => {
   return (
     <div className="max-w-lg mx-auto">
       <div className="relative">
-        <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-cyan-500/30 via-blue-500/30 to-emerald-500/30 blur-xl" />
+        <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-cyan-500/15 via-blue-500/15 to-emerald-500/15 blur-lg" />
         <div className="relative rounded-2xl border p-5 backdrop-blur-xl" style={{ borderColor: 'rgba(6,182,212,0.25)', background: 'linear-gradient(135deg, rgba(6,182,212,0.08) 0%, rgba(16,185,129,0.04) 50%, rgba(0,0,0,0.3) 100%)' }}>
           <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-400 via-blue-400 to-emerald-400" />
           <div className="mb-5">
@@ -659,7 +659,7 @@ const ReferPageContent = () => {
   return (
     <div className="max-w-lg mx-auto">
       <div className="relative">
-        <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-rose-500/30 blur-xl" />
+        <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/15 via-pink-500/15 to-rose-500/15 blur-lg" />
         <div className="relative rounded-2xl border p-5 backdrop-blur-xl" style={{ borderColor: 'rgba(139,92,246,0.25)', background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(236,72,153,0.04) 50%, rgba(0,0,0,0.3) 100%)' }}>
           <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400" />
           <div className="mb-5 grid grid-cols-2 gap-3">
@@ -697,7 +697,7 @@ const ReferPageContent = () => {
 const DetailsPageContent = () => (
   <div className="max-w-lg mx-auto">
     <div className="relative">
-      <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500/30 via-yellow-500/30 to-orange-500/30 blur-xl" />
+      <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-orange-500/15 blur-lg" />
       <div className="relative rounded-2xl border p-5 backdrop-blur-xl" style={{ borderColor: 'rgba(245,158,11,0.25)', background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(234,179,8,0.04) 50%, rgba(0,0,0,0.3) 100%)' }}>
         <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400" />
         <div className="mb-5 grid grid-cols-2 gap-3">
@@ -768,7 +768,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-slate-200">
       {/* Background */}
-      <div className="fixed inset-0 pointer-events-none"><div className="absolute -top-1/2 -left-1/2 h-full w-full rounded-full bg-violet-500/5 blur-3xl" /><div className="absolute -bottom-1/2 -right-1/2 h-full w-full rounded-full bg-cyan-500/5 blur-3xl" /></div>
+      <div className="fixed inset-0 pointer-events-none"><div className="absolute -top-1/2 -left-1/2 h-full w-full rounded-full bg-violet-500/3 blur-[100px]" /><div className="absolute -bottom-1/2 -right-1/2 h-full w-full rounded-full bg-cyan-500/3 blur-[100px]" /></div>
       
       {/* Mobile Menu */}
       <MobileMenuDrawer isOpen={menuOpen} onClose={() => setMenuOpen(false)} activeTab={activeTab} setActiveTab={setActiveTab} />
