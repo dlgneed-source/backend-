@@ -1019,12 +1019,8 @@ function PlansManagement() {
                     <p className="text-[10px] text-slate-500">Upline</p>
                     <p className="text-lg font-bold text-white">${selectedPlan.uplineCommission}</p>
                   </div>
-                  <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-slate-500">System</p>
-                    <p className="text-lg font-bold text-white">${selectedPlan.systemFee}</p>
-                  </div>
-                  <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-slate-500">Level (10%)</p>
+                   <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                     <p className="text-[10px] text-slate-500">Level (10%)</p>
                     <p className="text-lg font-bold text-white">${selectedPlan.levelCommission}</p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
