@@ -232,13 +232,13 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1, duration: 0.4 }} className="group relative">
       <div className={`absolute -inset-1 rounded-[1.5rem] sm:rounded-[2rem] blur-md transition-all ${isPlan6 ? 'opacity-50 group-hover:opacity-70' : 'opacity-25 group-hover:opacity-40'}`} style={{ background: isPlan6 ? `linear-gradient(135deg, #e11d48, #be123c, #f43f5e, #881337)` : `linear-gradient(135deg, ${plan.theme.glow}, transparent 60%)` }} />
       
-      {/* Plan 6: animated rotating conic border */}
+      {/* Plan 6: breathing glow border */}
       {isPlan6 && (
         <motion.div 
-          className="absolute -inset-[2px] rounded-[1.6rem] sm:rounded-[2.1rem] opacity-70 blur-[1px]"
-          style={{ background: 'conic-gradient(from 0deg, #e11d48, #f43f5e, #fb7185, #fda4af, #fff, #fda4af, #fb7185, #f43f5e, #e11d48)' }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+          className="absolute -inset-[2px] rounded-[1.6rem] sm:rounded-[2.1rem] blur-[2px]"
+          style={{ background: 'linear-gradient(135deg, #e11d48, #f43f5e, #fb7185, #f43f5e, #e11d48)' }}
+          animate={{ opacity: [0.4, 0.8, 0.4] }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
       
