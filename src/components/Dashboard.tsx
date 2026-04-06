@@ -763,6 +763,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'plans' | 'network' | 'rewards'>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
+  const [showSkills, setShowSkills] = useState(false);
   const balance = 2580.5;
 
   return (
