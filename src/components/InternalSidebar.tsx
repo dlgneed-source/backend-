@@ -6,6 +6,7 @@ import {
   Globe,
   Mail,
   FileText,
+  X,
 } from 'lucide-react';
 import type { PanelId } from '@/components/BottomNav';
 
