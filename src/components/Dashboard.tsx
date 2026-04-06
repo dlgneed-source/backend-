@@ -854,6 +854,14 @@ const Dashboard = () => {
                   </div>
                 </motion.button>
               </div>
+              {/* Skill Levels Popup */}
+              <AnimatePresence>
+                {showSkills && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                    <SkillLevelsCard />
+                  </motion.div>
+                )}
+              </AnimatePresence>
               {/* User Info Card */}
               <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-bold text-white shadow-lg shadow-cyan-500/25">
