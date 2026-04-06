@@ -1043,12 +1043,12 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
               </AnimatePresence>
               {/* User Info Card */}
               <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-bold text-white shadow-lg shadow-cyan-500/25">
-                  EA
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-bold text-white shadow-lg shadow-cyan-500/25 overflow-hidden">
+                  <User className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white truncate">User ID: EA2026</p>
-                  <p className="text-[11px] font-mono text-slate-400">0x1A4...B9F2</p>
+                  <p className="text-sm font-semibold text-white truncate">Arushi Tyagi</p>
+                  <p className="text-[11px] font-mono text-slate-400">ID: EA2026 • 0x1A4...B9F2</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-[10px] text-slate-500">Balance</p>
