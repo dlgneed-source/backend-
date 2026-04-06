@@ -763,6 +763,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'plans' | 'network' | 'rewards'>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
+  const [showSkills, setShowSkills] = useState(false);
   const balance = 2580.5;
 
   return (
@@ -827,9 +828,40 @@ const Dashboard = () => {
         <AnimatePresence mode="wait">
           {activeTab === 'overview' && (
             <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
-              <div>
-                <h1 className="text-xl font-bold text-white">Dashboard Overview</h1>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-400">Welcome Back!</p>
+                  <h1 className="text-xl font-bold text-white">Dashboard Overview</h1>
+                </div>
+                <motion.button
+                  onClick={() => setShowSkills(!showSkills)}
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="relative flex h-12 w-12 items-center justify-center rounded-full"
+                  style={{
+                    background: 'linear-gradient(135deg, #fbbf24, #f59e0b, #e879f9, #a855f7)',
+                    boxShadow: '0 0 20px rgba(251,191,36,0.4), 0 0 40px rgba(168,85,247,0.2)',
+                  }}
+                >
+                  <motion.div
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: 'linear-gradient(135deg, #fbbf24, #e879f9, #22d3ee, #fbbf24)' }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                  />
+                  <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[#0a0a0f]/80">
+                    <GraduationCap className="h-5 w-5 text-amber-300" />
+                  </div>
+                </motion.button>
               </div>
+              {/* Skill Levels Popup */}
+              <AnimatePresence>
+                {showSkills && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                    <SkillLevelsCard />
+                  </motion.div>
+                )}
+              </AnimatePresence>
               {/* User Info Card */}
               <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-bold text-white shadow-lg shadow-cyan-500/25">
