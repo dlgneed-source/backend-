@@ -69,7 +69,7 @@ export const plansData: PlanData[] = [
   },
   {
     level: 6, name: 'Supreme Visionary', joiningFee: 160, teamSize: 8, uplineCommission: 32, systemFee: 2, levelCommission: 16, slotFee: 110, totalCollection: 880, memberProfit: 800, leaderPool: 24, rewardPool: 12, sponsorPool: 4, roi: 500, flushoutDays: 60,
-    theme: { primary: '#ffd700', secondary: '#b8860b', glow: 'rgba(255, 215, 0, 0.5)', bgGlow: 'rgba(255, 215, 0, 0.15)', text: '#ffd700' },
+    theme: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
   },
 ];
 
@@ -230,45 +230,71 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
   
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1, duration: 0.4 }} className="group relative">
-      <div className={`absolute -inset-1 rounded-[1.5rem] sm:rounded-[2rem] blur-md transition-all ${isPlan6 ? 'opacity-50 group-hover:opacity-70' : 'opacity-25 group-hover:opacity-40'}`} style={{ background: isPlan6 ? `linear-gradient(135deg, #ffd700, #b8860b, #ffd700, #daa520)` : `linear-gradient(135deg, ${plan.theme.glow}, transparent 60%)` }} />
-      <div className={`relative overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border p-4 sm:p-6 backdrop-blur-xl ${isPlan6 ? 'border-yellow-500/40' : ''}`} style={{ borderColor: isPlan6 ? undefined : `${plan.theme.primary}30`, background: isPlan6 ? 'linear-gradient(135deg, rgba(255,215,0,0.12) 0%, rgba(184,134,11,0.08) 30%, rgba(218,165,32,0.06) 60%, rgba(0,0,0,0.3) 100%)' : 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.2) 100%)', boxShadow: isPlan6 ? '0 8px 40px rgba(255,215,0,0.2), inset 0 1px 0 rgba(255,215,0,0.3)' : `0 8px 32px ${plan.theme.glow}15` }}>
+      <div className={`absolute -inset-1 rounded-[1.5rem] sm:rounded-[2rem] blur-md transition-all ${isPlan6 ? 'opacity-50 group-hover:opacity-70' : 'opacity-25 group-hover:opacity-40'}`} style={{ background: isPlan6 ? `linear-gradient(135deg, #e11d48, #be123c, #f43f5e, #881337)` : `linear-gradient(135deg, ${plan.theme.glow}, transparent 60%)` }} />
+      
+      {/* Plan 6 animated rotating border glow */}
+      {isPlan6 && (
+        <motion.div 
+          className="absolute -inset-[2px] rounded-[1.6rem] sm:rounded-[2.1rem] opacity-60"
+          style={{ background: 'conic-gradient(from 0deg, #e11d48, #f43f5e, #fb7185, #fda4af, #f43f5e, #e11d48)' }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+        />
+      )}
+      
+      <div className={`relative overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border p-4 sm:p-6 backdrop-blur-xl ${isPlan6 ? 'border-rose-500/40' : ''}`} style={{ borderColor: isPlan6 ? undefined : `${plan.theme.primary}30`, background: isPlan6 ? 'linear-gradient(135deg, rgba(225,29,72,0.14) 0%, rgba(190,18,60,0.08) 30%, rgba(136,19,55,0.06) 60%, rgba(0,0,0,0.4) 100%)' : 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.2) 100%)', boxShadow: isPlan6 ? '0 8px 40px rgba(225,29,72,0.25), inset 0 1px 0 rgba(251,113,133,0.3)' : `0 8px 32px ${plan.theme.glow}15` }}>
         
         {/* Top accent line */}
-        <div className="absolute inset-x-0 top-0 h-0.5 sm:h-1" style={{ background: isPlan6 ? 'linear-gradient(90deg, transparent, #ffd700, #fff, #ffd700, transparent)' : `linear-gradient(90deg, transparent, ${plan.theme.primary}, ${plan.theme.secondary}, transparent)` }} />
+        <div className="absolute inset-x-0 top-0 h-0.5 sm:h-1" style={{ background: isPlan6 ? 'linear-gradient(90deg, transparent, #e11d48, #fb7185, #fff, #fb7185, #e11d48, transparent)' : `linear-gradient(90deg, transparent, ${plan.theme.primary}, ${plan.theme.secondary}, transparent)` }} />
         
-        {/* Plan 6 stars decoration */}
+        {/* Plan 6 floating animated stars */}
         {isPlan6 && (
           <>
-            <div className="absolute top-3 right-3 animate-pulse"><Star className="h-3 w-3 text-yellow-400/60" fill="currentColor" /></div>
-            <div className="absolute top-8 right-8 animate-pulse" style={{ animationDelay: '0.5s' }}><Sparkles className="h-4 w-4 text-yellow-300/50" /></div>
-            <div className="absolute bottom-12 right-4 animate-pulse" style={{ animationDelay: '1s' }}><Star className="h-2.5 w-2.5 text-amber-400/40" fill="currentColor" /></div>
-            <div className="absolute top-16 left-3 animate-pulse" style={{ animationDelay: '0.7s' }}><Star className="h-2 w-2 text-yellow-500/30" fill="currentColor" /></div>
+            <motion.div className="absolute top-3 right-3" animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity }}>
+              <Star className="h-3.5 w-3.5 text-rose-400" fill="currentColor" />
+            </motion.div>
+            <motion.div className="absolute top-8 right-8" animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0.9, 0.4], rotate: [0, 180, 360] }} transition={{ duration: 3, repeat: Infinity }}>
+              <Sparkles className="h-4 w-4 text-rose-300" />
+            </motion.div>
+            <motion.div className="absolute bottom-14 right-4" animate={{ y: [0, -6, 0], opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 2.5, repeat: Infinity }}>
+              <Star className="h-2.5 w-2.5 text-pink-400" fill="currentColor" />
+            </motion.div>
+            <motion.div className="absolute top-20 left-3" animate={{ scale: [0.8, 1.2, 0.8], opacity: [0.2, 0.7, 0.2] }} transition={{ duration: 3.5, repeat: Infinity }}>
+              <Star className="h-2 w-2 text-rose-500" fill="currentColor" />
+            </motion.div>
+            <motion.div className="absolute bottom-32 left-6" animate={{ rotate: [0, 360], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}>
+              <Diamond className="h-3 w-3 text-rose-300/50" />
+            </motion.div>
           </>
         )}
         
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{isPlan6 ? '✦ ULTRA PREMIUM ✦' : `Plan ${plan.level}`}</p>
-            <h3 className={`mt-0.5 text-lg sm:text-2xl font-bold truncate ${isPlan6 ? 'bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 bg-clip-text text-transparent' : 'text-white'}`}>{plan.name}</h3>
+            <motion.p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: isPlan6 ? '#fb7185' : undefined }} {...(isPlan6 ? {} : {})} >{isPlan6 ? '✦ ULTRA PREMIUM ✦' : `Plan ${plan.level}`}</motion.p>
+            <h3 className={`mt-0.5 text-lg sm:text-2xl font-bold truncate ${isPlan6 ? 'bg-gradient-to-r from-rose-300 via-pink-200 to-rose-400 bg-clip-text text-transparent' : 'text-white'}`}>{plan.name}</h3>
             <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: isPlan6 ? 'rgba(255,215,0,0.15)' : plan.theme.bgGlow, color: isPlan6 ? '#ffd700' : plan.theme.text, border: isPlan6 ? '1px solid rgba(255,215,0,0.3)' : `1px solid ${plan.theme.primary}40` }}><Users className="h-3 w-3" />{plan.teamSize} Team</span>
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: isPlan6 ? 'rgba(225,29,72,0.15)' : plan.theme.bgGlow, color: isPlan6 ? '#fb7185' : plan.theme.text, border: isPlan6 ? '1px solid rgba(225,29,72,0.3)' : `1px solid ${plan.theme.primary}40` }}><Users className="h-3 w-3" />{plan.teamSize} Team</span>
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><TrendingUp className="h-3 w-3" />{plan.roi}% ROI</span>
-              {isPlan6 && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-yellow-500/15 text-yellow-300 border border-yellow-500/30"><Diamond className="h-3 w-3" />Luxury</span>}
+              {isPlan6 && <motion.span animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30"><Diamond className="h-3 w-3" />Luxury</motion.span>}
             </div>
           </div>
-          <div className={`flex h-10 w-10 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl ${isPlan6 ? 'bg-gradient-to-br from-yellow-500/20 to-amber-600/20 border border-yellow-500/30 shadow-lg shadow-yellow-500/20' : ''}`} style={isPlan6 ? {} : { background: `linear-gradient(135deg, ${plan.theme.bgGlow}, transparent)`, border: `1px solid ${plan.theme.primary}40` }}>
-            <PlanIcon className="h-4 w-4 sm:h-6 sm:w-6" style={{ color: isPlan6 ? '#ffd700' : plan.theme.text }} />
-          </div>
+          <motion.div 
+            className={`flex h-10 w-10 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl ${isPlan6 ? 'bg-gradient-to-br from-rose-500/25 to-pink-600/20 border border-rose-500/30 shadow-lg shadow-rose-500/25' : ''}`} 
+            style={isPlan6 ? {} : { background: `linear-gradient(135deg, ${plan.theme.bgGlow}, transparent)`, border: `1px solid ${plan.theme.primary}40` }}
+            {...(isPlan6 ? { animate: { boxShadow: ['0 0 15px rgba(225,29,72,0.3)', '0 0 25px rgba(225,29,72,0.5)', '0 0 15px rgba(225,29,72,0.3)'] }, transition: { duration: 2, repeat: Infinity } } : {})}
+          >
+            <PlanIcon className="h-4 w-4 sm:h-6 sm:w-6" style={{ color: isPlan6 ? '#fb7185' : plan.theme.text }} />
+          </motion.div>
         </div>
         <div className="flex items-end gap-2 mb-4">
-          <p className={`text-3xl sm:text-5xl font-bold ${isPlan6 ? 'bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 bg-clip-text text-transparent' : ''}`} style={isPlan6 ? { textShadow: '0 0 30px rgba(255,215,0,0.4)' } : { color: plan.theme.text, textShadow: `0 0 20px ${plan.theme.glow}` }}>${plan.joiningFee}</p>
+          <p className={`text-3xl sm:text-5xl font-bold ${isPlan6 ? 'bg-gradient-to-r from-rose-300 via-pink-200 to-rose-400 bg-clip-text text-transparent' : ''}`} style={isPlan6 ? {} : { color: plan.theme.text, textShadow: `0 0 20px ${plan.theme.glow}` }}>${plan.joiningFee}</p>
           <span className="pb-1 text-xs sm:text-sm text-slate-400">Enrollment Fee</span>
         </div>
         <div className="mb-4 grid grid-cols-2 gap-2">
-          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-yellow-500/20 bg-yellow-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Total Earning</p><p className="text-base font-bold" style={{ color: isPlan6 ? '#ffd700' : plan.theme.text }}>${plan.memberProfit}</p></div>
-          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-yellow-500/20 bg-yellow-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Guaranteed Flushout</p><p className="text-base font-bold text-slate-200">{plan.flushoutDays} Days</p></div>
+          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-rose-500/20 bg-rose-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Total Earning</p><p className="text-base font-bold" style={{ color: isPlan6 ? '#fb7185' : plan.theme.text }}>${plan.memberProfit}</p></div>
+          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-rose-500/20 bg-rose-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Guaranteed Flushout</p><p className="text-base font-bold text-slate-200">{plan.flushoutDays} Days</p></div>
         </div>
-        <button onClick={() => setShowDetails(!showDetails)} className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-semibold hover:bg-white/[0.06] ${isPlan6 ? 'border-yellow-500/20 bg-yellow-500/5 text-yellow-300' : 'border-white/10 bg-white/[0.03] text-slate-400'}`}>
+        <button onClick={() => setShowDetails(!showDetails)} className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-semibold hover:bg-white/[0.06] ${isPlan6 ? 'border-rose-500/20 bg-rose-500/5 text-rose-300' : 'border-white/10 bg-white/[0.03] text-slate-400'}`}>
           {showDetails ? <><ChevronUp className="h-4 w-4" /> Hide</> : <><ChevronDown className="h-4 w-4" /> Details</>}
         </button>
         <AnimatePresence>
@@ -293,9 +319,14 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
             </motion.div>
           )}
         </AnimatePresence>
-        <button onClick={() => onSelect?.(plan)} className={`w-full rounded-xl py-3.5 text-sm font-bold ${isPlan6 ? 'shadow-lg shadow-yellow-500/30' : ''}`} style={{ background: isPlan6 ? 'linear-gradient(135deg, #ffd700, #b8860b, #daa520)' : `linear-gradient(135deg, ${plan.theme.primary}, ${plan.theme.secondary})`, boxShadow: isPlan6 ? undefined : `0 4px 15px ${plan.theme.glow}` }}>
-          <span className={`flex items-center justify-center gap-2 ${isPlan6 ? 'text-black font-extrabold' : 'text-slate-900'}`}><ArrowDownLeft className="h-4 w-4" />Enroll Now ${plan.joiningFee}</span>
-        </button>
+        <motion.button 
+          onClick={() => onSelect?.(plan)} 
+          className={`w-full rounded-xl py-3.5 text-sm font-bold ${isPlan6 ? 'shadow-lg shadow-rose-500/30' : ''}`} 
+          style={{ background: isPlan6 ? 'linear-gradient(135deg, #e11d48, #be123c, #9f1239)' : `linear-gradient(135deg, ${plan.theme.primary}, ${plan.theme.secondary})`, boxShadow: isPlan6 ? undefined : `0 4px 15px ${plan.theme.glow}` }}
+          {...(isPlan6 ? { whileHover: { scale: 1.02, boxShadow: '0 6px 25px rgba(225,29,72,0.4)' }, whileTap: { scale: 0.98 } } : {})}
+        >
+          <span className={`flex items-center justify-center gap-2 ${isPlan6 ? 'text-white font-extrabold' : 'text-slate-900'}`}><ArrowDownLeft className="h-4 w-4" />Enroll Now ${plan.joiningFee}</span>
+        </motion.button>
       </div>
     </motion.div>
   );
