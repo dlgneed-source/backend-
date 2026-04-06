@@ -170,9 +170,9 @@ export const poolStats = [
     }
   },
   { 
-    label: 'Auto Filling Tree', 
-    value: '142 Nodes', 
-    subtext: 'Network growth',
+    label: 'Auto Filling', 
+    value: '142 Members', 
+    subtext: 'Total members',
     icon: Network, 
     theme: {
       primary: '#e879f9',
