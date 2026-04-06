@@ -932,7 +932,7 @@ const DetailsPageContent = () => (
 // =============================================
 // MAIN DASHBOARD COMPONENT
 // =============================================
-const Dashboard = () => {
+const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'plans' | 'network' | 'rewards'>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
@@ -954,6 +954,12 @@ const Dashboard = () => {
             <button onClick={() => setMenuOpen(true)} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10">
               <Menu className="h-5 w-5" /><span className="hidden sm:inline">Menu</span>
             </button>
+            {onBack && (
+              <button onClick={onBack} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 hover:bg-white/10 ml-2">
+                <ArrowDownLeft className="h-4 w-4 rotate-90" />
+                <span className="hidden sm:inline">Back</span>
+              </button>
+            )}
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600"><Crown className="h-4 w-4 text-white" /></div>
               <span className="text-base font-bold text-white">Dashboard</span>
