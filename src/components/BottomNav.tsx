@@ -10,7 +10,7 @@ interface BottomNavProps {
 }
 
 const navItems: { id: PanelId; label: string; icon: React.ElementType; gradient: string }[] = [
-  { id: 'dashboard', label: 'Hub', icon: LayoutDashboard, gradient: 'from-cyan-400 via-blue-500 to-purple-600' },
+  { id: 'dashboard', label: 'Earn', icon: LayoutDashboard, gradient: 'from-cyan-400 via-blue-500 to-purple-600' },
   { id: 'edtech', label: 'Learn', icon: GraduationCap, gradient: 'from-emerald-400 via-teal-500 to-cyan-600' },
   { id: 'aitools', label: 'AI Tools', icon: Sparkles, gradient: 'from-violet-400 via-purple-500 to-fuchsia-600' },
   { id: 'community', label: 'Lounge', icon: MessageCircle, gradient: 'from-amber-400 via-orange-500 to-pink-600' },
