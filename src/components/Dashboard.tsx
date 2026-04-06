@@ -1034,7 +1034,7 @@ const Dashboard = () => {
 
           {activeTab === 'plans' && (
             <motion.div key="plans" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
-              <div><h1 className="text-xl font-bold text-white">Investment Plans</h1><p className="text-xs text-slate-400">Choose a plan that fits your goals</p></div>
+              <div><h1 className="text-xl font-bold text-white">Earning & Learning Programme</h1><p className="text-xs text-slate-400">Choose a plan that fits your goals</p></div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{plansData.map((plan, i) => <PremiumPlanCard key={plan.level} plan={plan} index={i} />)}</div>
               <FlushoutScheduleCard />
             </motion.div>
