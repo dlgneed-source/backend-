@@ -301,13 +301,20 @@ const LevelCommissionCard = () => (
       </div>
     </div>
     <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-      {levelCommissions.map((c, i) => (
-        <div key={i} className="relative rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center">
-          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-400 to-purple-400" />
-          <p className="text-[9px] text-slate-500">L{c.level}</p>
-          <p className="text-base sm:text-xl font-bold text-violet-300">{c.percentage}%</p>
-        </div>
-      ))}
+      {levelCommissions.map((c, i) => {
+        const earned = [48, 18, 7.5, 6, 4.2, 1.8, 1.5][i];
+        return (
+          <div key={i} className="relative rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center">
+            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-400 to-purple-400" />
+            <p className="text-[9px] text-slate-500">L{c.level}</p>
+            <p className="text-base sm:text-xl font-bold text-violet-300">{c.percentage}%</p>
+            <div className="mt-1 border-t border-white/5 pt-1">
+              <p className="text-[9px] text-emerald-400 font-semibold">${earned}</p>
+              <p className="text-[8px] text-slate-500">earned</p>
+            </div>
+          </div>
+        );
+      })}
     </div>
   </motion.div>
 );
@@ -888,8 +895,27 @@ const Dashboard = () => {
               </div>
               <LevelCommissionCard />
               <PlanMaturityCard />
-              <SkillLevelsCard />
               <ComingSoonCard title="Daily Income Plan" description="Earn Daily Rewards Based on Your Activity" icon={TrendingUp} />
+              {/* Earning Workspace - Coming Soon */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(56,189,248,0.25)', background: 'linear-gradient(135deg, rgba(56,189,248,0.08) 0%, rgba(14,165,233,0.04) 50%, rgba(0,0,0,0.2) 100%)' }}>
+                <div className="absolute right-3 top-3"><span className="inline-flex items-center gap-1 rounded-full border border-sky-400/25 bg-sky-500/12 px-2 py-1 text-[9px] font-bold text-sky-300"><TrendingUp className="h-2.5 w-2.5" />Coming Soon</span></div>
+                <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-sky-400 via-cyan-400 to-blue-400" />
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(14,165,233,0.08))', border: '1px solid rgba(56,189,248,0.25)' }}>
+                    <Zap className="h-5 w-5 sm:h-7 sm:w-7 text-sky-300" />
+                  </div>
+                  <div className="pr-16">
+                    <h3 className="text-lg sm:text-2xl font-bold text-white">Earning Workspace</h3>
+                    <p className="text-xs text-slate-400">Freelance like Fiverr/Upwork — Earn on your skills</p>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-sky-500/10 bg-sky-500/5 p-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/10"><Clock className="h-4 w-4 text-sky-400" /></div>
+                    <div><p className="text-xs text-sky-200">Stay Tuned</p><p className="text-[10px] text-slate-400">Feature under development</p></div>
+                  </div>
+                </div>
+              </motion.div>
             </motion.div>
           )}
 
