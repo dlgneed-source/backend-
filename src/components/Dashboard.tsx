@@ -543,42 +543,42 @@ const RedeemGiftCodeButton = () => {
         onClick={() => setOpen(true)}
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
-        className="relative w-full overflow-hidden rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-900/40 via-yellow-800/30 to-orange-900/40 p-4 text-left backdrop-blur-xl"
+        className="relative w-full overflow-hidden rounded-2xl border border-red-500/30 bg-gradient-to-r from-red-900/50 via-red-800/30 to-rose-900/40 p-4 text-left backdrop-blur-xl"
       >
-        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400" />
-        <motion.div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-amber-400/10 blur-2xl" animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 2, repeat: Infinity }} />
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-red-500 via-rose-400 to-red-600" />
+        <motion.div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-red-500/10 blur-2xl" animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 2, repeat: Infinity }} />
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400/15 border border-amber-400/25">
-            <Gift className="h-6 w-6 text-amber-300" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/15 border border-red-500/25">
+            <Gift className="h-6 w-6 text-red-300" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-bold text-amber-200">🎁 Redeem Gift Code</p>
-            <p className="text-xs text-amber-400/70">Enter your code to claim rewards</p>
+            <p className="text-sm font-bold text-red-200">🎁 Redeem Gift Code</p>
+            <p className="text-xs text-red-400/70">Enter your code to claim rewards</p>
           </div>
-          <ChevronRight className="h-5 w-5 text-amber-400/60" />
+          <ChevronRight className="h-5 w-5 text-red-400/60" />
         </div>
       </motion.button>
 
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => { if (!redeemed) { setOpen(false); } }}>
-            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} onClick={e => e.stopPropagation()} className="relative w-full max-w-sm rounded-3xl border border-amber-400/30 bg-gradient-to-b from-slate-900 via-slate-900 to-amber-950/30 p-6 shadow-2xl">
+            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} onClick={e => e.stopPropagation()} className="relative w-full max-w-sm rounded-3xl border border-red-500/30 bg-gradient-to-b from-slate-900 via-slate-900 to-red-950/30 p-6 shadow-2xl">
               <button onClick={() => setOpen(false)} className="absolute right-3 top-3 rounded-full p-1.5 text-slate-400 hover:text-white hover:bg-white/10"><X className="h-4 w-4" /></button>
 
               {!redeemed ? (
                 <div className="flex flex-col items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400/15 border border-amber-400/25">
-                    <Gift className="h-8 w-8 text-amber-300" />
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/15 border border-red-500/25">
+                    <Gift className="h-8 w-8 text-red-300" />
                   </div>
-                  <h3 className="text-xl font-bold text-amber-200">Enter Gift Code</h3>
+                  <h3 className="text-xl font-bold text-red-200">Enter Gift Code</h3>
                   <p className="text-xs text-slate-400 text-center">Paste your gift code below to redeem rewards</p>
                   <input
                     value={code}
                     onChange={e => setCode(e.target.value)}
                     placeholder="XXXX-XXXX-XXXX"
-                    className="w-full rounded-xl border border-amber-400/20 bg-white/5 px-4 py-3 text-center text-lg font-mono tracking-widest text-amber-200 placeholder:text-slate-600 focus:border-amber-400/50 focus:outline-none"
+                    className="w-full rounded-xl border border-red-500/20 bg-white/5 px-4 py-3 text-center text-lg font-mono tracking-widest text-red-200 placeholder:text-slate-600 focus:border-red-500/50 focus:outline-none"
                   />
-                  <button onClick={handleRedeem} disabled={!code.trim()} className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-bold text-black disabled:opacity-40 hover:from-amber-400 hover:to-orange-400 transition-all">
+                  <button onClick={handleRedeem} disabled={!code.trim()} className="w-full rounded-xl bg-gradient-to-r from-red-600 to-rose-500 py-3 text-sm font-bold text-white disabled:opacity-40 hover:from-red-500 hover:to-rose-400 transition-all">
                     Redeem Now 🎉
                   </button>
                 </div>
