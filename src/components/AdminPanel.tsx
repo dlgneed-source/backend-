@@ -2189,6 +2189,8 @@ export default function AdminPanel() {
         return <FlushoutsManagement />;
       case 'commissions':
         return <CommissionsManagement />;
+      case 'gift-codes':
+        return <GiftCodeManagement />;
       case 'rewards':
         return <RewardsManagement />;
       case 'daily-income':
