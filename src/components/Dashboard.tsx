@@ -284,9 +284,9 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Plan {plan.level}</p>
-            <h3 className="mt-0.5 text-lg sm:text-2xl font-bold truncate" style={isPlan6 ? { color: '#fb7185' } : {}}>{isPlan6 ? '' : ''}<span className={isPlan6 ? '' : 'text-white'}>{plan.name}</span></h3>
+            <h3 className="mt-0.5 text-lg sm:text-2xl font-bold truncate" style={isPlan6 ? { color: '#c0c0c0', textShadow: '0 0 12px rgba(192,192,192,0.4)' } : {}}><span className={isPlan6 ? '' : 'text-white'}>{plan.name}</span></h3>
             <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: isPlan6 ? 'rgba(225,29,72,0.15)' : plan.theme.bgGlow, color: isPlan6 ? '#fb7185' : plan.theme.text, border: isPlan6 ? '1px solid rgba(225,29,72,0.3)' : `1px solid ${plan.theme.primary}40` }}><Users className="h-3 w-3" />{plan.teamSize} Team</span>
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: isPlan6 ? 'rgba(192,192,192,0.12)' : plan.theme.bgGlow, color: isPlan6 ? '#d4d4d4' : plan.theme.text, border: isPlan6 ? '1px solid rgba(192,192,192,0.25)' : `1px solid ${plan.theme.primary}40` }}><Users className="h-3 w-3" />{plan.teamSize} Team</span>
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><TrendingUp className="h-3 w-3" />{plan.roi}% ROI</span>
             </div>
           </div>
@@ -295,21 +295,21 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
             style={isPlan6 ? {} : { background: `linear-gradient(135deg, ${plan.theme.bgGlow}, transparent)`, border: `1px solid ${plan.theme.primary}40` }}
             {...(isPlan6 ? { animate: { boxShadow: ['0 0 10px rgba(225,29,72,0.2)', '0 0 25px rgba(225,29,72,0.5)', '0 0 10px rgba(225,29,72,0.2)'] }, transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } } : {})}
           >
-            <PlanIcon className="h-4 w-4 sm:h-6 sm:w-6" style={{ color: isPlan6 ? '#fb7185' : plan.theme.text }} />
+            <PlanIcon className="h-4 w-4 sm:h-6 sm:w-6" style={{ color: isPlan6 ? '#c0c0c0' : plan.theme.text }} />
           </motion.div>
         </div>
         <div className="flex items-end gap-2 mb-4">
           <p 
             className={`text-3xl sm:text-5xl font-bold`} 
-            style={isPlan6 ? { color: '#fb7185', textShadow: '0 0 20px rgba(225,29,72,0.4)' } : { color: plan.theme.text, textShadow: `0 0 20px ${plan.theme.glow}` }}
+            style={isPlan6 ? { color: '#e0e0e0', textShadow: '0 0 20px rgba(192,192,192,0.35)' } : { color: plan.theme.text, textShadow: `0 0 20px ${plan.theme.glow}` }}
           >${plan.joiningFee}</p>
           <span className="pb-1 text-xs sm:text-sm text-slate-400">Enrollment Fee</span>
         </div>
         <div className="mb-4 grid grid-cols-2 gap-2">
-          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-rose-500/20 bg-rose-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Total Earning</p><p className="text-base font-bold" style={{ color: isPlan6 ? '#fb7185' : plan.theme.text }}>${plan.memberProfit}</p></div>
-          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-rose-500/20 bg-rose-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Guaranteed Flushout</p><p className="text-base font-bold text-slate-200">{plan.flushoutDays} Days</p></div>
+          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-rose-500/20 bg-rose-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Total Earning</p><p className="text-base font-bold" style={{ color: isPlan6 ? '#d4d4d4' : plan.theme.text }}>${plan.memberProfit}</p></div>
+          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-rose-500/20 bg-rose-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Guaranteed Flushout</p><p className="text-base font-bold" style={{ color: isPlan6 ? '#d4d4d4' : undefined }}>{plan.flushoutDays} Days</p></div>
         </div>
-        <button onClick={() => setShowDetails(!showDetails)} className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-semibold hover:bg-white/[0.06] ${isPlan6 ? 'border-rose-500/20 bg-rose-500/5 text-rose-300' : 'border-white/10 bg-white/[0.03] text-slate-400'}`}>
+        <button onClick={() => setShowDetails(!showDetails)} className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-semibold hover:bg-white/[0.06] ${isPlan6 ? 'border-silver/20 bg-white/5 text-slate-300' : 'border-white/10 bg-white/[0.03] text-slate-400'}`}>
           {showDetails ? <><ChevronUp className="h-4 w-4" /> Hide</> : <><ChevronDown className="h-4 w-4" /> Details</>}
         </button>
         <AnimatePresence>
