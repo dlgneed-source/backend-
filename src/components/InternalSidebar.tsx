@@ -51,16 +51,16 @@ const InternalSidebar: React.FC<InternalSidebarProps> = ({ open, activePanel, on
           ${open ? 'w-64 translate-x-0' : 'w-0 -translate-x-full'}
         `}
       >
-        <div className="flex-1 flex flex-col pt-16 overflow-y-auto overflow-x-hidden">
+        <div className="flex-1 flex flex-col pt-4 overflow-y-auto overflow-x-hidden">
           {/* Close button */}
-          <div className="px-4 pb-2 flex justify-end">
+          <div className="px-4 pb-1 flex justify-end">
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Menu heading */}
-          <div className="px-4 pb-3 mb-1">
+          <div className="px-4 pb-2 mb-0">
             <p className="text-primary font-bold tracking-widest text-[11px] uppercase border-b border-border/40 pb-2">Menu</p>
           </div>
 
