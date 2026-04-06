@@ -523,7 +523,7 @@ const PoolStatsCard = () => {
     { label: 'Leader Pool', value: '$2,180', subtext: 'Plan 1-6', icon: Crown, color: '#fbbf24' },
     { label: 'Reward Pool', value: '$1,450', subtext: 'Plan 1-6', icon: Gem, color: '#22d3ee' },
     { label: 'Sponsor Pool', value: '$320', subtext: 'Plan 4-6', icon: Award, color: '#34d399' },
-    { label: 'Auto Fill', value: '142', subtext: 'Nodes', icon: Network, color: '#e879f9' },
+    { label: 'Auto Fill', value: '142', subtext: 'Total Members', icon: Network, color: '#e879f9' },
   ];
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(6,182,212,0.2)', background: 'linear-gradient(135deg, rgba(6,182,212,0.06) 0%, rgba(59,130,246,0.03) 50%, rgba(0,0,0,0.2) 100%)' }}>
@@ -802,39 +802,53 @@ const Dashboard = () => {
               <div className="flex items-center gap-3">
                 {subView === 'details' && <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-500"><Info className="h-5 w-5 text-white" /></div>}
                 {subView === 'withdrawal' && <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg shadow-blue-500/30"><ArrowUpRight className="h-5 w-5 text-white" /></div>}
-                {subView === 'refer' && <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-pink-500"><Share2 className="h-5 w-5 text-white" /></div>}
+                
                 <div>
                   <h2 className="text-lg font-bold text-white">
-                    {subView === 'details' && 'Account Details'}
+                    {subView === 'details' && 'Portfolio'}
                     {subView === 'withdrawal' && 'Withdraw'}
-                    {subView === 'refer' && 'Refer & Earn'}
                   </h2>
                   <p className="text-xs text-slate-400">
-                    {subView === 'details' && 'Your portfolio'}
+                    {subView === 'details' && 'Your portfolio overview'}
                     {subView === 'withdrawal' && `Available: $${balance.toLocaleString()}`}
-                    {subView === 'refer' && 'Share with friends'}
                   </p>
                 </div>
               </div>
             </div>
 
-            {subView === 'details' && <DetailsPageContent />}
+            {subView === 'details' && (
+              <div className="overflow-x-auto -mx-3 px-3">
+                <DetailsPageContent />
+              </div>
+            )}
             {subView === 'withdrawal' && <WithdrawalPageContent balance={balance} />}
-            {subView === 'refer' && <ReferPageContent />}
           </motion.div>
         ) : (
         <AnimatePresence mode="wait">
           {activeTab === 'overview' && (
             <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
               <div>
-                <h1 className="text-xl font-bold text-white">Welcome Back!</h1>
-                <p className="text-xs text-slate-400">Here's your dashboard overview</p>
+                <h1 className="text-xl font-bold text-white">Dashboard Overview</h1>
+              </div>
+              {/* User Info Card */}
+              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-bold text-white shadow-lg shadow-cyan-500/25">
+                  EA
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-white truncate">User ID: EA2026</p>
+                  <p className="text-[11px] font-mono text-slate-400">0x1A4...B9F2</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[10px] text-slate-500">Balance</p>
+                  <p className="text-base font-bold text-emerald-400">${balance.toLocaleString()}</p>
+                </div>
               </div>
               {/* Action Buttons */}
               <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => setSubView('details')} className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-3 text-xs text-slate-300 hover:bg-white/10"><Info className="h-5 w-5 text-amber-400" /><span>Details</span></button>
+                <button onClick={() => setSubView('details')} className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-3 text-xs text-slate-300 hover:bg-white/10"><Info className="h-5 w-5 text-amber-400" /><span>Portfolio</span></button>
                 <button onClick={() => setSubView('withdrawal')} className="flex flex-col items-center gap-1.5 rounded-xl border border-blue-600/30 bg-blue-900/40 py-3 text-xs text-slate-300 hover:bg-blue-800/50"><ArrowUpRight className="h-5 w-5 text-cyan-400" /><span>Withdrawal</span></button>
-                <button onClick={() => setSubView('refer')} className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-3 text-xs text-slate-300 hover:bg-white/10"><Share2 className="h-5 w-5 text-purple-400" /><span>Refer</span></button>
+                <button onClick={() => setActiveTab('plans')} className="flex flex-col items-center gap-1.5 rounded-xl border border-rose-400/30 bg-gradient-to-br from-rose-900/40 to-slate-400/10 py-3 text-xs text-slate-200 hover:from-rose-800/50 hover:to-slate-300/15"><Layers className="h-5 w-5 text-rose-300" /><span>Plan</span></button>
               </div>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <PoolStatsCard />
