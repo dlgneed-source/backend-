@@ -295,7 +295,7 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
             style={isPlan6 ? {} : { background: `linear-gradient(135deg, ${plan.theme.bgGlow}, transparent)`, border: `1px solid ${plan.theme.primary}40` }}
             {...(isPlan6 ? { animate: { boxShadow: ['0 0 10px rgba(225,29,72,0.2)', '0 0 25px rgba(225,29,72,0.5)', '0 0 10px rgba(225,29,72,0.2)'] }, transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } } : {})}
           >
-            <PlanIcon className="h-4 w-4 sm:h-6 sm:w-6" style={{ color: isPlan6 ? '#fb7185' : plan.theme.text }} />
+            <PlanIcon className="h-4 w-4 sm:h-6 sm:w-6" style={{ color: isPlan6 ? '#c0c0c0' : plan.theme.text }} />
           </motion.div>
         </div>
         <div className="flex items-end gap-2 mb-4">
