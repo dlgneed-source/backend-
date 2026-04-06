@@ -105,7 +105,7 @@ const ProfilePanel: React.FC = () => {
               </div>
               
               <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[11px] font-semibold text-slate-200">Level 4 Node</span>
+                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[11px] font-semibold text-slate-200">Level 4 Plan</span>
                 <span className="px-2 py-0.5 rounded bg-sky-500/10 border border-sky-400/20 text-[11px] font-semibold text-sky-200">Active Account</span>
               </div>
 
@@ -206,9 +206,17 @@ const ProfilePanel: React.FC = () => {
                 <span className="text-xs font-medium text-slate-400">Total Withdrawn</span>
                 <span className="text-sm font-bold text-slate-300">$3,652.00</span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-white/10">
-                <span className="text-xs font-medium text-slate-400">Active Package</span>
-                <span className="text-xs font-bold bg-white/[0.06] text-slate-200 px-2.5 py-1 rounded-lg border border-white/10">Plan 4 • $56</span>
+              <div className="py-2 border-b border-white/10">
+                <span className="text-xs font-medium text-slate-400 block mb-1.5">Active Packages</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { name: 'Plan 1', fee: '$5', color: '#fbbf24' },
+                    { name: 'Plan 2', fee: '$10', color: '#22d3ee' },
+                    { name: 'Plan 4', fee: '$40', color: '#e879f9' },
+                  ].map((p, i) => (
+                    <span key={i} className="text-[10px] font-bold px-2 py-0.5 rounded-lg border" style={{ borderColor: `${p.color}30`, background: `${p.color}10`, color: p.color }}>{p.name} • {p.fee}</span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
