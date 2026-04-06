@@ -834,7 +834,7 @@ const Dashboard = () => {
                   <h1 className="text-xl font-bold text-white">Dashboard Overview</h1>
                 </div>
                 <motion.button
-                  onClick={() => setActiveTab('plans')}
+                  onClick={() => setShowSkills(!showSkills)}
                   whileHover={{ scale: 1.08 }}
                   whileTap={{ scale: 0.95 }}
                   className="relative flex h-12 w-12 items-center justify-center rounded-full"
