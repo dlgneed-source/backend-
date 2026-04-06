@@ -5,7 +5,7 @@ import {
   BookOpen, Layers, User, Send, Gift, CheckCircle, ChevronRight, ChevronDown, ChevronUp,
   Info, AlertCircle, Flame, Crown, Gem, Award, Medal, Trophy, Network, RefreshCw,
   Repeat, BarChart3, Calendar, GraduationCap, Code2, Shield, Brain, Database, Server,
-  MessageSquare, Copy, Menu, LayoutDashboard, Check, Zap
+  MessageSquare, Copy, Menu, LayoutDashboard, Check, Zap, Sparkles, Star, Rocket, Target, Diamond
 } from 'lucide-react';
 
 // =============================================
