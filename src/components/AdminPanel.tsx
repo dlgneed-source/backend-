@@ -260,7 +260,7 @@ const plansData: Plan[] = [
     activeUsers: 98,
     maturedUsers: 87,
     totalRevenue: 86240,
-    theme: { primary: '#ffd700', secondary: '#b8860b', glow: 'rgba(255, 215, 0, 0.5)', bgGlow: 'rgba(255, 215, 0, 0.15)', text: '#ffd700' },
+    theme: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
   },
 ];
 
