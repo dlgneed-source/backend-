@@ -230,19 +230,19 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
   
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1, duration: 0.4 }} className="group relative">
-      <div className={`absolute -inset-1 rounded-[1.5rem] sm:rounded-[2rem] blur-md transition-all ${isPlan6 ? 'opacity-50 group-hover:opacity-70' : 'opacity-25 group-hover:opacity-40'}`} style={{ background: isPlan6 ? `linear-gradient(135deg, #e11d48, #be123c, #f43f5e, #881337)` : `linear-gradient(135deg, ${plan.theme.glow}, transparent 60%)` }} />
+      <div className={`absolute -inset-1 rounded-[1.5rem] sm:rounded-[2rem] transition-all ${isPlan6 ? 'opacity-40 group-hover:opacity-60' : 'opacity-25 group-hover:opacity-40 blur-md'}`} style={{ background: isPlan6 ? `linear-gradient(135deg, #e11d48, #be123c, #f43f5e, #881337)` : `linear-gradient(135deg, ${plan.theme.glow}, transparent 60%)` }} />
       
       {/* Plan 6: breathing glow border */}
       {isPlan6 && (
         <motion.div 
-          className="absolute -inset-[2px] rounded-[1.6rem] sm:rounded-[2.1rem] blur-[2px]"
+          className="absolute -inset-[1.5px] rounded-[1.6rem] sm:rounded-[2.1rem]"
           style={{ background: 'linear-gradient(135deg, #e11d48, #f43f5e, #fb7185, #f43f5e, #e11d48)' }}
           animate={{ opacity: [0.4, 0.8, 0.4] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
       
-      <div className={`relative overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border p-4 sm:p-6 backdrop-blur-xl ${isPlan6 ? 'border-rose-500/40' : ''}`} style={{ borderColor: isPlan6 ? undefined : `${plan.theme.primary}30`, background: isPlan6 ? 'linear-gradient(135deg, rgba(225,29,72,0.14) 0%, rgba(190,18,60,0.08) 30%, rgba(136,19,55,0.06) 60%, rgba(0,0,0,0.4) 100%)' : 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.2) 100%)', boxShadow: isPlan6 ? '0 8px 40px rgba(225,29,72,0.25), inset 0 1px 0 rgba(251,113,133,0.3)' : `0 8px 32px ${plan.theme.glow}15` }}>
+      <div className={`relative overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border p-4 sm:p-6 ${isPlan6 ? 'border-rose-500/40' : ''}`} style={{ borderColor: isPlan6 ? undefined : `${plan.theme.primary}30`, background: isPlan6 ? 'linear-gradient(135deg, rgba(225,29,72,0.12) 0%, rgba(136,19,55,0.08) 40%, rgba(20,10,15,0.95) 100%)' : 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.2) 100%)', boxShadow: isPlan6 ? '0 4px 20px rgba(225,29,72,0.15), inset 0 1px 0 rgba(251,113,133,0.2)' : `0 8px 32px ${plan.theme.glow}15` }}>
         
         {/* Top shimmer line */}
         {isPlan6 ? (
