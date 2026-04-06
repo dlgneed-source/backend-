@@ -11,7 +11,6 @@ import {
 import type { PanelId } from '@/components/BottomNav';
 
 const menuItems: { label: string; icon: React.ElementType; action: string }[] = [
-  { label: 'Admin Panel', icon: Shield, action: 'admin' },
   { label: 'Terms & Conditions', icon: FileText, action: 'terms' },
   { label: 'Privacy & Policy', icon: Globe, action: 'privacy' },
   { label: 'Contact Us', icon: Mail, action: 'contact' },
@@ -68,21 +67,11 @@ const InternalSidebar: React.FC<InternalSidebarProps> = ({ open, activePanel, on
           <nav className="px-2 space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = item.action === 'admin' && activePanel === 'admin';
               return (
                 <button
                   key={item.label}
-                  onClick={() => {
-                    if (item.action === 'admin') { onNavigate('admin'); onClose(); }
-                    else onClose();
-                  }}
-                  className={`
-                    w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all min-h-[44px]
-                    ${isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                    }
-                  `}
+                  onClick={() => onClose()}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all min-h-[44px] text-muted-foreground hover:text-foreground hover:bg-white/5"
                 >
                   <Icon className="w-[18px] h-[18px] shrink-0" />
                   <span className="whitespace-nowrap">{item.label}</span>

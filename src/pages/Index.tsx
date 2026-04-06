@@ -47,7 +47,7 @@ const Index: React.FC = () => {
         )}
         <AnimatePresence mode="wait">
           <motion.div key={activePanel} variants={panelVariants} initial="initial" animate="animate" exit="exit" className="flex-1">
-            {activePanel === 'dashboard' && <Dashboard />}
+            {activePanel === 'dashboard' && <Dashboard onBack={() => setIsLoggedIn(false)} />}
             {activePanel === 'referral' && <ReferralEngine />}
             {activePanel === 'community' && <CommunityLounge />}
             {activePanel === 'edtech' && <EdTechSpace />}

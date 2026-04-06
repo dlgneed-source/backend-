@@ -932,7 +932,7 @@ const DetailsPageContent = () => (
 // =============================================
 // MAIN DASHBOARD COMPONENT
 // =============================================
-const Dashboard = () => {
+const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'plans' | 'network' | 'rewards'>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
@@ -954,8 +954,14 @@ const Dashboard = () => {
             <button onClick={() => setMenuOpen(true)} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10">
               <Menu className="h-5 w-5" /><span className="hidden sm:inline">Menu</span>
             </button>
+            {onBack && (
+              <button onClick={onBack} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 hover:bg-white/10 ml-2">
+                <ArrowDownLeft className="h-4 w-4 rotate-90" />
+                <span className="hidden sm:inline">Back</span>
+              </button>
+            )}
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600"><Crown className="h-4 w-4 text-white" /></div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600"><TrendingUp className="h-4 w-4 text-white" /></div>
               <span className="text-base font-bold text-white">Dashboard</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-2">
@@ -1037,12 +1043,12 @@ const Dashboard = () => {
               </AnimatePresence>
               {/* User Info Card */}
               <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-bold text-white shadow-lg shadow-cyan-500/25">
-                  EA
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-bold text-white shadow-lg shadow-cyan-500/25 overflow-hidden">
+                  <User className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white truncate">User ID: EA2026</p>
-                  <p className="text-[11px] font-mono text-slate-400">0x1A4...B9F2</p>
+                  <p className="text-sm font-semibold text-white truncate">Arushi Tyagi</p>
+                  <p className="text-[11px] font-mono text-slate-400">ID: EA2026 • 0x1A4...B9F2</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-[10px] text-slate-500">Balance</p>
