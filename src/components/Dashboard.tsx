@@ -284,7 +284,7 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Plan {plan.level}</p>
-            <h3 className={`mt-0.5 text-lg sm:text-2xl font-bold truncate ${isPlan6 ? 'bg-gradient-to-r from-rose-300 via-pink-200 to-rose-400 bg-clip-text text-transparent' : 'text-white'}`}>{plan.name}</h3>
+            <h3 className="mt-0.5 text-lg sm:text-2xl font-bold truncate" style={isPlan6 ? { color: '#fb7185' } : {}}>{isPlan6 ? '' : ''}<span className={isPlan6 ? '' : 'text-white'}>{plan.name}</span></h3>
             <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: isPlan6 ? 'rgba(225,29,72,0.15)' : plan.theme.bgGlow, color: isPlan6 ? '#fb7185' : plan.theme.text, border: isPlan6 ? '1px solid rgba(225,29,72,0.3)' : `1px solid ${plan.theme.primary}40` }}><Users className="h-3 w-3" />{plan.teamSize} Team</span>
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><TrendingUp className="h-3 w-3" />{plan.roi}% ROI</span>
@@ -299,11 +299,10 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
           </motion.div>
         </div>
         <div className="flex items-end gap-2 mb-4">
-          <motion.p 
-            className={`text-3xl sm:text-5xl font-bold ${isPlan6 ? 'bg-gradient-to-r from-rose-300 via-pink-200 to-rose-400 bg-clip-text text-transparent' : ''}`} 
-            style={isPlan6 ? {} : { color: plan.theme.text, textShadow: `0 0 20px ${plan.theme.glow}` }}
-            {...(isPlan6 ? { animate: { backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }, transition: { duration: 3, repeat: Infinity }, style: { backgroundSize: '200% 200%', backgroundImage: 'linear-gradient(90deg, #fb7185, #fda4af, #fff, #fda4af, #fb7185)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' } } : {})}
-          >${plan.joiningFee}</motion.p>
+          <p 
+            className={`text-3xl sm:text-5xl font-bold`} 
+            style={isPlan6 ? { color: '#fb7185', textShadow: '0 0 20px rgba(225,29,72,0.4)' } : { color: plan.theme.text, textShadow: `0 0 20px ${plan.theme.glow}` }}
+          >${plan.joiningFee}</p>
           <span className="pb-1 text-xs sm:text-sm text-slate-400">Enrollment Fee</span>
         </div>
         <div className="mb-4 grid grid-cols-2 gap-2">
