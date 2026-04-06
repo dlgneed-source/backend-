@@ -464,8 +464,8 @@ function Sidebar({ activeTab, setActiveTab, collapsed, setCollapsed, mobileOpen,
     { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpRight },
     { id: 'flushouts', label: 'Flushouts', icon: Flame },
     { id: 'commissions', label: 'Commissions', icon: Percent },
-    
-    { id: 'rewards', label: 'Rewards', icon: Gift },
+    { id: 'gift-codes', label: 'Gift Codes', icon: Gift },
+    { id: 'rewards', label: 'Rewards', icon: Award },
     { id: 'daily-income', label: 'Daily Income', icon: Calendar },
     { id: 'security', label: 'Security Logs', icon: Shield },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
@@ -1530,6 +1530,205 @@ function KIMILevelsManagement() {
 }
 
 // =============================================
+// GIFT CODE MANAGEMENT COMPONENT
+// =============================================
+interface GiftCode {
+  id: string;
+  code: string;
+  amount: number;
+  maxUses: number;
+  usedCount: number;
+  expiresAt: string;
+  status: 'Active' | 'Expired' | 'Revoked';
+  createdAt: string;
+}
+
+function GiftCodeManagement() {
+  const [codes, setCodes] = useState<GiftCode[]>([
+    { id: 'GC001', code: 'WELCOME50', amount: 50, maxUses: 100, usedCount: 42, expiresAt: '2026-04-30', status: 'Active', createdAt: '2026-03-15' },
+    { id: 'GC002', code: 'BONUS25', amount: 25, maxUses: 50, usedCount: 50, expiresAt: '2026-03-25', status: 'Expired', createdAt: '2026-03-01' },
+    { id: 'GC003', code: 'VIP100', amount: 100, maxUses: 10, usedCount: 3, expiresAt: '2026-05-15', status: 'Active', createdAt: '2026-03-20' },
+    { id: 'GC004', code: 'LAUNCH10', amount: 10, maxUses: 500, usedCount: 128, expiresAt: '2026-04-10', status: 'Revoked', createdAt: '2026-02-28' },
+  ]);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newCode, setNewCode] = useState({ code: '', amount: '', maxUses: '', days: '' });
+  const [revokeId, setRevokeId] = useState<string | null>(null);
+
+  const handleCreate = () => {
+    if (!newCode.code || !newCode.amount || !newCode.maxUses || !newCode.days) return;
+    const expDate = new Date();
+    expDate.setDate(expDate.getDate() + parseInt(newCode.days));
+    const gc: GiftCode = {
+      id: `GC${String(codes.length + 1).padStart(3, '0')}`,
+      code: newCode.code.toUpperCase(),
+      amount: parseFloat(newCode.amount),
+      maxUses: parseInt(newCode.maxUses),
+      usedCount: 0,
+      expiresAt: expDate.toISOString().split('T')[0],
+      status: 'Active',
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setCodes([gc, ...codes]);
+    setNewCode({ code: '', amount: '', maxUses: '', days: '' });
+    setShowCreate(false);
+  };
+
+  const handleRevoke = (id: string) => {
+    setCodes(codes.map(c => c.id === id ? { ...c, status: 'Revoked' as const } : c));
+    setRevokeId(null);
+  };
+
+  const gcStatusStyle = (s: string) => {
+    if (s === 'Active') return 'text-emerald-200 bg-emerald-500/10 border-emerald-400/20';
+    if (s === 'Expired') return 'text-amber-200 bg-amber-500/10 border-amber-400/20';
+    return 'text-rose-200 bg-rose-500/10 border-rose-400/20';
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-white">Gift Code Management</h1>
+          <p className="text-xs text-slate-400">Create, manage and revoke gift codes</p>
+        </div>
+        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all">
+          <Plus className="h-4 w-4" /> Create Code
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Codes', value: codes.length, color: '#22d3ee' },
+          { label: 'Active', value: codes.filter(c => c.status === 'Active').length, color: '#34d399' },
+          { label: 'Total Redeemed', value: codes.reduce((a, c) => a + c.usedCount, 0), color: '#fbbf24' },
+          { label: 'Total Amount Given', value: `$${codes.reduce((a, c) => a + c.amount * c.usedCount, 0).toLocaleString()}`, color: '#e879f9' },
+        ].map((s, i) => (
+          <div key={i} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider">{s.label}</p>
+            <p className="text-2xl font-bold mt-1" style={{ color: s.color }}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Codes List */}
+      <div className="space-y-3">
+        {codes.map((gc) => (
+          <motion.div key={gc.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500/20 to-pink-500/20 border border-rose-500/20">
+                  <Gift className="h-5 w-5 text-rose-300" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-base font-bold font-mono text-white tracking-wider">{gc.code}</p>
+                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${gcStatusStyle(gc.status)}`}>{gc.status}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">{gc.id} • Created {gc.createdAt}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-lg font-bold text-emerald-400">${gc.amount}</p>
+                  <p className="text-[10px] text-slate-500">per redeem</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-white">{gc.usedCount}/{gc.maxUses}</p>
+                  <p className="text-[10px] text-slate-500">used</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-300">{gc.expiresAt}</p>
+                  <p className="text-[10px] text-slate-500">expires</p>
+                </div>
+                {gc.status === 'Active' && (
+                  <button onClick={() => setRevokeId(gc.id)} className="flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition-colors">
+                    <Ban className="h-3.5 w-3.5" /> Revoke
+                  </button>
+                )}
+              </div>
+            </div>
+            {/* Usage bar */}
+            <div className="mt-3">
+              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all" style={{ width: `${Math.min((gc.usedCount / gc.maxUses) * 100, 100)}%` }} />
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Create Modal */}
+      <AnimatePresence>
+        {showCreate && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowCreate(false)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()} className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1321] p-6 shadow-2xl">
+              <div className="mb-5 flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/25">
+                    <Gift className="h-6 w-6 text-emerald-300" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Create Gift Code</h3>
+                    <p className="text-xs text-slate-400">Generate a new promo code</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowCreate(false)} className="p-2 rounded-full bg-white/5 text-slate-400 hover:text-white"><X className="h-5 w-5" /></button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Gift Code Name</label>
+                  <input value={newCode.code} onChange={e => setNewCode({ ...newCode, code: e.target.value })} placeholder="e.g. WELCOME50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono text-white uppercase tracking-wider placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Amount ($)</label>
+                    <input type="number" value={newCode.amount} onChange={e => setNewCode({ ...newCode, amount: e.target.value })} placeholder="50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Max Users</label>
+                    <input type="number" value={newCode.maxUses} onChange={e => setNewCode({ ...newCode, maxUses: e.target.value })} placeholder="100" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Valid For (Days)</label>
+                  <input type="number" value={newCode.days} onChange={e => setNewCode({ ...newCode, days: e.target.value })} placeholder="30" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setShowCreate(false)} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white">Cancel</button>
+                  <button onClick={handleCreate} className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3 text-sm font-bold text-white">Create Code</button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Revoke Confirm Modal */}
+      <AnimatePresence>
+        {revokeId && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setRevokeId(null)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()} className="w-full max-w-sm rounded-3xl border border-rose-500/20 bg-[#0d1321] p-6 shadow-2xl">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/15 border border-rose-500/25">
+                  <AlertTriangle className="h-8 w-8 text-rose-400" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Revoke Gift Code?</h3>
+                <p className="text-sm text-slate-400">Code <span className="font-mono font-bold text-rose-300">{codes.find(c => c.id === revokeId)?.code}</span> will be permanently deactivated. Users won't be able to redeem it anymore.</p>
+                <div className="flex w-full gap-3 pt-2">
+                  <button onClick={() => setRevokeId(null)} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white">Cancel</button>
+                  <button onClick={() => handleRevoke(revokeId)} className="flex-1 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 py-3 text-sm font-bold text-white">Revoke Code</button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// =============================================
 // REWARDS MANAGEMENT COMPONENT
 // =============================================
 function RewardsManagement() {
@@ -1990,6 +2189,8 @@ export default function AdminPanel() {
         return <FlushoutsManagement />;
       case 'commissions':
         return <CommissionsManagement />;
+      case 'gift-codes':
+        return <GiftCodeManagement />;
       case 'rewards':
         return <RewardsManagement />;
       case 'daily-income':
