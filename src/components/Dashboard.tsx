@@ -5,7 +5,7 @@ import {
   BookOpen, Layers, User, Send, Gift, CheckCircle, ChevronRight, ChevronDown, ChevronUp,
   Info, AlertCircle, Flame, Crown, Gem, Award, Medal, Trophy, Network, RefreshCw,
   Repeat, BarChart3, Calendar, GraduationCap, Code2, Shield, Brain, Database, Server,
-  MessageSquare, Copy, Menu, LayoutDashboard, Check, Zap
+  MessageSquare, Copy, Menu, LayoutDashboard, Check, Zap, Sparkles, Star, Rocket, Target, Diamond
 } from 'lucide-react';
 
 // =============================================
@@ -69,7 +69,7 @@ export const plansData: PlanData[] = [
   },
   {
     level: 6, name: 'Supreme Visionary', joiningFee: 160, teamSize: 8, uplineCommission: 32, systemFee: 2, levelCommission: 16, slotFee: 110, totalCollection: 880, memberProfit: 800, leaderPool: 24, rewardPool: 12, sponsorPool: 4, roi: 500, flushoutDays: 60,
-    theme: { primary: '#fb7185', secondary: '#f43f5e', glow: 'rgba(251, 113, 133, 0.5)', bgGlow: 'rgba(251, 113, 133, 0.15)', text: '#ffe4e6' },
+    theme: { primary: '#ffd700', secondary: '#b8860b', glow: 'rgba(255, 215, 0, 0.5)', bgGlow: 'rgba(255, 215, 0, 0.15)', text: '#ffd700' },
   },
 ];
 
@@ -221,35 +221,54 @@ const TreeNodeItem = ({ node, depth = 0 }: any) => {
 // =============================================
 // PLAN CARD
 // =============================================
+const planIcons = [BookOpen, Code2, Shield, Brain, Rocket, Diamond];
+
 const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
   const [showDetails, setShowDetails] = useState(false);
+  const PlanIcon = planIcons[plan.level - 1] || Crown;
+  const isPlan6 = plan.level === 6;
+  
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1, duration: 0.4 }} className="group relative">
-      <div className="absolute -inset-1 rounded-[1.5rem] sm:rounded-[2rem] opacity-25 blur-md transition-all group-hover:opacity-40" style={{ background: `linear-gradient(135deg, ${plan.theme.glow}, transparent 60%)` }} />
-      <div className="relative overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: `${plan.theme.primary}30`, background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.2) 100%)', boxShadow: `0 8px 32px ${plan.theme.glow}15` }}>
-        <div className="absolute inset-x-0 top-0 h-0.5 sm:h-1" style={{ background: `linear-gradient(90deg, transparent, ${plan.theme.primary}, ${plan.theme.secondary}, transparent)` }} />
+      <div className={`absolute -inset-1 rounded-[1.5rem] sm:rounded-[2rem] blur-md transition-all ${isPlan6 ? 'opacity-50 group-hover:opacity-70' : 'opacity-25 group-hover:opacity-40'}`} style={{ background: isPlan6 ? `linear-gradient(135deg, #ffd700, #b8860b, #ffd700, #daa520)` : `linear-gradient(135deg, ${plan.theme.glow}, transparent 60%)` }} />
+      <div className={`relative overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border p-4 sm:p-6 backdrop-blur-xl ${isPlan6 ? 'border-yellow-500/40' : ''}`} style={{ borderColor: isPlan6 ? undefined : `${plan.theme.primary}30`, background: isPlan6 ? 'linear-gradient(135deg, rgba(255,215,0,0.12) 0%, rgba(184,134,11,0.08) 30%, rgba(218,165,32,0.06) 60%, rgba(0,0,0,0.3) 100%)' : 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.2) 100%)', boxShadow: isPlan6 ? '0 8px 40px rgba(255,215,0,0.2), inset 0 1px 0 rgba(255,215,0,0.3)' : `0 8px 32px ${plan.theme.glow}15` }}>
+        
+        {/* Top accent line */}
+        <div className="absolute inset-x-0 top-0 h-0.5 sm:h-1" style={{ background: isPlan6 ? 'linear-gradient(90deg, transparent, #ffd700, #fff, #ffd700, transparent)' : `linear-gradient(90deg, transparent, ${plan.theme.primary}, ${plan.theme.secondary}, transparent)` }} />
+        
+        {/* Plan 6 stars decoration */}
+        {isPlan6 && (
+          <>
+            <div className="absolute top-3 right-3 animate-pulse"><Star className="h-3 w-3 text-yellow-400/60" fill="currentColor" /></div>
+            <div className="absolute top-8 right-8 animate-pulse" style={{ animationDelay: '0.5s' }}><Sparkles className="h-4 w-4 text-yellow-300/50" /></div>
+            <div className="absolute bottom-12 right-4 animate-pulse" style={{ animationDelay: '1s' }}><Star className="h-2.5 w-2.5 text-amber-400/40" fill="currentColor" /></div>
+            <div className="absolute top-16 left-3 animate-pulse" style={{ animationDelay: '0.7s' }}><Star className="h-2 w-2 text-yellow-500/30" fill="currentColor" /></div>
+          </>
+        )}
+        
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Plan {plan.level}</p>
-            <h3 className="mt-0.5 text-lg sm:text-2xl font-bold text-white truncate">{plan.name}</h3>
+            <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{isPlan6 ? '✦ ULTRA PREMIUM ✦' : `Plan ${plan.level}`}</p>
+            <h3 className={`mt-0.5 text-lg sm:text-2xl font-bold truncate ${isPlan6 ? 'bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 bg-clip-text text-transparent' : 'text-white'}`}>{plan.name}</h3>
             <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: plan.theme.bgGlow, color: plan.theme.text, border: `1px solid ${plan.theme.primary}40` }}><Users className="h-3 w-3" />{plan.teamSize} Team</span>
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: isPlan6 ? 'rgba(255,215,0,0.15)' : plan.theme.bgGlow, color: isPlan6 ? '#ffd700' : plan.theme.text, border: isPlan6 ? '1px solid rgba(255,215,0,0.3)' : `1px solid ${plan.theme.primary}40` }}><Users className="h-3 w-3" />{plan.teamSize} Team</span>
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><TrendingUp className="h-3 w-3" />{plan.roi}% ROI</span>
+              {isPlan6 && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-yellow-500/15 text-yellow-300 border border-yellow-500/30"><Diamond className="h-3 w-3" />Luxury</span>}
             </div>
           </div>
-          <div className="flex h-10 w-10 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl" style={{ background: `linear-gradient(135deg, ${plan.theme.bgGlow}, transparent)`, border: `1px solid ${plan.theme.primary}40` }}>
-            <Crown className="h-4 w-4 sm:h-6 sm:w-6" style={{ color: plan.theme.text }} />
+          <div className={`flex h-10 w-10 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl ${isPlan6 ? 'bg-gradient-to-br from-yellow-500/20 to-amber-600/20 border border-yellow-500/30 shadow-lg shadow-yellow-500/20' : ''}`} style={isPlan6 ? {} : { background: `linear-gradient(135deg, ${plan.theme.bgGlow}, transparent)`, border: `1px solid ${plan.theme.primary}40` }}>
+            <PlanIcon className="h-4 w-4 sm:h-6 sm:w-6" style={{ color: isPlan6 ? '#ffd700' : plan.theme.text }} />
           </div>
         </div>
         <div className="flex items-end gap-2 mb-4">
-          <p className="text-3xl sm:text-5xl font-bold" style={{ color: plan.theme.text, textShadow: `0 0 20px ${plan.theme.glow}` }}>${plan.joiningFee}</p>
-          <span className="pb-1 text-xs sm:text-sm text-slate-400">Joining Fee</span>
+          <p className={`text-3xl sm:text-5xl font-bold ${isPlan6 ? 'bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 bg-clip-text text-transparent' : ''}`} style={isPlan6 ? { textShadow: '0 0 30px rgba(255,215,0,0.4)' } : { color: plan.theme.text, textShadow: `0 0 20px ${plan.theme.glow}` }}>${plan.joiningFee}</p>
+          <span className="pb-1 text-xs sm:text-sm text-slate-400">Enrollment Fee</span>
         </div>
         <div className="mb-4 grid grid-cols-2 gap-2">
-          <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2.5"><p className="text-[9px] text-slate-500">Member Profit</p><p className="text-base font-bold" style={{ color: plan.theme.text }}>${plan.memberProfit}</p></div>
-          <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2.5"><p className="text-[9px] text-slate-500">Flush Out</p><p className="text-base font-bold text-slate-200">{plan.flushoutDays} Days</p></div>
+          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-yellow-500/20 bg-yellow-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Total Earning</p><p className="text-base font-bold" style={{ color: isPlan6 ? '#ffd700' : plan.theme.text }}>${plan.memberProfit}</p></div>
+          <div className={`rounded-lg border p-2.5 ${isPlan6 ? 'border-yellow-500/20 bg-yellow-500/5' : 'border-white/5 bg-white/[0.03]'}`}><p className="text-[9px] text-slate-500">Guaranteed Flushout</p><p className="text-base font-bold text-slate-200">{plan.flushoutDays} Days</p></div>
         </div>
-        <button onClick={() => setShowDetails(!showDetails)} className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] py-2.5 text-xs font-semibold text-slate-400 hover:bg-white/[0.06]">
+        <button onClick={() => setShowDetails(!showDetails)} className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-semibold hover:bg-white/[0.06] ${isPlan6 ? 'border-yellow-500/20 bg-yellow-500/5 text-yellow-300' : 'border-white/10 bg-white/[0.03] text-slate-400'}`}>
           {showDetails ? <><ChevronUp className="h-4 w-4" /> Hide</> : <><ChevronDown className="h-4 w-4" /> Details</>}
         </button>
         <AnimatePresence>
@@ -259,14 +278,13 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
                 <p className="text-[10px] text-slate-500">Fee Distribution</p>
                 <div className="space-y-1">
                   <div className="flex justify-between rounded-lg bg-white/[0.02] px-2.5 py-1.5"><span className="text-xs text-slate-400">Upline</span><span className="text-xs font-semibold">${plan.uplineCommission}</span></div>
-                  <div className="flex justify-between rounded-lg bg-white/[0.02] px-2.5 py-1.5"><span className="text-xs text-slate-400">System</span><span className="text-xs font-semibold">${plan.systemFee}</span></div>
                   <div className="flex justify-between rounded-lg bg-white/[0.02] px-2.5 py-1.5"><span className="text-xs text-slate-400">Level (10%)</span><span className="text-xs font-semibold">${plan.levelCommission}</span></div>
                 </div>
               </div>
               <div className="mb-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
-                <p className="mb-2 text-[10px] text-slate-500">Flushout Distribution</p>
+                <p className="mb-2 text-[10px] text-slate-500">Guaranteed Flushout Distribution</p>
                 <div className="space-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-slate-400">Member Profit</span><span className="text-emerald-400">${plan.memberProfit}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Total Earning</span><span className="text-emerald-400">${plan.memberProfit}</span></div>
                   <div className="flex justify-between"><span className="text-slate-400">Leader Pool</span><span className="text-amber-400">${plan.leaderPool}</span></div>
                   <div className="flex justify-between"><span className="text-slate-400">Reward Pool</span><span className="text-purple-400">${plan.rewardPool}</span></div>
                   {plan.sponsorPool > 0 && <div className="flex justify-between"><span className="text-slate-400">Sponsor Pool</span><span className="text-cyan-400">${plan.sponsorPool}</span></div>}
@@ -275,8 +293,8 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
             </motion.div>
           )}
         </AnimatePresence>
-        <button onClick={() => onSelect?.(plan)} className="w-full rounded-xl py-3.5 text-sm font-bold" style={{ background: `linear-gradient(135deg, ${plan.theme.primary}, ${plan.theme.secondary})`, boxShadow: `0 4px 15px ${plan.theme.glow}` }}>
-          <span className="flex items-center justify-center gap-2 text-slate-900"><ArrowDownLeft className="h-4 w-4" />Join ${plan.joiningFee}</span>
+        <button onClick={() => onSelect?.(plan)} className={`w-full rounded-xl py-3.5 text-sm font-bold ${isPlan6 ? 'shadow-lg shadow-yellow-500/30' : ''}`} style={{ background: isPlan6 ? 'linear-gradient(135deg, #ffd700, #b8860b, #daa520)' : `linear-gradient(135deg, ${plan.theme.primary}, ${plan.theme.secondary})`, boxShadow: isPlan6 ? undefined : `0 4px 15px ${plan.theme.glow}` }}>
+          <span className={`flex items-center justify-center gap-2 ${isPlan6 ? 'text-black font-extrabold' : 'text-slate-900'}`}><ArrowDownLeft className="h-4 w-4" />Enroll Now ${plan.joiningFee}</span>
         </button>
       </div>
     </motion.div>
@@ -1016,7 +1034,7 @@ const Dashboard = () => {
 
           {activeTab === 'plans' && (
             <motion.div key="plans" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
-              <div><h1 className="text-xl font-bold text-white">Investment Plans</h1><p className="text-xs text-slate-400">Choose a plan that fits your goals</p></div>
+              <div><h1 className="text-xl font-bold text-white">Earning & Learning Programme</h1><p className="text-xs text-slate-400">Choose a plan that fits your goals</p></div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{plansData.map((plan, i) => <PremiumPlanCard key={plan.level} plan={plan} index={i} />)}</div>
               <FlushoutScheduleCard />
             </motion.div>

@@ -260,7 +260,7 @@ const plansData: Plan[] = [
     activeUsers: 98,
     maturedUsers: 87,
     totalRevenue: 86240,
-    theme: { primary: '#fb7185', secondary: '#f43f5e', glow: 'rgba(251, 113, 133, 0.5)', bgGlow: 'rgba(251, 113, 133, 0.15)', text: '#ffe4e6' },
+    theme: { primary: '#ffd700', secondary: '#b8860b', glow: 'rgba(255, 215, 0, 0.5)', bgGlow: 'rgba(255, 215, 0, 0.15)', text: '#ffd700' },
   },
 ];
 
@@ -924,7 +924,7 @@ function PlansManagement() {
 
             <div className="mb-4 grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">Joining Fee</p>
+                <p className="text-[10px] text-slate-500">Enrollment Fee</p>
                 <p className="text-lg font-bold text-white">${plan.joiningFee}</p>
               </div>
               <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
@@ -936,7 +936,7 @@ function PlansManagement() {
                 <p className="text-lg font-bold text-white">{plan.teamSize}</p>
               </div>
               <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">Flushout</p>
+                <p className="text-[10px] text-slate-500">Guaranteed Flushout</p>
                 <p className="text-lg font-bold text-white">{plan.flushoutDays}d</p>
               </div>
             </div>
@@ -995,16 +995,16 @@ function PlansManagement() {
 
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
-                  <p className="text-xs text-slate-500">Joining Fee</p>
-                  <p className="text-xl font-bold text-white">${selectedPlan.joiningFee}</p>
+                   <p className="text-xs text-slate-500">Enrollment Fee</p>
+                   <p className="text-xl font-bold text-white">${selectedPlan.joiningFee}</p>
                 </div>
                 <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
                   <p className="text-xs text-slate-500">Slot Fee</p>
                   <p className="text-xl font-bold text-white">${selectedPlan.slotFee}</p>
                 </div>
                 <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
-                  <p className="text-xs text-slate-500">Member Profit</p>
-                  <p className="text-xl font-bold text-emerald-400">${selectedPlan.memberProfit}</p>
+                   <p className="text-xs text-slate-500">Total Earning</p>
+                   <p className="text-xl font-bold text-emerald-400">${selectedPlan.memberProfit}</p>
                 </div>
                 <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
                   <p className="text-xs text-slate-500">ROI</p>
@@ -1019,12 +1019,8 @@ function PlansManagement() {
                     <p className="text-[10px] text-slate-500">Upline</p>
                     <p className="text-lg font-bold text-white">${selectedPlan.uplineCommission}</p>
                   </div>
-                  <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-slate-500">System</p>
-                    <p className="text-lg font-bold text-white">${selectedPlan.systemFee}</p>
-                  </div>
-                  <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-slate-500">Level (10%)</p>
+                   <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                     <p className="text-[10px] text-slate-500">Level (10%)</p>
                     <p className="text-lg font-bold text-white">${selectedPlan.levelCommission}</p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
