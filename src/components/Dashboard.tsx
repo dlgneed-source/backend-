@@ -889,6 +889,8 @@ const Dashboard = () => {
                 <button onClick={() => setSubView('withdrawal')} className="flex flex-col items-center gap-1.5 rounded-xl border border-blue-600/30 bg-blue-900/40 py-3 text-xs text-slate-300 hover:bg-blue-800/50"><ArrowUpRight className="h-5 w-5 text-cyan-400" /><span>Withdrawal</span></button>
                 <button onClick={() => setActiveTab('plans')} className="flex flex-col items-center gap-1.5 rounded-xl border border-rose-400/30 bg-gradient-to-br from-rose-900/40 to-slate-400/10 py-3 text-xs text-slate-200 hover:from-rose-800/50 hover:to-slate-300/15"><Layers className="h-5 w-5 text-rose-300" /><span>Plan</span></button>
               </div>
+              {/* Redeem Gift Code Button */}
+              <RedeemGiftCodeButton />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <PoolStatsCard />
                 <ReferralNetworkCard />
