@@ -12,21 +12,38 @@ import AdminPanel from '@/components/AdminPanel';
 import ProfilePanel from '@/components/ProfilePanel';
 import BottomNav, { type PanelId } from '@/components/BottomNav';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 
 const panelVariants = {
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.2 } },
   exit: { opacity: 0, y: -8, transition: { duration: 0.12 } },
 };
+const WALLET_ADDRESS_BYTES = 20;
 
 const Index: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelId>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
+  const { isAuthenticated, login, logout, isLoading } = useAuth();
 
-  if (!isLoggedIn) {
-    return <Landing onLogin={() => setIsLoggedIn(true)} />;
+  const handleLogin = async () => {
+    const key = 'ea_wallet_address';
+    let wallet = localStorage.getItem(key);
+
+    if (!wallet) {
+      const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(WALLET_ADDRESS_BYTES)))
+        .map((n) => n.toString(16).padStart(2, '0'))
+        .join('');
+      wallet = `0x${randomHex}`;
+      localStorage.setItem(key, wallet);
+    }
+
+    await login(wallet);
+  };
+
+  if (!isAuthenticated) {
+    return <Landing onLogin={() => { if (!isLoading) void handleLogin(); }} />;
   }
 
   return (
@@ -36,7 +53,7 @@ const Index: React.FC = () => {
         onNavigate={(p: PanelId) => { setActivePanel(p); setSidebarOpen(false); }}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onLogout={() => setIsLoggedIn(false)}
+        onLogout={logout}
       />
       <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
         {activePanel === 'dashboard' && (
@@ -47,7 +64,7 @@ const Index: React.FC = () => {
         )}
         <AnimatePresence mode="wait">
           <motion.div key={activePanel} variants={panelVariants} initial="initial" animate="animate" exit="exit" className="flex-1">
-            {activePanel === 'dashboard' && <Dashboard onBack={() => setIsLoggedIn(false)} />}
+            {activePanel === 'dashboard' && <Dashboard onBack={logout} />}
             {activePanel === 'referral' && <ReferralEngine />}
             {activePanel === 'community' && <CommunityLounge />}
             {activePanel === 'edtech' && <EdTechSpace />}

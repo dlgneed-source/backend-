@@ -5,6 +5,8 @@
 import express from "express";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import { createServer } from "http";
+import { Server as SocketIOServer } from "socket.io";
 
 dotenv.config();
 
@@ -22,12 +24,23 @@ import giftCodeRoutes from "./routes/giftCodes";
 import incentiveRoutes from "./routes/incentives";
 import poolRoutes from "./routes/pools";
 import adminRoutes from "./routes/admin";
+import communityRoutes from "./routes/community";
 
 // Utils
 import { initCronJobs } from "./utils/cronJobs";
 import { initSmartContract } from "./utils/smartContract";
+import { initCommunitySocket } from "./socket/communitySocket";
 
 const app = express();
+const httpServer = createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: config.NODE_ENV === "development" ? true : config.CORS_ORIGINS,
+    credentials: true,
+  },
+});
+
+initCommunitySocket(io);
 
 // =============================================
 // MIDDLEWARE
@@ -72,6 +85,7 @@ app.use("/api/gift-codes", giftCodeRoutes);
 app.use("/api/incentives", incentiveRoutes);
 app.use("/api/pools", poolRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/community", communityRoutes);
 
 // =============================================
 // ERROR HANDLING
@@ -94,7 +108,7 @@ async function startServer() {
       initCronJobs();
     }
 
-    app.listen(config.PORT, () => {
+    httpServer.listen(config.PORT, () => {
       console.log(`
 ╔═══════════════════════════════════════════╗
 ║        eAkhuwat Backend Server            ║
