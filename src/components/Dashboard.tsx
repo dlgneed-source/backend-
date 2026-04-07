@@ -496,6 +496,7 @@ const SkillLevelsCard = () => {
               key={i}
               type="button"
               aria-expanded={isSel}
+              aria-label={`Toggle details for ${level.name}`}
               onClick={() => setSelected(isSel ? null : level.level)}
               className={`w-full text-left rounded-lg border p-3 transition-all ${isSel ? 'border-amber-500/30 bg-amber-500/8' : 'border-white/5 bg-white/[0.03]'}`}
             >

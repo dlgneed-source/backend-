@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ApiError, adminApi, teamApi } from '@/lib/api';
@@ -2413,6 +2413,14 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const previousOverflow = useRef<string | null>(null);
+
+  const restoreBodyOverflow = useCallback(() => {
+    if (previousOverflow.current !== null) {
+      document.body.style.overflow = previousOverflow.current;
+      previousOverflow.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -2426,11 +2434,18 @@ export default function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [mobileMenuOpen]);
+    if (mobileMenuOpen) {
+      if (previousOverflow.current === null) {
+        previousOverflow.current = document.body.style.overflow;
+      }
+      document.body.style.overflow = 'hidden';
+      return () => {
+        restoreBodyOverflow();
+      };
+    }
+
+    restoreBodyOverflow();
+  }, [mobileMenuOpen, restoreBodyOverflow]);
 
   useEffect(() => {
     if (!mobileMenuOpen) return;

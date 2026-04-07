@@ -17,6 +17,7 @@ const setViewportWidth = (width: number) => {
     writable: true,
     value: width,
   });
+  fireEvent(window, new Event('resize'));
 };
 
 afterEach(() => {
@@ -32,7 +33,6 @@ describe('responsive interactions', () => {
     expect(screen.getByLabelText('Close dashboard menu')).toBeTruthy();
 
     setViewportWidth(1280);
-    fireEvent(window, new Event('resize'));
 
     await waitFor(() => {
       expect(screen.queryByLabelText('Close dashboard menu')).toBeNull();
@@ -57,8 +57,9 @@ describe('responsive interactions', () => {
       expect(screen.queryByText('Withdraw Funds')).toBeNull();
     });
 
+    const expectedTransactionHash = '0xa3f...12b4';
     fireEvent.click(screen.getByRole('button', { name: /Copy transaction hash 0xa3f\.\.\.12b4/i }));
-    expect(writeText).toHaveBeenCalledWith('0xa3f...12b4');
+    expect(writeText).toHaveBeenCalledWith(expectedTransactionHash);
   });
 
   it('closes admin mobile sidebar on escape and desktop resize', async () => {
@@ -77,7 +78,6 @@ describe('responsive interactions', () => {
     expect(screen.getByLabelText('Close admin menu')).toBeTruthy();
 
     setViewportWidth(1366);
-    fireEvent(window, new Event('resize'));
     await waitFor(() => {
       expect(screen.queryByLabelText('Close admin menu')).toBeNull();
     });

@@ -161,7 +161,9 @@ const ReferralEngine: React.FC = () => {
     if (!navigator?.clipboard || hash === '—') return;
     try {
       await navigator.clipboard.writeText(hash);
-    } catch {}
+    } catch (error) {
+      console.warn('Failed to copy transaction hash', error);
+    }
   };
 
   return (
@@ -287,7 +289,7 @@ const ReferralEngine: React.FC = () => {
                           <button
                             type="button"
                             aria-label={`Copy transaction hash ${row.hash}`}
-                            onClick={() => void handleCopyHash(row.hash)}
+                            onClick={() => handleCopyHash(row.hash)}
                             className="rounded p-1 text-muted-foreground hover:text-primary transition-colors"
                           >
                             <Copy className="w-3 h-3" />
