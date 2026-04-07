@@ -17,9 +17,23 @@ const prisma = new PrismaClient();
  */
 export async function generateGiftCode(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { planId, expiryDays = 30 } = req.body;
-  const generatedById = req.user!.id;
+  const generatedById = req.user?.id;
 
   try {
+    let actorUserId = generatedById;
+    if (!actorUserId && req.admin?.walletAddress) {
+      const adminUser = await prisma.user.findFirst({
+        where: { walletAddress: req.admin.walletAddress.toLowerCase() },
+        select: { id: true },
+      });
+      actorUserId = adminUser?.id;
+    }
+
+    if (!actorUserId) {
+      res.status(400).json({ success: false, message: "Admin user profile not found" });
+      return;
+    }
+
     const plan = await prisma.plan.findUnique({ where: { id: planId } });
     if (!plan || !plan.isActive) {
       res.status(404).json({ success: false, message: "Plan not found or inactive" });
@@ -31,13 +45,13 @@ export async function generateGiftCode(req: AuthenticatedRequest, res: Response)
     expiresAt.setDate(expiresAt.getDate() + expiryDays);
 
     const giftCode = await prisma.giftCode.create({
-      data: {
-        code,
-        planId,
-        generatedById,
-        expiresAt,
-        status: "ACTIVE",
-      },
+        data: {
+          code,
+          planId,
+          generatedById: actorUserId,
+          expiresAt,
+          status: "ACTIVE",
+        },
       include: { plan: { select: { name: true } } },
     });
 

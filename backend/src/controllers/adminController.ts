@@ -10,6 +10,7 @@ import { generateAdminToken } from "../middleware/auth";
 import { verifyWalletSignature, generateSignInMessage } from "../utils/eip712";
 import { processFlushout } from "../utils/flushoutLogic";
 import { v4 as uuidv4 } from "uuid";
+import { isValidWalletAddress } from "../middleware/security";
 
 const prisma = new PrismaClient();
 
@@ -21,15 +22,20 @@ const prisma = new PrismaClient();
  * GET /admin/nonce/:walletAddress
  */
 export async function getAdminNonce(req: Request, res: Response): Promise<void> {
-  const { walletAddress } = req.params;
+  const walletAddress = String(req.params.walletAddress || "").toLowerCase();
+
+  if (!isValidWalletAddress(walletAddress)) {
+    res.status(400).json({ success: false, message: "Invalid wallet address" });
+    return;
+  }
 
   try {
     const nonce = uuidv4();
     const message = generateSignInMessage(walletAddress, nonce);
 
     await prisma.admin.update({
-      where: { walletAddress: walletAddress.toLowerCase() },
-      data: {},
+      where: { walletAddress },
+      data: { nonce },
     });
 
     res.json({ success: true, nonce, message });
@@ -42,7 +48,7 @@ export async function getAdminNonce(req: Request, res: Response): Promise<void> 
  * POST /admin/login
  */
 export async function adminLogin(req: Request, res: Response): Promise<void> {
-  const { walletAddress, signature, message } = req.body;
+  const { walletAddress, signature } = req.body;
 
   try {
     const normalizedWallet = walletAddress.toLowerCase();
@@ -51,14 +57,16 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
       where: { walletAddress: normalizedWallet },
     });
 
-    if (!admin || !admin.isActive) {
+    if (!admin || !admin.isActive || !admin.nonce) {
       res.status(401).json({ success: false, message: "Admin not found or inactive" });
       return;
     }
 
+    const expectedMessage = generateSignInMessage(normalizedWallet, admin.nonce);
+
     let signerAddress: string;
     try {
-      signerAddress = verifyWalletSignature(message, signature);
+      signerAddress = verifyWalletSignature(expectedMessage, signature);
     } catch {
       res.status(401).json({ success: false, message: "Invalid signature" });
       return;
@@ -71,7 +79,7 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
 
     await prisma.admin.update({
       where: { id: admin.id },
-      data: { lastLoginAt: new Date() },
+      data: { nonce: null, lastLoginAt: new Date() },
     });
 
     const token = generateAdminToken(admin.id, admin.walletAddress, admin.role);

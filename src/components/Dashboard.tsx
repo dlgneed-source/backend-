@@ -16,6 +16,7 @@ import {
 
 
 import {
+  type LucideIcon,
   Wallet, ArrowUpRight, ArrowDownLeft, Users, TrendingUp, Share2, Clock, X, Download,
   BookOpen, Layers, User, Send, Gift, CheckCircle, ChevronRight, ChevronDown, ChevronUp,
   Info, AlertCircle, Flame, Crown, Gem, Award, Medal, Trophy, Network, RefreshCw,
@@ -27,6 +28,8 @@ import {
 // TYPES & INTERFACES
 // =============================================
 type TreeNode = ReferralDisplayNode;
+type DashboardTab = 'overview' | 'plans' | 'network' | 'rewards';
+type TransactionItem = { id: string | number; type: string; amount: string; time: string };
 
 export interface PlanData {
   level: number;
@@ -109,18 +112,19 @@ export const individualIncentives = [
   { plan: 'Plan 6', target: 10, reward: 30 },
 ];
 
-export const recentTransactions = [
-  { id: 1, type: 'Deposit', amount: '+$500.00', time: '2h ago' },
-  { id: 2, type: 'Commission', amount: '+$24.50', time: '5h ago' },
-  { id: 3, type: 'Withdrawal', amount: '-$200.00', time: '1d ago' },
-  { id: 4, type: 'Referral', amount: '+$15.00', time: '2d ago' },
-];
-
-
 // =============================================
 // MOBILE MENU DRAWER
 // =============================================
-const MobileMenuDrawer = ({ isOpen, onClose, activeTab, setActiveTab }: any) => {
+type MobileMenuDrawerProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  activeTab: DashboardTab;
+  setActiveTab: React.Dispatch<React.SetStateAction<DashboardTab>>;
+  walletAddress: string;
+  balanceLabel: string;
+};
+
+const MobileMenuDrawer = ({ isOpen, onClose, activeTab, setActiveTab, walletAddress, balanceLabel }: MobileMenuDrawerProps) => {
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'plans', label: 'Plans', icon: Layers },
@@ -150,8 +154,8 @@ const MobileMenuDrawer = ({ isOpen, onClose, activeTab, setActiveTab }: any) => 
                   <User className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">0x1A4...B9F2</p>
-                  <p className="text-xs text-slate-400">$2,580.50</p>
+                  <p className="text-sm font-medium text-white">{walletAddress}</p>
+                  <p className="text-xs text-slate-400">{balanceLabel}</p>
                 </div>
               </div>
             </div>
@@ -213,7 +217,13 @@ const TreeNodeItem = ({ node, depth = 0 }: { node: TreeNode; depth?: number }) =
 // =============================================
 const planIcons = [BookOpen, Code2, Shield, Brain, Rocket, Diamond];
 
-const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
+type PremiumPlanCardProps = {
+  plan: PlanData;
+  index: number;
+  onSelect?: (plan: PlanData) => void;
+};
+
+const PremiumPlanCard = ({ plan, index, onSelect }: PremiumPlanCardProps) => {
   const [showDetails, setShowDetails] = useState(false);
   const PlanIcon = planIcons[plan.level - 1] || Crown;
   const isPlan6 = plan.level === 6;
@@ -563,7 +573,13 @@ const PlanMaturityCard = () => (
 // =============================================
 // COMING SOON CARD
 // =============================================
-const ComingSoonCard = ({ title, description, icon: Icon }: any) => (
+type ComingSoonCardProps = {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+};
+
+const ComingSoonCard = ({ title, description, icon: Icon }: ComingSoonCardProps) => (
   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(245,158,11,0.2)', background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(234,179,8,0.03) 50%, rgba(0,0,0,0.2) 100%)' }}>
     <div className="absolute right-3 top-3"><span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/12 px-2 py-1 text-[9px] font-bold text-amber-300"><TrendingUp className="h-2.5 w-2.5" />Coming Soon</span></div>
     <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400" />
@@ -1218,7 +1234,7 @@ const ReferPageContent = ({
 // =============================================
 // DETAILS PAGE CONTENT
 // =============================================
-const DetailsPageContent = ({ transactions }: { transactions: typeof recentTransactions }) => (
+const DetailsPageContent = ({ transactions }: { transactions: TransactionItem[] }) => (
   <div className="max-w-lg mx-auto">
     <div className="relative">
       <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-orange-500/15 blur-lg" />
@@ -1285,11 +1301,11 @@ const DetailsPageContent = ({ transactions }: { transactions: typeof recentTrans
 // =============================================
 const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const { user, token } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'plans' | 'network' | 'rewards'>('overview');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
   const [showSkills, setShowSkills] = useState(false);
-  const [liveTransactions, setLiveTransactions] = useState<typeof recentTransactions>(recentTransactions);
+  const [liveTransactions, setLiveTransactions] = useState<TransactionItem[]>([]);
   const [referralData, setReferralData] = useState<ReferralInsightsData | null>(null);
   const [isReferralLoading, setIsReferralLoading] = useState(false);
   const [referralError, setReferralError] = useState<string | null>(null);
@@ -1332,7 +1348,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
         setLiveTransactions(mapped);
       })
       .catch(() => {
-        setLiveTransactions(recentTransactions);
+        setLiveTransactions([]);
       });
   }, [token]);
 
@@ -1412,7 +1428,14 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
       <div className="fixed inset-0 pointer-events-none"><div className="absolute -top-1/2 -left-1/2 h-full w-full rounded-full bg-violet-500/3 blur-[100px]" /><div className="absolute -bottom-1/2 -right-1/2 h-full w-full rounded-full bg-cyan-500/3 blur-[100px]" /></div>
       
       {/* Mobile Menu */}
-      <MobileMenuDrawer isOpen={menuOpen} onClose={() => setMenuOpen(false)} activeTab={activeTab} setActiveTab={setActiveTab} />
+      <MobileMenuDrawer
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        walletAddress={walletAddr}
+        balanceLabel={`$${balance.toLocaleString()}`}
+      />
       
       {/* Header */}
       <nav className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/90 backdrop-blur-xl">

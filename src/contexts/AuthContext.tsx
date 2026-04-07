@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: profile?.name || fallbackUser?.name || undefined,
       balance: String(balance?.availableBalance ?? 0),
       totalEarned: String(balance?.totalEarned ?? 0),
-      totalInvested: '0.00',
+      totalInvested: String(profile?.totalInvested ?? 0),
       totalWithdrawn: String(balance?.totalWithdrawn ?? 0),
       status: String(profile?.status || fallbackUser?.status || 'ACTIVE'),
       referralCode: referral?.referralCode || profile?.referralCode || fallbackUser?.referralCode,
