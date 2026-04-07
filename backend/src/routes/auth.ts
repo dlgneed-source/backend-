@@ -8,7 +8,9 @@ import config from "../config";
 const router = Router();
 
 router.get("/nonce/:walletAddress", authRateLimiter, getNonce);
+router.get("/nonce", authRateLimiter, getNonce);
 router.post("/login", authRateLimiter, validate(walletAuthSchema), login);
+router.post("/verify", authRateLimiter, validate(walletAuthSchema), login);
 if (config.NODE_ENV !== "production") {
   router.post("/dev-login", authRateLimiter, devLogin);
 }

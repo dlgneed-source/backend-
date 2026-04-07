@@ -35,7 +35,7 @@ export function validate(schema: ZodSchema) {
 export const walletAuthSchema = z.object({
   walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid wallet address"),
   signature: z.string().min(1, "Signature required"),
-  message: z.string().min(1, "Message required"),
+  message: z.string().optional(),
   referralCode: z.string().optional(),
 });
 

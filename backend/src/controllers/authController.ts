@@ -19,7 +19,12 @@ const prisma = new PrismaClient();
  * Get a nonce for wallet signing
  */
 export async function getNonce(req: Request, res: Response): Promise<void> {
-  const { walletAddress } = req.params;
+  const walletAddress = String(req.params.walletAddress || req.query.walletAddress || "").toLowerCase();
+
+  if (!isValidWalletAddress(walletAddress)) {
+    res.status(400).json({ success: false, message: "Invalid wallet address" });
+    return;
+  }
 
   try {
     const nonce = uuidv4();
@@ -62,10 +67,16 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    const expectedMessage = generateSignInMessage(normalizedWallet, user.nonce);
+    if (typeof message === "string" && message !== expectedMessage) {
+      res.status(401).json({ success: false, message: "Message mismatch" });
+      return;
+    }
+
     // Verify signature
     let signerAddress: string;
     try {
-      signerAddress = verifyWalletSignature(message, signature);
+      signerAddress = verifyWalletSignature(expectedMessage, signature);
     } catch {
       res.status(401).json({ success: false, message: "Invalid signature" });
       return;

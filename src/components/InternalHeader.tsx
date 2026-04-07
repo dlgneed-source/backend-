@@ -6,9 +6,10 @@ interface InternalHeaderProps {
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
   onNavigateHome?: () => void;
+  connectedAddress?: string;
 }
 
-const InternalHeader: React.FC<InternalHeaderProps> = ({ onToggleSidebar, sidebarOpen }) => {
+const InternalHeader: React.FC<InternalHeaderProps> = ({ onToggleSidebar, sidebarOpen, connectedAddress }) => {
   const [notifOpen, setNotifOpen] = useState(false);
 
   return (
@@ -26,14 +27,20 @@ const InternalHeader: React.FC<InternalHeaderProps> = ({ onToggleSidebar, sideba
           {sidebarOpen ? <ChevronLeft className="w-6 h-6 text-slate-300" /> : <Menu className="w-6 h-6 text-slate-300" />}
         </button>
 
-        {/* Right: notification bell */}
-        <button
-          onClick={() => setNotifOpen(true)}
-          className="relative p-2.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-        >
-          <Bell className="w-6 h-6 text-slate-300" />
-          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-primary ring-2 ring-background animate-pulse" />
-        </button>
+        <div className="flex items-center gap-2">
+          {connectedAddress && (
+            <span className="text-xs font-semibold text-primary px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30">
+              {connectedAddress}
+            </span>
+          )}
+          <button
+            onClick={() => setNotifOpen(true)}
+            className="relative p-2.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <Bell className="w-6 h-6 text-slate-300" />
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-primary ring-2 ring-background animate-pulse" />
+          </button>
+        </div>
       </header>
 
       <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />

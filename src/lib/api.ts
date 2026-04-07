@@ -30,7 +30,14 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
 }
 
 export const authApi = {
-  devLogin: (walletAddress: string, name?: string) =>
+  getNonce: (walletAddress: string) =>
+    apiRequest<{
+      success: boolean;
+      nonce: string;
+      message: string;
+    }>(`/api/auth/nonce?walletAddress=${encodeURIComponent(walletAddress)}`),
+
+  verify: (walletAddress: string, signature: string, referralCode?: string) =>
     apiRequest<{
       success: boolean;
       token: string;
@@ -41,9 +48,9 @@ export const authApi = {
         referralCode?: string;
         status: string;
       };
-    }>('/api/auth/dev-login', {
+    }>('/api/auth/verify', {
       method: 'POST',
-      body: { walletAddress, name },
+      body: { walletAddress, signature, ...(referralCode ? { referralCode } : {}) },
     }),
 };
 
