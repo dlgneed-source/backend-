@@ -565,7 +565,7 @@ const RewardsIncentivesCard = () => {
 // =============================================
 // FLUSHOUT SCHEDULE CARD
 // =============================================
-const FlushoutScheduleCard = () => (
+const FlushoutScheduleCard = ({ plans }: { plans: PlanData[] }) => (
   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(59,130,246,0.2)', background: 'linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(99,102,241,0.03) 50%, rgba(0,0,0,0.2) 100%)' }}>
     <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400" />
     <div className="mb-4 flex items-start gap-3">
@@ -579,7 +579,7 @@ const FlushoutScheduleCard = () => (
       </div>
     </div>
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-      {plansData.map((plan, i) => (
+      {plans.map((plan, i) => (
         <div key={i} className="relative rounded-lg border p-2.5 text-center" style={{ borderColor: `${plan.theme.primary}25`, background: `linear-gradient(135deg, ${plan.theme.bgGlow}30, rgba(0,0,0,0.1))` }}>
           <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${plan.theme.primary}, transparent)` }} />
           <p className="text-[9px]" style={{ color: plan.theme.primary }}>P{plan.level}</p>
@@ -869,7 +869,7 @@ const ReferPageContent = () => {
 // =============================================
 // DETAILS PAGE CONTENT
 // =============================================
-const DetailsPageContent = () => (
+const DetailsPageContent = ({ transactions }: { transactions: typeof recentTransactions }) => (
   <div className="max-w-lg mx-auto">
     <div className="relative">
       <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-orange-500/15 blur-lg" />
@@ -897,7 +897,7 @@ const DetailsPageContent = () => (
             <h4 className="text-sm font-semibold text-white">Recent Activity</h4>
             <button 
               onClick={() => {
-                const csv = 'Type,Amount,Time\n' + recentTransactions.map(tx => `${tx.type},${tx.amount},${tx.time}`).join('\n');
+                const csv = 'Type,Amount,Time\n' + transactions.map(tx => `${tx.type},${tx.amount},${tx.time}`).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -912,7 +912,7 @@ const DetailsPageContent = () => (
             </button>
           </div>
           <div className="space-y-2">
-            {recentTransactions.slice(0, 3).map((tx) => (
+            {transactions.slice(0, 3).map((tx) => (
               <div key={tx.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
                 <div className="flex items-center gap-3">
                   <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tx.type === 'Withdrawal' ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`}>
@@ -943,8 +943,51 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   // API hooks
   const { data: backendOnline } = useBackendStatus();
   const { data: apiPlans } = usePlans();
+  const { data: apiTransactions } = useTransactions();
   const { user } = useAuth();
   
+  // Theme map for plans (DB doesn't store themes)
+  const planThemes: Record<number, PlanData['theme']> = {
+    1: { primary: '#fbbf24', secondary: '#f59e0b', glow: 'rgba(251, 191, 36, 0.5)', bgGlow: 'rgba(251, 191, 36, 0.15)', text: '#fef3c7' },
+    2: { primary: '#22d3ee', secondary: '#0ea5e9', glow: 'rgba(34, 211, 238, 0.5)', bgGlow: 'rgba(34, 211, 238, 0.15)', text: '#cffafe' },
+    3: { primary: '#34d399', secondary: '#10b981', glow: 'rgba(52, 211, 153, 0.5)', bgGlow: 'rgba(52, 211, 153, 0.15)', text: '#d1fae5' },
+    4: { primary: '#e879f9', secondary: '#a855f7', glow: 'rgba(232, 121, 249, 0.5)', bgGlow: 'rgba(232, 121, 249, 0.15)', text: '#fae8ff' },
+    5: { primary: '#f472b6', secondary: '#ec4899', glow: 'rgba(244, 114, 182, 0.5)', bgGlow: 'rgba(244, 114, 182, 0.15)', text: '#fce7f3' },
+    6: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
+  };
+
+  // Merge API plans with themes, fallback to hardcoded
+  const activePlans: PlanData[] = apiPlans?.length
+    ? apiPlans.map((p: any) => ({
+        level: p.id,
+        name: p.name,
+        joiningFee: Number(p.joiningFee),
+        teamSize: p.teamSize,
+        uplineCommission: Number(p.uplineCommission),
+        systemFee: Number(p.systemFee),
+        levelCommission: Number(p.levelCommission),
+        slotFee: Number(p.slotFee),
+        totalCollection: Number(p.totalCollection),
+        memberProfit: Number(p.memberProfit),
+        leaderPool: Number(p.leaderPool),
+        rewardPool: Number(p.rewardPool),
+        sponsorPool: Number(p.sponsorPool),
+        roi: Number(p.roi),
+        flushoutDays: p.flushoutDays,
+        theme: planThemes[p.id] || planThemes[1],
+      }))
+    : plansData;
+
+  // Merge API transactions with fallback
+  const activeTransactions = apiTransactions?.length
+    ? apiTransactions.map((tx: any, i: number) => ({
+        id: tx.id || i,
+        type: tx.type || tx.description || 'Transaction',
+        amount: tx.amount >= 0 ? `+$${Math.abs(tx.amount).toFixed(2)}` : `-$${Math.abs(tx.amount).toFixed(2)}`,
+        time: tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : '',
+      }))
+    : recentTransactions;
+
   // Use API data if available, fallback to hardcoded
   const balance = user ? Number(user.balance) : 2580.5;
   const displayName = user?.name || 'Arushi Tyagi';
@@ -1020,7 +1063,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
 
             {subView === 'details' && (
               <div className="overflow-x-auto -mx-3 px-3">
-                <DetailsPageContent />
+                <DetailsPageContent transactions={activeTransactions} />
               </div>
             )}
             {subView === 'withdrawal' && <WithdrawalPageContent balance={balance} />}
@@ -1118,8 +1161,8 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
           {activeTab === 'plans' && (
             <motion.div key="plans" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
               <div><h1 className="text-xl font-bold text-white">Earning & Learning Programme</h1><p className="text-xs text-slate-400">Choose a plan that fits your goals</p></div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{plansData.map((plan, i) => <PremiumPlanCard key={plan.level} plan={plan} index={i} />)}</div>
-              <FlushoutScheduleCard />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{activePlans.map((plan, i) => <PremiumPlanCard key={plan.level} plan={plan} index={i} />)}</div>
+              <FlushoutScheduleCard plans={activePlans} />
             </motion.div>
           )}
 
