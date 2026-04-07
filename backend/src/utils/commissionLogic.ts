@@ -8,7 +8,13 @@ import { PrismaClient, UserStatus } from "@prisma/client";
 import config from "../config";
 import { roundMoney } from "./money";
 
-const prisma = new PrismaClient();
+let prisma: PrismaClient | null = null;
+const getPrisma = (): PrismaClient => {
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  return prisma;
+};
 
 // Commission percentages per upline level
 export const COMMISSION_LEVELS = config.COMMISSION_LEVELS;
@@ -46,6 +52,7 @@ export function resolveCommissionRecipients(
  * Get upline chain for a user (up to 7 levels)
  */
 export async function getUplineChain(userId: string, maxLevels = 7): Promise<string[]> {
+  const prisma = getPrisma();
   const chain: string[] = [];
   let currentId: string | null = userId;
 
@@ -76,6 +83,7 @@ export async function distributeCommissions(
   slotFee: number,
   planId: number
 ): Promise<CommissionBreakdown[]> {
+  const prisma = getPrisma();
   const uplineChain = await getUplineChain(enrolleeId, COMMISSION_LEVELS.length);
   const commissions = calculateCommissions(slotFee);
   const uplineCandidates = Array.from(new Set(uplineChain.slice(0, commissions.length)));
@@ -137,6 +145,7 @@ export function totalCommissionPercentage(): number {
  * Get commission summary for a user
  */
 export async function getUserCommissionSummary(userId: string) {
+  const prisma = getPrisma();
   const [total, byLevel] = await Promise.all([
     prisma.commission.aggregate({
       where: { toUserId: userId },

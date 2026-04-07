@@ -79,7 +79,21 @@ describe("earning integrity math", () => {
     });
 
     expect(totals.commissionTotal).toBe(1.4);
-    expect(totals.poolTotal).toBe(3.199388);
-    expect(totals.flushoutTotal).toBe(5.532721);
+    expect(totals.poolTotal).toBe(3.19753);
+    expect(totals.flushoutTotal).toBe(5.530861);
+  });
+
+  it("rejects non-integer enrollmentCount to avoid silent truncation", () => {
+    expect(() =>
+      calculatePlanTotals({
+        planId: 7,
+        enrollmentCount: 2.5,
+        slotFee: 3,
+        memberProfit: 12,
+        leaderPool: 1,
+        rewardPool: 0,
+        sponsorPool: 0,
+      })
+    ).toThrow("enrollmentCount must be an integer");
   });
 });

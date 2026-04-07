@@ -87,7 +87,7 @@ export async function redeemGiftCode(req: AuthenticatedRequest, res: Response): 
     }
 
     if (!giftCode.plan.isActive) {
-      res.status(409).json({ success: false, message: "Plan is inactive" });
+      res.status(422).json({ success: false, message: "Plan is inactive" });
       return;
     }
 

@@ -1,4 +1,4 @@
-import { calculateCommissions } from "./commissionLogic";
+import config from "../config";
 import { roundMoney, sumMoney } from "./money";
 
 export interface PlanMathInput {
@@ -28,11 +28,20 @@ export function calculateFlushoutTotal(plan: Pick<PlanMathInput, "memberProfit" 
 }
 
 export function calculateCommissionTotal(slotFee: number): number {
-  return sumMoney(calculateCommissions(slotFee).map((commission) => commission.amount));
+  return sumMoney(
+    config.COMMISSION_LEVELS.map((level) => roundMoney((slotFee * level.percentage) / 100))
+  );
 }
 
 export function calculatePlanTotals(plan: PlanMathInput): PlanMathTotals {
-  const enrollmentCount = Math.max(0, Math.trunc(plan.enrollmentCount ?? 1));
+  const requestedEnrollmentCount = plan.enrollmentCount ?? 1;
+  if (!Number.isFinite(requestedEnrollmentCount) || requestedEnrollmentCount < 0) {
+    throw new Error("enrollmentCount must be a finite non-negative number");
+  }
+  if (!Number.isInteger(requestedEnrollmentCount)) {
+    throw new Error("enrollmentCount must be an integer");
+  }
+  const enrollmentCount = requestedEnrollmentCount;
   const commissionTotalPerEnrollment = calculateCommissionTotal(plan.slotFee);
   const flushoutTotalPerEnrollment = calculateFlushoutTotal(plan);
   const poolTotalPerEnrollment = calculatePoolTotal(plan);
