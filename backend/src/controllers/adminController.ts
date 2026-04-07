@@ -659,8 +659,11 @@ export async function updateAdminGiftCodeStatus(req: AuthenticatedRequest, res: 
     await prisma.auditLog.create({
       data: {
         adminId: req.admin!.id,
-        action: "GIFT_CODE_DISABLED",
-        description: `Gift code ${updated.code} status changed from ${giftCode.status} to ${status}`,
+        action: status === "DISABLED" ? "GIFT_CODE_DISABLED" : "GIFT_CODE_CREATED",
+        description:
+          status === "DISABLED"
+            ? `Gift code ${updated.code} disabled`
+            : `Gift code ${updated.code} re-enabled`,
         metadata: { giftCodeId: updated.id, fromStatus: giftCode.status, toStatus: status },
       },
     });

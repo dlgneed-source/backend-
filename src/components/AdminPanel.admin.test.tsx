@@ -149,7 +149,6 @@ describe('AdminPanel gift code and audit integrations', () => {
     await screen.findByText('NEWCODE');
 
     fireEvent.click(screen.getByRole('button', { name: 'Disable' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Disable Code' }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

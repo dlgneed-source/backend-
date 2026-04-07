@@ -114,6 +114,21 @@ export async function authenticateAdmin(
         select: { id: true, walletAddress: true, role: true, isActive: true },
       });
     } else if (decoded.type === "user") {
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: { id: true, walletAddress: true, status: true },
+      });
+
+      if (
+        !user ||
+        user.walletAddress.toLowerCase() !== decoded.walletAddress.toLowerCase() ||
+        user.status === "BLOCKED" ||
+        user.status === "SUSPENDED"
+      ) {
+        res.status(403).json({ success: false, message: "Admin permission denied" });
+        return;
+      }
+
       admin = await prisma.admin.findUnique({
         where: { walletAddress: decoded.walletAddress.toLowerCase() },
         select: { id: true, walletAddress: true, role: true, isActive: true },

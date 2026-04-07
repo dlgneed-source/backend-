@@ -1633,7 +1633,6 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newCode, setNewCode] = useState({ code: '', planId: '1', days: '30', quantity: '1' });
-  const [revokeId, setRevokeId] = useState<string | null>(null);
 
   const loadGiftCodes = useCallback(async () => {
     if (!token) {
@@ -1724,10 +1723,8 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
     setError(null);
     try {
       await adminApi.updateGiftCodeStatus(token, id, status);
-      setRevokeId(null);
       await loadGiftCodes();
     } catch (err) {
-      setRevokeId(null);
       setError(err instanceof Error ? err.message : 'Failed to update gift code status');
       await loadGiftCodes();
     } finally {
@@ -1821,7 +1818,7 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
                 {gc.status !== 'USED' && gc.status !== 'EXPIRED' && (
                   <button
                     disabled={isUpdating === gc.id}
-                    onClick={() => (gc.status === 'ACTIVE' ? setRevokeId(gc.id) : void handleStatusChange(gc.id, 'ACTIVE'))}
+                    onClick={() => void handleStatusChange(gc.id, gc.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE')}
                     className="flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition-colors disabled:opacity-60"
                   >
                     <Ban className="h-3.5 w-3.5" /> {gc.status === 'ACTIVE' ? 'Disable' : 'Enable'}
@@ -1859,7 +1856,7 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
               <div className="space-y-4">
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Custom Code (Optional)</label>
-                  <input value={newCode.code} onChange={e => setNewCode({ ...newCode, code: e.target.value.toUpperCase() })} placeholder="e.g. WELCOME50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono text-white uppercase tracking-wider placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                  <input value={newCode.code} onChange={e => setNewCode({ ...newCode, code: e.target.value })} placeholder="e.g. WELCOME50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono text-white tracking-wider placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1890,25 +1887,7 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
       </AnimatePresence>
 
       {/* Revoke Confirm Modal */}
-      <AnimatePresence>
-        {revokeId && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setRevokeId(null)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()} className="w-full max-w-sm rounded-3xl border border-rose-500/20 bg-[#0d1321] p-6 shadow-2xl">
-              <div className="flex flex-col items-center gap-4 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/15 border border-rose-500/25">
-                  <AlertTriangle className="h-8 w-8 text-rose-400" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Revoke Gift Code?</h3>
-                <p className="text-sm text-slate-400">Code <span className="font-mono font-bold text-rose-300">{codes.find(c => c.id === revokeId)?.code}</span> will be permanently deactivated. Users won't be able to redeem it anymore.</p>
-                <div className="flex w-full gap-3 pt-2">
-                  <button onClick={() => setRevokeId(null)} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white">Cancel</button>
-                  <button disabled={!revokeId || isUpdating === revokeId} onClick={() => revokeId && void handleStatusChange(revokeId, 'DISABLED')} className="flex-1 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 py-3 text-sm font-bold text-white disabled:opacity-60">Disable Code</button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Status actions are backend-driven and applied directly */}
     </div>
   );
 }
