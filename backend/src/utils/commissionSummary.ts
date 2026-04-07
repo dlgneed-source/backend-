@@ -2,7 +2,8 @@ import config from "../config";
 
 const ROUND_SCALE = 1_000_000;
 const COMMISSION_CHAIN = config.COMMISSION_LEVELS.map((item) => ({
-  sourceLevel: item.level,
+  storedLevel: item.level,
+  displayLevel: item.level + 1,
   label: `Level ${item.level + 1}`,
   percentage: item.percentage,
 }));
@@ -55,10 +56,10 @@ export function buildCommissionLevelSummary({
       amount: fromScaledInt(toScaledInt(sanitizeAmount(uplineAmount))),
     },
     ...COMMISSION_CHAIN.map((chainLevel) => ({
-      key: `LEVEL_${chainLevel.sourceLevel + 1}`,
+      key: `LEVEL_${chainLevel.displayLevel}`,
       label: chainLevel.label,
       percentage: chainLevel.percentage,
-      amount: fromScaledInt(toScaledInt(sanitizeAmount(levelAmountMap.get(chainLevel.sourceLevel)))),
+      amount: fromScaledInt(toScaledInt(sanitizeAmount(levelAmountMap.get(chainLevel.storedLevel)))),
     })),
   ];
 
