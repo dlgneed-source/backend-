@@ -939,10 +939,30 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
   const [showSkills, setShowSkills] = useState(false);
-  const balance = 2580.5;
+  
+  // API hooks
+  const { data: backendOnline } = useBackendStatus();
+  const { data: apiPlans } = usePlans();
+  const { user } = useAuth();
+  
+  // Use API data if available, fallback to hardcoded
+  const balance = user ? Number(user.balance) : 2580.5;
+  const displayName = user?.name || 'Arushi Tyagi';
+  const walletAddr = user?.walletAddress ? `${user.walletAddress.slice(0,5)}...${user.walletAddress.slice(-4)}` : '0x1A4...B9F2';
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-slate-200">
+      {/* Backend Status Banner */}
+      {backendOnline === false && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-center">
+          <p className="text-xs text-amber-300">⚠️ Backend offline — showing demo data. Start your server on Kali to see real data.</p>
+        </div>
+      )}
+      {backendOnline === true && (
+        <div className="bg-emerald-500/15 border-b border-emerald-500/30 px-4 py-1.5 text-center">
+          <p className="text-xs text-emerald-300">✅ Connected to backend — live data active</p>
+        </div>
+      )}
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none"><div className="absolute -top-1/2 -left-1/2 h-full w-full rounded-full bg-violet-500/3 blur-[100px]" /><div className="absolute -bottom-1/2 -right-1/2 h-full w-full rounded-full bg-cyan-500/3 blur-[100px]" /></div>
       
