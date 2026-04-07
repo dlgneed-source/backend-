@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { useAuth } from '@/contexts/AuthContext';
+
 import {
   Wallet, ArrowUpRight, ArrowDownLeft, Users, TrendingUp, Share2, Clock, X, Download,
   BookOpen, Layers, User, Send, Gift, CheckCircle, ChevronRight, ChevronDown, ChevronUp,
