@@ -82,16 +82,6 @@ export const plansData: PlanData[] = [
   },
 ];
 
-export const levelCommissions = [
-  { level: 1, percentage: 4, label: 'Direct' },
-  { level: 2, percentage: 2, label: 'L2' },
-  { level: 3, percentage: 1, label: 'L3' },
-  { level: 4, percentage: 1, label: 'L4' },
-  { level: 5, percentage: 1, label: 'L5' },
-  { level: 6, percentage: 0.5, label: 'L6' },
-  { level: 7, percentage: 0.5, label: 'L7' },
-];
-
 export const skillLevels = [
   { level: 1, name: 'Foundation Explorer', title: 'Beginner', skills: ['HTML5 & CSS3', 'JavaScript Basics', 'Python Intro', 'Linux CLI', 'Git'], icon: BookOpen, theme: { primary: '#fbbf24', bgGlow: 'rgba(251, 191, 36, 0.15)' } },
   { level: 2, name: 'Frontend Craftsman', title: 'Intermediate', skills: ['React.js', 'Tailwind CSS', 'TypeScript', 'Responsive Design', 'APIs'], icon: Code2, theme: { primary: '#22d3ee', bgGlow: 'rgba(34, 211, 238, 0.15)' } },
@@ -359,37 +349,108 @@ const PremiumPlanCard = ({ plan, index, onSelect }: any) => {
 // =============================================
 // LEVEL COMMISSION CARD
 // =============================================
-const LevelCommissionCard = () => (
-  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(139,92,246,0.2)', background: 'linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(168,85,247,0.03) 50%, rgba(0,0,0,0.2) 100%)' }}>
-    <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400" />
-    <div className="mb-4 flex items-start gap-3">
-      <div className="flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(168,85,247,0.08))', border: '1px solid rgba(139,92,246,0.25)' }}>
-        <Network className="h-5 w-5 sm:h-7 sm:w-7 text-violet-300" />
+const LevelCommissionCard = () => {
+  const { token } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [levels, setLevels] = useState<Array<{ key: string; label: string; percentage: number | null; amount: number }>>([]);
+
+  const loadCommissions = useCallback(async () => {
+    if (!token) {
+      setLevels([]);
+      setError(null);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await teamApi.getCommissions(token);
+      const summaryLevels = response.commissionSummary?.levels;
+      const safeLevels = Array.isArray(summaryLevels)
+        ? summaryLevels
+            .filter((level) => typeof level?.label === 'string' && level.label.length > 0)
+            .map((level) => ({
+              key: String(level.key || level.label),
+              label: level.label,
+              percentage: typeof level.percentage === 'number' ? level.percentage : null,
+              amount: typeof level.amount === 'number' && Number.isFinite(level.amount) && level.amount > 0 ? level.amount : 0,
+            }))
+        : [];
+      setLevels(safeLevels);
+    } catch (err) {
+      setLevels([]);
+      setError(err instanceof Error ? err.message : 'Failed to load commissions');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadCommissions();
+  }, [loadCommissions]);
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(139,92,246,0.2)', background: 'linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(168,85,247,0.03) 50%, rgba(0,0,0,0.2) 100%)' }}>
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400" />
+      <div className="mb-4 flex items-start gap-3">
+        <div className="flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(168,85,247,0.08))', border: '1px solid rgba(139,92,246,0.25)' }}>
+          <Network className="h-5 w-5 sm:h-7 sm:w-7 text-violet-300" />
+        </div>
+        <div>
+          <p className="text-[10px] text-violet-300">Multi-Level Commission</p>
+          <h3 className="text-lg sm:text-2xl font-bold text-white">Level Commission</h3>
+          <p className="text-xs text-slate-400">Direct Upline + Level 2-8</p>
+        </div>
       </div>
-      <div>
-        <p className="text-[10px] text-violet-300">Multi-Level Commission</p>
-        <h3 className="text-lg sm:text-2xl font-bold text-white">Level Commission</h3>
-        <p className="text-xs text-slate-400">7 Levels • 10% Total</p>
-      </div>
-    </div>
-    <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-      {levelCommissions.map((c, i) => {
-        const earned = [48, 18, 7.5, 6, 4.2, 1.8, 1.5][i];
-        return (
-          <div key={i} className="relative rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center">
-            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-400 to-purple-400" />
-            <p className="text-[9px] text-slate-500">L{c.level}</p>
-            <p className="text-base sm:text-xl font-bold text-violet-300">{c.percentage}%</p>
-            <div className="mt-1 border-t border-white/5 pt-1">
-              <p className="text-[9px] text-emerald-400 font-semibold">${earned}</p>
-              <p className="text-[8px] text-slate-500">earned</p>
+
+      {isLoading && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
+          <p className="text-sm font-semibold text-slate-200">Loading commission levels...</p>
+        </div>
+      )}
+
+      {!isLoading && error && (
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4">
+          <p className="text-xs font-semibold text-rose-300">Could not load commissions</p>
+          <p className="mt-1 text-[11px] text-rose-200/80">{error}</p>
+          <button
+            onClick={loadCommissions}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-1.5 text-[11px] font-semibold text-rose-200 hover:bg-rose-500/20"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!isLoading && !error && levels.length === 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
+          <p className="text-sm font-semibold text-slate-200">No commission data</p>
+          <p className="mt-1 text-[11px] text-slate-400">Commission levels will appear after payouts are recorded.</p>
+        </div>
+      )}
+
+      {!isLoading && !error && levels.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+          {levels.map((level) => (
+            <div key={level.key} className="relative rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center">
+              <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-400 to-purple-400" />
+              <p className="text-[9px] text-slate-500">{level.label}</p>
+              <p className="text-base sm:text-xl font-bold text-violet-300">
+                {level.percentage === null ? '—' : `${level.percentage}%`}
+              </p>
+              <div className="mt-1 border-t border-white/5 pt-1">
+                <p className="text-[9px] text-emerald-400 font-semibold">${level.amount.toFixed(6)}</p>
+                <p className="text-[8px] text-slate-500">earned</p>
+              </div>
             </div>
-          </div>
-        );
-      })}
-    </div>
-  </motion.div>
-);
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+};
 
 // =============================================
 // SKILL LEVELS CARD

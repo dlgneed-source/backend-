@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
+import { teamApi } from '@/lib/api';
 import {
   AlertOctagon, Ban, Briefcase, ChevronRight, Copy, Gift, Radio, RefreshCw,
   Search, Send, Shield, TrendingUp, Wallet, Zap, Users, LayoutDashboard,
@@ -103,16 +105,6 @@ interface FlushoutRecord {
   amount: number;
   flushedAt: string;
   type: 'Auto' | 'Manual';
-}
-
-interface CommissionRecord {
-  id: number;
-  fromUser: string;
-  toUser: string;
-  amount: number;
-  level: number;
-  planId: number;
-  createdAt: string;
 }
 
 interface SecurityLog {
@@ -331,14 +323,6 @@ const flushoutRecords: FlushoutRecord[] = [
 // =============================================
 // COMMISSION RECORDS DATA
 // =============================================
-
-const commissionRecords: CommissionRecord[] = [
-  { id: 1, fromUser: '0x8A3...B7F6', toUser: '0x7B2...F1A3', amount: 0.20, level: 1, planId: 1, createdAt: '2026-03-30 14:00:00' },
-  { id: 2, fromUser: '0x2D7...C5E3', toUser: '0x7B2...F1A3', amount: 0.12, level: 2, planId: 1, createdAt: '2026-03-30 13:30:00' },
-  { id: 3, fromUser: '0x5E6...A8D4', toUser: '0x3C1...E4B2', amount: 0.40, level: 1, planId: 2, createdAt: '2026-03-30 12:00:00' },
-  { id: 4, fromUser: '0x9F8...D2C1', toUser: '0x3C1...E4B2', amount: 0.80, level: 1, planId: 3, createdAt: '2026-03-30 10:00:00' },
-  { id: 5, fromUser: '0x7B2...F1A3', toUser: '0x5E6...A8D4', amount: 0.20, level: 1, planId: 1, createdAt: '2026-03-29 16:00:00' },
-];
 
 // =============================================
 // SECURITY LOGS DATA
@@ -1389,6 +1373,70 @@ function FlushoutsManagement() {
 // COMMISSIONS MANAGEMENT COMPONENT
 // =============================================
 function CommissionsManagement() {
+  const { token } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [totalEarned, setTotalEarned] = useState(0);
+  const [levels, setLevels] = useState<Array<{ key: string; label: string; percentage: number | null; amount: number }>>([]);
+  const [records, setRecords] = useState<Array<{
+    id: string;
+    fromUser?: { walletAddress: string; name?: string | null } | null;
+    level: number;
+    planId: number;
+    amount: number;
+    createdAt: string;
+  }>>([]);
+
+  const loadCommissions = async () => {
+    if (!token) {
+      setLevels([]);
+      setRecords([]);
+      setTotalEarned(0);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await teamApi.getCommissions(token, 20);
+      const summaryLevels = response.commissionSummary?.levels;
+      setTotalEarned(typeof response.totalEarned === 'number' && Number.isFinite(response.totalEarned) ? Math.max(0, response.totalEarned) : 0);
+      setLevels(
+        Array.isArray(summaryLevels)
+          ? summaryLevels.map((level) => ({
+              key: String(level.key || level.label),
+              label: level.label,
+              percentage: typeof level.percentage === 'number' ? level.percentage : null,
+              amount: typeof level.amount === 'number' && Number.isFinite(level.amount) && level.amount > 0 ? level.amount : 0,
+            }))
+          : [],
+      );
+      setRecords(
+        Array.isArray(response.commissions)
+          ? response.commissions.map((commission) => ({
+              id: commission.id,
+              fromUser: commission.fromUser,
+              level: commission.level,
+              planId: commission.planId,
+              amount: typeof commission.amount === 'number' && Number.isFinite(commission.amount) && commission.amount > 0 ? commission.amount : 0,
+              createdAt: commission.createdAt,
+            }))
+          : [],
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load commissions');
+      setLevels([]);
+      setRecords([]);
+      setTotalEarned(0);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadCommissions();
+  }, [token]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1398,31 +1446,49 @@ function CommissionsManagement() {
           <p className="text-sm text-slate-400">Track multi-level commission payouts</p>
         </div>
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 sm:px-4 py-2">
-          <p className="text-[10px] sm:text-xs text-emerald-400">Total Distributed Today</p>
-          <p className="font-mono text-lg sm:text-xl font-bold text-emerald-300">$1,245.50</p>
+          <p className="text-[10px] sm:text-xs text-emerald-400">Total Earned</p>
+          <p className="font-mono text-lg sm:text-xl font-bold text-emerald-300">${totalEarned.toFixed(6)}</p>
         </div>
       </div>
 
       {/* Level Commission Structure */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
         <h3 className="mb-4 text-lg font-semibold text-white">Level Commission Structure</h3>
-        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-          {[
-            { level: 1, percent: 4, label: 'Direct' },
-            { level: 2, percent: 2, label: 'L2' },
-            { level: 3, percent: 1, label: 'L3' },
-            { level: 4, percent: 1, label: 'L4' },
-            { level: 5, percent: 1, label: 'L5' },
-            { level: 6, percent: 0.5, label: 'L6' },
-            { level: 7, percent: 0.5, label: 'L7' },
-          ].map((lvl) => (
-            <div key={lvl.level} className="rounded-xl border border-violet-500/20 bg-violet-500/10 p-3 text-center">
-              <p className="text-[10px] text-violet-400">{lvl.label}</p>
-              <p className="text-xl font-bold text-violet-300">{lvl.percent}%</p>
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-slate-500">Total: 10% distributed across 7 levels</p>
+        {isLoading && (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
+            <p className="text-sm font-semibold text-slate-200">Loading commissions...</p>
+          </div>
+        )}
+        {!isLoading && error && (
+          <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4">
+            <p className="text-xs font-semibold text-rose-300">Could not load commission data</p>
+            <p className="mt-1 text-[11px] text-rose-200/80">{error}</p>
+            <button
+              onClick={loadCommissions}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-1.5 text-[11px] font-semibold text-rose-200 hover:bg-rose-500/20"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Retry
+            </button>
+          </div>
+        )}
+        {!isLoading && !error && levels.length === 0 && (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
+            <p className="text-sm font-semibold text-slate-200">No commission data</p>
+          </div>
+        )}
+        {!isLoading && !error && levels.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            {levels.map((lvl) => (
+              <div key={lvl.key} className="rounded-xl border border-violet-500/20 bg-violet-500/10 p-3 text-center">
+                <p className="text-[10px] text-violet-400">{lvl.label}</p>
+                <p className="text-xl font-bold text-violet-300">{lvl.percentage === null ? '—' : `${lvl.percentage}%`}</p>
+                <p className="text-[10px] text-emerald-300">${lvl.amount.toFixed(6)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="mt-3 text-xs text-slate-500">Direct Upline + Level 2 to Level 8</p>
       </div>
 
       {/* Commission Records */}
@@ -1431,36 +1497,40 @@ function CommissionsManagement() {
           <div className="border-b border-white/10 px-4 sm:px-6 py-4">
             <h3 className="text-lg font-semibold text-white">Recent Commissions</h3>
           </div>
-          <table className="w-full">
-            <thead className="bg-white/[0.03]">
-              <tr className="border-b border-white/10">
-                <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">ID</th>
-                <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">From</th>
-                <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">To</th>
-                <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Level</th>
-                <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan</th>
-                <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Amount</th>
-                <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {commissionRecords.map((record) => (
-                <tr key={record.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
-                  <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">#{record.id}</td>
-                  <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">{record.fromUser}</td>
-                  <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">{record.toUser}</td>
-                  <td className="px-4 sm:px-6 py-4">
-                    <span className="inline-flex rounded-full border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-300">
-                      L{record.level}
-                    </span>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-slate-300">Plan {record.planId}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm font-semibold text-emerald-400">+${record.amount}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-slate-400">{record.createdAt}</td>
+          {!isLoading && !error && records.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-sm text-slate-300">No commission records found.</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-white/[0.03]">
+                <tr className="border-b border-white/10">
+                  <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">ID</th>
+                  <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">From</th>
+                  <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Level</th>
+                  <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan</th>
+                  <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Amount</th>
+                  <th className="px-4 sm:px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {records.map((record) => (
+                  <tr key={record.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
+                    <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">{record.id.slice(0, 8)}</td>
+                    <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">{record.fromUser?.walletAddress || '-'}</td>
+                    <td className="px-4 sm:px-6 py-4">
+                      <span className="inline-flex rounded-full border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                        Level {record.level + 1}
+                      </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-slate-300">Plan {record.planId}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm font-semibold text-emerald-400">+${record.amount.toFixed(6)}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-slate-400">{new Date(record.createdAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
