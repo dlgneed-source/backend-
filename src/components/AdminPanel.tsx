@@ -1856,7 +1856,7 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
               <div className="space-y-4">
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Custom Code (Optional)</label>
-                  <input value={newCode.code} onChange={e => setNewCode({ ...newCode, code: e.target.value })} placeholder="e.g. WELCOME50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono text-white tracking-wider placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                  <input value={newCode.code} onChange={e => setNewCode({ ...newCode, code: e.target.value })} placeholder="e.g. WELCOME50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono uppercase text-white tracking-wider placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>

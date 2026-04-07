@@ -515,7 +515,7 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
   try {
     const plan = await prisma.plan.findUnique({ where: { id: planId } });
     if (!plan || !plan.isActive) {
-      res.status(404).json({ success: false, message: "Plan not found" });
+      res.status(404).json({ success: false, message: "Plan not found or inactive" });
       return;
     }
 
@@ -656,17 +656,16 @@ export async function updateAdminGiftCodeStatus(req: AuthenticatedRequest, res: 
       },
     });
 
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.admin!.id,
-        action: status === "DISABLED" ? "GIFT_CODE_DISABLED" : "GIFT_CODE_CREATED",
-        description:
-          status === "DISABLED"
-            ? `Gift code ${updated.code} disabled`
-            : `Gift code ${updated.code} re-enabled`,
-        metadata: { giftCodeId: updated.id, fromStatus: giftCode.status, toStatus: status },
-      },
-    });
+    if (status === "DISABLED") {
+      await prisma.auditLog.create({
+        data: {
+          adminId: req.admin!.id,
+          action: "GIFT_CODE_DISABLED",
+          description: `Gift code ${updated.code} disabled`,
+          metadata: { giftCodeId: updated.id, fromStatus: giftCode.status, toStatus: status },
+        },
+      });
+    }
 
     res.json({
       success: true,
