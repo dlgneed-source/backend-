@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import type { StringValue } from "ms";
 dotenv.config();
 
 const config = {
@@ -10,9 +11,11 @@ const config = {
   DATABASE_URL: process.env.DATABASE_URL || "postgresql://localhost:5432/eakhuwat",
 
   // JWT
-  JWT_SECRET: process.env.JWT_SECRET || "eakhuwat-jwt-secret-change-in-production",
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
-  JWT_ADMIN_EXPIRES_IN: process.env.JWT_ADMIN_EXPIRES_IN || "1d",
+  JWT_SECRET: process.env.JWT_SECRET || (process.env.NODE_ENV === "production"
+    ? (() => { throw new Error("JWT_SECRET environment variable is required in production"); })()
+    : "eakhuwat-jwt-secret-change-in-production"),
+  JWT_EXPIRES_IN: (process.env.JWT_EXPIRES_IN || "7d") as StringValue,
+  JWT_ADMIN_EXPIRES_IN: (process.env.JWT_ADMIN_EXPIRES_IN || "1d") as StringValue,
 
   // CORS
   CORS_ORIGINS: (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000").split(","),

@@ -82,7 +82,7 @@ export const withdrawalRateLimiter = rateLimit({
  * Request ID middleware - adds unique ID to each request
  */
 export function requestIdMiddleware(req: Request, res: Response, next: NextFunction): void {
-  const id = req.headers["x-request-id"] || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const id = req.headers["x-request-id"] || `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   req.headers["x-request-id"] = id as string;
   res.setHeader("X-Request-ID", id);
   next();

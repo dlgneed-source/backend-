@@ -142,8 +142,8 @@ export function requireSuperAdmin(
 export function generateUserToken(userId: string, walletAddress: string): string {
   return jwt.sign(
     { id: userId, walletAddress, type: "user" },
-    config.JWT_SECRET as any,
-    { expiresIn: config.JWT_EXPIRES_IN as any }
+    config.JWT_SECRET,
+    { expiresIn: config.JWT_EXPIRES_IN }
   );
 }
 
@@ -153,7 +153,7 @@ export function generateUserToken(userId: string, walletAddress: string): string
 export function generateAdminToken(adminId: string, walletAddress: string, role: string): string {
   return jwt.sign(
     { id: adminId, walletAddress, role, type: "admin" },
-    config.JWT_SECRET as any,
-    { expiresIn: config.JWT_ADMIN_EXPIRES_IN as any }
+    config.JWT_SECRET,
+    { expiresIn: config.JWT_ADMIN_EXPIRES_IN }
   );
 }

@@ -38,7 +38,7 @@ export async function getUplineChain(userId: string, maxLevels = 7): Promise<str
   let currentId: string | null = userId;
 
   for (let i = 0; i < maxLevels; i++) {
-    const user = await prisma.user.findUnique({
+    const user: { referredById: string | null } | null = await prisma.user.findUnique({
       where: { id: currentId! },
       select: { referredById: true },
     });
