@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useSocket } from '@/hooks/useSocket';
+import { useAuth } from '@/contexts/AuthContext';
 import NotificationPanel from '@/components/NotificationPanel';
 import {
   ArrowLeft, BadgeCheck, ChevronDown, Hash, Lock, Pin, Plus, Reply, 
