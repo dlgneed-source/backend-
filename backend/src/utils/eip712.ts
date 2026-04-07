@@ -313,6 +313,7 @@ export function validateWithdrawalDeadline(deadline: number): void {
  */
 export function generateWithdrawalNonce(): number {
   const randomHex = Buffer.from(randomBytes(8)).toString("hex");
+  // Keep nonce within Number.MAX_SAFE_INTEGER (2^53 - 1) while preserving high entropy.
   const nonce53Bit = BigInt(`0x${randomHex}`) & ((1n << 53n) - 1n);
   return Number(nonce53Bit);
 }

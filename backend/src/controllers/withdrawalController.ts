@@ -117,7 +117,7 @@ export async function signWithdrawalRequest(req: AuthenticatedRequest, res: Resp
     let nonceAttempts = 0;
     while (nonceAttempts < MAX_NONCE_GENERATION_ATTEMPTS) {
       try {
-        // eslint-disable-next-line no-await-in-loop
+        // eslint-disable-next-line no-await-in-loop -- sequential nonce checks avoid concurrent reuse.
         await ensureNonceNotUsed(nonce, async (candidateNonce: string) => {
           const existing = await prisma.withdrawal.findFirst({
             where: { nonce: candidateNonce },

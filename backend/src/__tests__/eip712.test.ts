@@ -2,13 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ethers } from "ethers";
 
 const SIGNER_PRIVATE_KEY = "0x59c6995e998f97a5a0044966f0945382d7f9f691f8f8f7f2a5f4e5f5a5c5d5e5";
+const TEST_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000010";
 const BASE_ENV = { ...process.env };
 
 async function loadEip712(envOverrides: Record<string, string | undefined> = {}) {
   process.env = {
     ...BASE_ENV,
     NODE_ENV: "test",
-    CONTRACT_ADDRESS: "0x0000000000000000000000000000000000000010",
+    CONTRACT_ADDRESS: TEST_CONTRACT_ADDRESS,
     CHAIN_ID: "1",
     SIGNER_PRIVATE_KEY,
     EIP712_DOMAIN_NAME: "eAkhuwat",
