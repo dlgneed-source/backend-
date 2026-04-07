@@ -367,9 +367,25 @@ const LevelCommissionCard = () => {
     try {
       const response = await teamApi.getCommissions(token);
       const summaryLevels = response.commissionSummary?.levels;
+      const isValidCommissionLevel = (
+        level: unknown,
+      ): level is { key: string; label: string; percentage: number | null; amount: number } => {
+        if (!level || typeof level !== 'object') return false;
+        const candidate = level as Record<string, unknown>;
+        const hasValidPercentage = typeof candidate.percentage === 'number' || candidate.percentage === null;
+        return (
+          typeof candidate.key === 'string' &&
+          candidate.key.length > 0 &&
+          typeof candidate.label === 'string' &&
+          candidate.label.length > 0 &&
+          hasValidPercentage &&
+          typeof candidate.amount === 'number' &&
+          Number.isFinite(candidate.amount)
+        );
+      };
       const safeLevels = Array.isArray(summaryLevels)
         ? summaryLevels
-            .filter((level) => typeof level?.label === 'string' && level.label.length > 0)
+            .filter(isValidCommissionLevel)
             .map((level) => ({
               key: String(level.key || level.label),
               label: level.label,

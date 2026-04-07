@@ -23,7 +23,7 @@ interface BuildCommissionSummaryParams {
   }> | null;
 }
 
-const toScaledInt = (value: number): number => Math.round((value + Number.EPSILON) * ROUND_SCALE);
+const toScaledInt = (value: number): number => Math.round(value * ROUND_SCALE);
 const fromScaledInt = (value: number): number => value / ROUND_SCALE;
 
 const sanitizeAmount = (value: number | null | undefined): number => {

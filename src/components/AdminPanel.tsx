@@ -1401,10 +1401,26 @@ function CommissionsManagement() {
     try {
       const response = await teamApi.getCommissions(token, 20);
       const summaryLevels = response.commissionSummary?.levels;
+      const isValidCommissionLevel = (
+        level: unknown,
+      ): level is { key: string; label: string; percentage: number | null; amount: number } => {
+        if (!level || typeof level !== 'object') return false;
+        const candidate = level as Record<string, unknown>;
+        const hasValidPercentage = typeof candidate.percentage === 'number' || candidate.percentage === null;
+        return (
+          typeof candidate.key === 'string' &&
+          candidate.key.length > 0 &&
+          typeof candidate.label === 'string' &&
+          candidate.label.length > 0 &&
+          hasValidPercentage &&
+          typeof candidate.amount === 'number' &&
+          Number.isFinite(candidate.amount)
+        );
+      };
       setTotalEarned(typeof response.totalEarned === 'number' && Number.isFinite(response.totalEarned) ? Math.max(0, response.totalEarned) : 0);
       setLevels(
         Array.isArray(summaryLevels)
-          ? summaryLevels.map((level) => ({
+          ? summaryLevels.filter(isValidCommissionLevel).map((level) => ({
               key: String(level.key || level.label),
               label: level.label,
               percentage: typeof level.percentage === 'number' ? level.percentage : null,
