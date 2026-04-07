@@ -687,14 +687,19 @@ const CommunityLounge: React.FC = () => {
               {activeRoom?.isVip && <Crown className="h-4 w-4" style={{ color: '#fbbf24' }} />}
             </h1>
             <p className="truncate text-xs flex items-center gap-1.5" style={{ color: '#94a3b8' }}>
-              {selectedDM ? (
+              {typingCount > 0 ? (
+                <span className="text-violet-400 animate-pulse">
+                  {typingCount === 1 ? 'Someone is typing...' : `${typingCount} people typing...`}
+                </span>
+              ) : selectedDM ? (
                 <>
-                  <span className={`w-2 h-2 rounded-full ${activeDMObj?.online ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-                  {activeDMObj?.online ? 'Online' : `Last seen ${activeDMObj?.lastSeen}`}
+                  <span className={`w-2 h-2 rounded-full ${socket.isConnected && socket.onlineUsers.includes(selectedDM) ? 'bg-emerald-500' : activeDMObj?.online ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                  {socket.isConnected && socket.onlineUsers.includes(selectedDM) ? 'Online' : activeDMObj?.online ? 'Online' : `Last seen ${activeDMObj?.lastSeen}`}
                 </>
               ) : (
                 <>
                   <Users className="w-3 h-3" /> {activeRoom?.memberCount?.toLocaleString()} members
+                  {socket.isConnected && <span className="ml-1 text-emerald-400">• Live</span>}
                 </>
               )}
             </p>
