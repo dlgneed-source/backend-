@@ -6,6 +6,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
+import { roundMoney } from "../utils/money";
 
 const prisma = new PrismaClient();
 
@@ -106,14 +107,14 @@ export async function getBalance(req: AuthenticatedRequest, res: Response): Prom
     res.json({
       success: true,
       balance: {
-        totalEarned: parseFloat(totalEarned.toFixed(6)),
-        totalWithdrawn: parseFloat(totalWithdrawn.toFixed(6)),
-        availableBalance: parseFloat(Math.max(0, availableBalance).toFixed(6)),
+        totalEarned: roundMoney(totalEarned),
+        totalWithdrawn: roundMoney(totalWithdrawn),
+        availableBalance: roundMoney(Math.max(0, availableBalance)),
         breakdown: {
-          commissions: parseFloat((commissions._sum.amount || 0).toFixed(6)),
-          uplineCommissions: parseFloat((uplineCommissions._sum.amount || 0).toFixed(6)),
-          flushouts: parseFloat((flushouts._sum.amount || 0).toFixed(6)),
-          incentives: parseFloat((incentives._sum.amount || 0).toFixed(6)),
+          commissions: roundMoney(commissions._sum.amount || 0),
+          uplineCommissions: roundMoney(uplineCommissions._sum.amount || 0),
+          flushouts: roundMoney(flushouts._sum.amount || 0),
+          incentives: roundMoney(incentives._sum.amount || 0),
         },
       },
     });

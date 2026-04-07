@@ -1,7 +1,6 @@
 import config from "../config";
+import { roundMoney, sumMoney } from "./money";
 
-// Keep precision safe up to 6 decimal places for commission amounts.
-const ROUND_SCALE = 1_000_000;
 const COMMISSION_CHAIN = config.COMMISSION_LEVELS.map((item) => ({
   storedLevel: item.level,
   displayLevel: item.level + 1,
@@ -23,9 +22,6 @@ interface BuildCommissionSummaryParams {
     amount?: number | null;
   }> | null;
 }
-
-const toScaledInt = (value: number): number => Math.round(value * ROUND_SCALE);
-const fromScaledInt = (value: number): number => value / ROUND_SCALE;
 
 const sanitizeAmount = (value: number | null | undefined): number => {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -54,19 +50,17 @@ export function buildCommissionLevelSummary({
       key: "DIRECT_UPLINE",
       label: "Direct Upline",
       percentage: null,
-      amount: fromScaledInt(toScaledInt(sanitizeAmount(uplineAmount))),
+      amount: roundMoney(sanitizeAmount(uplineAmount)),
     },
     ...COMMISSION_CHAIN.map((chainLevel) => ({
       key: `LEVEL_${chainLevel.displayLevel}`,
       label: chainLevel.label,
       percentage: chainLevel.percentage,
-      amount: fromScaledInt(toScaledInt(sanitizeAmount(levelAmountMap.get(chainLevel.storedLevel)))),
+      amount: roundMoney(sanitizeAmount(levelAmountMap.get(chainLevel.storedLevel))),
     })),
   ];
 
-  const totalEarned = fromScaledInt(
-    levels.reduce((sum, level) => sum + toScaledInt(level.amount), 0),
-  );
+  const totalEarned = sumMoney(levels.map((level) => level.amount));
 
   return {
     levels,

@@ -61,6 +61,15 @@ export async function enrollInPlan(req: AuthenticatedRequest, res: Response): Pr
   const userId = req.user!.id;
 
   try {
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { status: true, referredById: true },
+    });
+    if (!currentUser || currentUser.status !== "ACTIVE") {
+      res.status(403).json({ success: false, message: "Inactive users cannot enroll in plans" });
+      return;
+    }
+
     const plan = await prisma.plan.findUnique({ where: { id: planId } });
     if (!plan || !plan.isActive) {
       res.status(404).json({ success: false, message: "Plan not found or inactive" });
@@ -95,16 +104,18 @@ export async function enrollInPlan(req: AuthenticatedRequest, res: Response): Pr
     });
 
     // Upline commission (direct referrer gets joiningFee commission)
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { referredById: true },
-    });
+    const directUpline = currentUser.referredById
+      ? await prisma.user.findUnique({
+          where: { id: currentUser.referredById },
+          select: { id: true, status: true },
+        })
+      : null;
 
-    if (user?.referredById && plan.uplineCommission > 0) {
+    if (directUpline?.status === "ACTIVE" && plan.uplineCommission > 0) {
       await prisma.uplineCommission.create({
         data: {
           enrollmentId: enrollment.id,
-          recipientId: user.referredById,
+          recipientId: directUpline.id,
           amount: plan.uplineCommission,
           planId,
         },
@@ -112,7 +123,7 @@ export async function enrollInPlan(req: AuthenticatedRequest, res: Response): Pr
 
       await prisma.transaction.create({
         data: {
-          userId: user.referredById,
+          userId: directUpline.id,
           type: "UPLINE_COMMISSION",
           amount: plan.uplineCommission,
           description: `Upline commission from Plan ${planId} enrollment`,

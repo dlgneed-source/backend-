@@ -4,10 +4,17 @@
  * Applied on the slotFee (entry fee paid by new enrollee)
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, UserStatus } from "@prisma/client";
 import config from "../config";
+import { roundMoney } from "./money";
 
-const prisma = new PrismaClient();
+let prisma: PrismaClient | null = null;
+const getPrisma = (): PrismaClient => {
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  return prisma;
+};
 
 // Commission percentages per upline level
 export const COMMISSION_LEVELS = config.COMMISSION_LEVELS;
@@ -26,14 +33,26 @@ export function calculateCommissions(slotFee: number): Array<{ level: number; pe
   return COMMISSION_LEVELS.map(({ level, percentage }) => ({
     level,
     percentage,
-    amount: parseFloat(((slotFee * percentage) / 100).toFixed(6)),
+    amount: roundMoney((slotFee * percentage) / 100),
   }));
+}
+
+export function resolveCommissionRecipients(
+  uplineChain: string[],
+  statusByUserId: Map<string, UserStatus>
+): Array<string | null> {
+  return COMMISSION_LEVELS.map((_, index) => {
+    const candidateId = uplineChain[index];
+    if (!candidateId) return null;
+    return statusByUserId.get(candidateId) === "ACTIVE" ? candidateId : null;
+  });
 }
 
 /**
  * Get upline chain for a user (up to 7 levels)
  */
 export async function getUplineChain(userId: string, maxLevels = 7): Promise<string[]> {
+  const prisma = getPrisma();
   const chain: string[] = [];
   let currentId: string | null = userId;
 
@@ -64,13 +83,23 @@ export async function distributeCommissions(
   slotFee: number,
   planId: number
 ): Promise<CommissionBreakdown[]> {
+  const prisma = getPrisma();
   const uplineChain = await getUplineChain(enrolleeId, COMMISSION_LEVELS.length);
   const commissions = calculateCommissions(slotFee);
+  const uplineCandidates = Array.from(new Set(uplineChain.slice(0, commissions.length)));
+  const uplineUsers = uplineCandidates.length
+    ? await prisma.user.findMany({
+        where: { id: { in: uplineCandidates } },
+        select: { id: true, status: true },
+      })
+    : [];
+  const statusByUserId = new Map<string, UserStatus>(uplineUsers.map((user) => [user.id, user.status]));
+  const resolvedRecipients = resolveCommissionRecipients(uplineChain, statusByUserId);
   const results: CommissionBreakdown[] = [];
 
   for (let i = 0; i < commissions.length; i++) {
     const { level, percentage, amount } = commissions[i];
-    const recipientId = uplineChain[i] || null;
+    const recipientId = resolvedRecipients[i];
 
     if (recipientId && amount > 0) {
       // Create commission record
@@ -116,6 +145,7 @@ export function totalCommissionPercentage(): number {
  * Get commission summary for a user
  */
 export async function getUserCommissionSummary(userId: string) {
+  const prisma = getPrisma();
   const [total, byLevel] = await Promise.all([
     prisma.commission.aggregate({
       where: { toUserId: userId },

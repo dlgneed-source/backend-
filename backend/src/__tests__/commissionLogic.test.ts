@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { calculateCommissions, totalCommissionPercentage, COMMISSION_LEVELS } from "../utils/commissionLogic";
+import { UserStatus } from "@prisma/client";
+import {
+  calculateCommissions,
+  totalCommissionPercentage,
+  COMMISSION_LEVELS,
+  resolveCommissionRecipients,
+} from "../utils/commissionLogic";
 
 describe("Commission Logic", () => {
   it("should have 7 commission levels", () => {
@@ -69,6 +75,7 @@ describe("Commission Logic", () => {
   });
 
   it("should have correct commission level structure", () => {
+    const commissions = calculateCommissions(10);
     commissions.forEach((c) => {
       expect(c).toHaveProperty("level");
       expect(c).toHaveProperty("percentage");
@@ -82,7 +89,25 @@ describe("Commission Logic", () => {
     const total = commissions.reduce((sum, c) => sum + c.amount, 0);
     expect(total).toBeCloseTo(10, 4); // 10% of 100 (4+2+1+1+1+0.5+0.5)
   });
-});
 
-// Fix the missing commissions variable in the last test
-const commissions = calculateCommissions(10);
+  it("applies deterministic 6-decimal rounding for edge slotFee values", () => {
+    const commissions = calculateCommissions(1.9999999);
+    expect(commissions[0].amount).toBe(0.08);
+    expect(commissions[1].amount).toBe(0.04);
+    expect(commissions[5].amount).toBe(0.01);
+  });
+
+  it("handles missing and inactive uplines safely", () => {
+    const statuses = new Map<string, UserStatus>([
+      ["u1", "ACTIVE"],
+      ["u2", "SUSPENDED"],
+      ["u3", "ACTIVE"],
+    ]);
+    const recipients = resolveCommissionRecipients(["u1", "u2", "u3"], statuses);
+
+    expect(recipients[0]).toBe("u1");
+    expect(recipients[1]).toBeNull();
+    expect(recipients[2]).toBe("u3");
+    expect(recipients.slice(3).every((id) => id === null)).toBe(true);
+  });
+});
