@@ -128,7 +128,7 @@ export async function getTeamCommissions(req: AuthenticatedRequest, res: Respons
   const skip = (page - 1) * limit;
 
   try {
-    const [commissions, total, totalEarned, uplineEarned, byLevel] = await Promise.all([
+    const [commissions, total, uplineEarned, byLevel] = await Promise.all([
       prisma.commission.findMany({
         where: { toUserId: req.user!.id },
         include: {
@@ -140,10 +140,6 @@ export async function getTeamCommissions(req: AuthenticatedRequest, res: Respons
         take: limit,
       }),
       prisma.commission.count({ where: { toUserId: req.user!.id } }),
-      prisma.commission.aggregate({
-        where: { toUserId: req.user!.id },
-        _sum: { amount: true },
-      }),
       prisma.uplineCommission.aggregate({
         where: { recipientId: req.user!.id },
         _sum: { amount: true },
@@ -170,9 +166,7 @@ export async function getTeamCommissions(req: AuthenticatedRequest, res: Respons
     res.json({
       success: true,
       commissions: normalizedCommissions,
-      totalEarned: parseFloat(
-        ((totalEarned._sum.amount || 0) + (uplineEarned._sum.amount || 0)).toFixed(6),
-      ),
+      totalEarned: summary.totalEarned,
       commissionSummary: summary,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });

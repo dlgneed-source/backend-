@@ -387,7 +387,7 @@ const LevelCommissionCard = () => {
         ? summaryLevels
             .filter(isValidCommissionLevel)
             .map((level) => ({
-              key: String(level.key || level.label),
+              key: level.key,
               label: level.label,
               percentage: typeof level.percentage === 'number' ? level.percentage : null,
               amount: typeof level.amount === 'number' && Number.isFinite(level.amount) && level.amount > 0 ? level.amount : 0,

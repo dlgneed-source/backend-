@@ -1,5 +1,6 @@
 import config from "../config";
 
+// Keep precision safe up to 6 decimal places for commission amounts.
 const ROUND_SCALE = 1_000_000;
 const COMMISSION_CHAIN = config.COMMISSION_LEVELS.map((item) => ({
   storedLevel: item.level,
