@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 
@@ -16,6 +16,15 @@ const ADDRESS_2 = '0x2222222222222222222222222222222222222222';
 
 type Listener = (...args: unknown[]) => void;
 type ProviderEvents = Record<string, Listener[]>;
+
+class ProviderRejectedError extends Error {
+  code = 4001;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'ProviderRejectedError';
+  }
+}
 
 function createProvider(requestHandler: (method: string, params?: unknown[] | object) => unknown) {
   const events: ProviderEvents = {};
@@ -135,7 +144,7 @@ describe('AuthContext wallet flow', () => {
     const provider = createProvider((method) => {
       if (method === 'eth_accounts') return [];
       if (method === 'eth_chainId') return '0x38';
-      if (method === 'eth_requestAccounts') throw { code: 4001, message: 'Rejected' };
+      if (method === 'eth_requestAccounts') throw new ProviderRejectedError('Rejected');
       return null;
     });
     Object.defineProperty(window, 'ethereum', { configurable: true, value: provider });
@@ -252,7 +261,9 @@ describe('AuthContext wallet flow', () => {
     fireEvent.click(screen.getByText('connect'));
     await waitFor(() => expect(screen.getByTestId('authenticated')).toHaveTextContent('true'));
 
-    provider.emit('accountsChanged', [ADDRESS_2]);
+    await act(async () => {
+      provider.emit('accountsChanged', [ADDRESS_2]);
+    });
     await waitFor(() => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('false');
       expect(screen.getByTestId('wallet-error')).toHaveTextContent('account changed');

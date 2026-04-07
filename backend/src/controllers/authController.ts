@@ -52,7 +52,7 @@ export async function getNonce(req: Request, res: Response): Promise<void> {
  * Verify wallet signature and issue JWT
  */
 export async function login(req: Request, res: Response): Promise<void> {
-  const { walletAddress, signature, message, referralCode } = req.body;
+  const { walletAddress, signature, referralCode } = req.body;
 
   try {
     const normalizedWallet = walletAddress.toLowerCase();
@@ -68,10 +68,6 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const expectedMessage = generateSignInMessage(normalizedWallet, user.nonce);
-    if (typeof message === "string" && message !== expectedMessage) {
-      res.status(401).json({ success: false, message: "Message mismatch" });
-      return;
-    }
 
     // Verify signature
     let signerAddress: string;

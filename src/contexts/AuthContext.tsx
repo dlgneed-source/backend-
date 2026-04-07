@@ -42,7 +42,8 @@ interface AuthContextType {
 }
 
 const AUTH_TOKEN_KEY = 'ea_auth_token';
-const EXPECTED_CHAIN_ID = normalizeChainId(import.meta.env.VITE_CHAIN_ID || '0x38');
+const DEFAULT_BSC_CHAIN_ID = '0x38';
+const EXPECTED_CHAIN_ID = normalizeChainId(import.meta.env.VITE_CHAIN_ID || DEFAULT_BSC_CHAIN_ID);
 const AuthContext = createContext<AuthContextType | null>(null);
 
 function getProvider(): EthereumProvider | null {
@@ -62,7 +63,7 @@ function normalizeChainId(chainId: string | undefined): string | null {
   }
 
   const asNumber = Number(chainId);
-  if (!Number.isFinite(asNumber) || asNumber <= 0) return null;
+  if (!Number.isFinite(asNumber) || asNumber < 0) return null;
   return `0x${asNumber.toString(16)}`.toLowerCase();
 }
 
@@ -267,7 +268,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setWalletError(`Wrong network. Switch to ${formatExpectedChain(EXPECTED_CHAIN_ID)}.`);
         }
       } catch {
-        // no-op
+        if (import.meta.env.DEV) {
+          console.warn('Failed to read wallet provider state');
+        }
       }
     })();
 
@@ -283,7 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const activeUser = userRef.current;
-      if (activeUser && activeUser.walletAddress.toLowerCase() !== nextAddress) {
+      if (activeUser && activeUser.walletAddress !== nextAddress) {
         clearSession();
         setWalletError('Wallet account changed. Please reconnect.');
         toast.info('Wallet account changed. Please reconnect.');
