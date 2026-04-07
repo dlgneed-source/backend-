@@ -9,6 +9,8 @@ import { v4 as uuidv4 } from "uuid";
 import { verifyWalletSignature, generateSignInMessage } from "../utils/eip712";
 import { generateUserToken } from "../middleware/auth";
 import { AuthenticatedRequest } from "../middleware/auth";
+import config from "../config";
+import { isValidWalletAddress } from "../middleware/security";
 
 const prisma = new PrismaClient();
 
@@ -154,6 +156,57 @@ export async function getMe(req: AuthenticatedRequest, res: Response): Promise<v
 export async function refreshToken(req: AuthenticatedRequest, res: Response): Promise<void> {
   const token = generateUserToken(req.user!.id, req.user!.walletAddress);
   res.json({ success: true, token });
+}
+
+/**
+ * POST /auth/dev-login
+ * Development-only login for frontend local integration
+ */
+export async function devLogin(req: Request, res: Response): Promise<void> {
+  if (config.NODE_ENV === "production") {
+    res.status(403).json({ success: false, message: "dev-login is disabled in production" });
+    return;
+  }
+
+  const walletAddress = String(req.body?.walletAddress || "").toLowerCase();
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : undefined;
+
+  if (!isValidWalletAddress(walletAddress)) {
+    res.status(400).json({ success: false, message: "Invalid wallet address" });
+    return;
+  }
+
+  try {
+    const user = await prisma.user.upsert({
+      where: { walletAddress },
+      update: {
+        ...(name ? { name } : {}),
+        lastLoginAt: new Date(),
+      },
+      create: {
+        walletAddress,
+        name: name || null,
+        referralCode: generateReferralCode(walletAddress),
+        lastLoginAt: new Date(),
+      },
+    });
+
+    const token = generateUserToken(user.id, user.walletAddress);
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        walletAddress: user.walletAddress,
+        name: user.name,
+        referralCode: user.referralCode,
+        status: user.status,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Development login failed" });
+  }
 }
 
 // =============================================

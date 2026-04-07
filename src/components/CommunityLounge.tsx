@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationPanel from '@/components/NotificationPanel';
+import { communityApi } from '@/lib/api';
+import { communitySocket } from '@/lib/communitySocket';
 import {
   ArrowLeft, BadgeCheck, ChevronDown, Hash, Lock, Pin, Plus, Reply, 
   Search, Send, Settings, Shield, Smile, Users, Wallet, X, User, 
@@ -39,7 +41,7 @@ type Contact = {
 };
 
 interface Msg { 
-  id: number; 
+  id: string; 
   roomId: string; 
   user: string; 
   initials: string; 
@@ -49,7 +51,7 @@ interface Msg {
   userId?: string; 
   role?: string; 
   wallet?: string; 
-  replyToId?: number;
+  replyToId?: string;
   reactions?: { emoji: string; count: number; users: string[] }[];
   isEdited?: boolean;
   attachments?: { type: 'image' | 'file'; url: string; name: string; size?: string }[];
@@ -97,10 +99,10 @@ const communityMembers: Contact[] = [...dmContacts,
 ];
 
 const seedMessages: Msg[] = [
-  { id: 1, roomId: 'announcements', user: 'Web3Wizard', initials: 'WW', text: '🎉 Welcome to the new E@Akhuwat Premium Lounge! Experience the future of community.', time: '09:15', userId: 'dm2', role: 'Admin', wallet: '0x99B...1C3d', reactions: [{ emoji: '🎉', count: 24, users: [] }, { emoji: '🔥', count: 18, users: [] }] },
-  { id: 2, roomId: 'general', user: 'CryptoKing', initials: 'CK', text: 'This UI is absolutely fire! The glassmorphism effects are chefs kiss 👌', time: '09:18', userId: 'dm4', role: 'Member', wallet: '0x44D...2E1f', reactions: [{ emoji: '❤️', count: 8, users: [] }] },
-  { id: 3, roomId: 'general', user: 'AIDevSara', initials: 'AS', text: 'Agreed! The mobile experience is so smooth now 🚀', time: '09:19', userId: 'dm1', role: 'Moderator', wallet: '0x71C...4A2b', replyToId: 2, reactions: [{ emoji: '💯', count: 5, users: [] }] },
-  { id: 4, roomId: 'general', user: 'NodeRunner', initials: 'NR', text: 'Just staked my tokens. The yield is insane! 📈', time: '09:22', userId: 'dm3', role: 'VIP Member', wallet: '0x11A...9F8e' },
+  { id: '1', roomId: 'announcements', user: 'Web3Wizard', initials: 'WW', text: '🎉 Welcome to the new E@Akhuwat Premium Lounge! Experience the future of community.', time: '09:15', userId: 'dm2', role: 'Admin', wallet: '0x99B...1C3d', reactions: [{ emoji: '🎉', count: 24, users: [] }, { emoji: '🔥', count: 18, users: [] }] },
+  { id: '2', roomId: 'general', user: 'CryptoKing', initials: 'CK', text: 'This UI is absolutely fire! The glassmorphism effects are chefs kiss 👌', time: '09:18', userId: 'dm4', role: 'Member', wallet: '0x44D...2E1f', reactions: [{ emoji: '❤️', count: 8, users: [] }] },
+  { id: '3', roomId: 'general', user: 'AIDevSara', initials: 'AS', text: 'Agreed! The mobile experience is so smooth now 🚀', time: '09:19', userId: 'dm1', role: 'Moderator', wallet: '0x71C...4A2b', replyToId: '2', reactions: [{ emoji: '💯', count: 5, users: [] }] },
+  { id: '4', roomId: 'general', user: 'NodeRunner', initials: 'NR', text: 'Just staked my tokens. The yield is insane! 📈', time: '09:22', userId: 'dm3', role: 'VIP Member', wallet: '0x11A...9F8e' },
 ];
 
 const emojis = ['👍', '❤️', '🔥', '😂', '🎉', '👏', '😍', '🤔', '👎', '😢'];
@@ -115,8 +117,9 @@ const CommunityLounge: React.FC = () => {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auth
-  const socket = null; // Socket removed - will be added with backend
+  const socket = communitySocket;
   const { user, isAuthenticated } = useAuth();
+  const [isSocketConnected, setIsSocketConnected] = useState(socket.isConnected);
 
   // Check mobile on mount and resize
   useEffect(() => {
@@ -125,6 +128,8 @@ const CommunityLounge: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  useEffect(() => socket.onConnectionChange(setIsSocketConnected), [socket]);
 
   const [activeTab, setActiveTab] = useState<'community' | 'dms'>('community');
   const [mobileShowChat, setMobileShowChat] = useState(false);
@@ -145,8 +150,8 @@ const CommunityLounge: React.FC = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState<number | null>(null);
-  const [showMessageMenu, setShowMessageMenu] = useState<number | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [showMessageMenu, setShowMessageMenu] = useState<string | null>(null);
   const [profileTarget, setProfileTarget] = useState<Profile | null>(null);
   const [showSearchInChat, setShowSearchInChat] = useState(false);
   const [myBio, setMyBio] = useState('Web3 enthusiast and crypto trader. Building the future of decentralized finance.');
@@ -155,6 +160,55 @@ const CommunityLounge: React.FC = () => {
   const [isNewRoomVip, setIsNewRoomVip] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    communityApi
+      .getBootstrap()
+      .then((payload) => {
+        if (!mounted) return;
+        if (payload.rooms?.length) setRooms(payload.rooms);
+        if (payload.messages?.length) {
+          setMessages(
+            payload.messages.map((msg) => ({
+              id: String(msg.id),
+              roomId: msg.roomId,
+              user: msg.user?.name || 'Unknown',
+              initials: (msg.user?.name || 'UN').slice(0, 2).toUpperCase(),
+              text: msg.text,
+              time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              userId: msg.userId,
+              wallet: msg.user?.walletAddress || '—',
+              replyToId: msg.replyToId ? String(msg.replyToId) : undefined,
+              isPinned: msg.isPinned,
+            }))
+          );
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      socket.disconnect();
+      return;
+    }
+
+    socket.connect({
+      id: user.id,
+      name: user.name || user.walletAddress.slice(0, 8),
+      walletAddress: user.walletAddress,
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [isAuthenticated, user?.id, user?.name, user?.walletAddress]);
 
   const activeRoom = rooms.find((r) => r.id === selectedRoomId) ?? rooms[0];
   const activeDMObj = selectedDM ? contacts.find((c) => c.id === selectedDM) ?? null : null;
@@ -225,18 +279,18 @@ const CommunityLounge: React.FC = () => {
     if (!input.trim()) return;
     const targetRoomId = selectedDM ? `dm:${selectedDM}` : selectedRoomId;
     
-    if (socket.isConnected) {
+    if (isSocketConnected) {
       // Use Socket.IO for real-time
       if (selectedDM) {
         socket.sendDM(selectedDM, input.trim());
       } else {
-        socket.sendMessage(selectedRoomId, input.trim(), replyTo?.id?.toString());
+        socket.sendMessage(selectedRoomId, input.trim(), replyTo?.id);
       }
       socket.stopTyping(selectedRoomId);
     } else {
       // Fallback: local-only message
       setMessages((prev) => [...prev, { 
-        id: Date.now(), 
+        id: String(Date.now()), 
         roomId: targetRoomId, 
         user: user?.name || 'You', 
         initials: (user?.name || 'YO').slice(0, 2).toUpperCase(), 
@@ -257,15 +311,15 @@ const CommunityLounge: React.FC = () => {
 
   // Socket.IO listeners
   useEffect(() => {
-    if (!socket.isConnected) return;
+    if (!isSocketConnected) return;
 
     // Join current room
     if (!selectedDM) socket.joinRoom(selectedRoomId);
 
     // Listen for new messages
-    socket.onMessage((msg) => {
+    const offMessage = socket.onMessage((msg) => {
       setMessages((prev) => [...prev, {
-        id: Date.now() + Math.random(),
+        id: String(msg.id || Date.now()),
         roomId: msg.roomId,
         user: msg.user?.name || msg.user?.walletAddress?.slice(0, 8) || 'Unknown',
         initials: (msg.user?.name || 'UN').slice(0, 2).toUpperCase(),
@@ -277,9 +331,9 @@ const CommunityLounge: React.FC = () => {
       }]);
     });
 
-    socket.onDM((dm) => {
+    const offDM = socket.onDM((dm) => {
       setMessages((prev) => [...prev, {
-        id: Date.now() + Math.random(),
+        id: String(dm.id || Date.now()),
         roomId: `dm:${dm.senderId === user?.id ? dm.receiverId : dm.senderId}`,
         user: dm.sender?.name || dm.sender?.walletAddress?.slice(0, 8) || 'Unknown',
         initials: (dm.sender?.name || 'UN').slice(0, 2).toUpperCase(),
@@ -290,11 +344,11 @@ const CommunityLounge: React.FC = () => {
       }]);
     });
 
-    socket.onDelete(({ messageId }) => {
+    const offDelete = socket.onDelete(({ messageId }) => {
       setMessages(prev => prev.filter(m => String(m.id) !== messageId));
     });
 
-    socket.onPin(({ messageId, isPinned }) => {
+    const offPin = socket.onPin(({ messageId, isPinned }) => {
       setMessages(prev => prev.map(m => 
         String(m.id) === messageId ? { ...m, isPinned } : m
       ));
@@ -302,13 +356,17 @@ const CommunityLounge: React.FC = () => {
 
     return () => {
       if (!selectedDM) socket.leaveRoom(selectedRoomId);
+      offMessage();
+      offDM();
+      offDelete();
+      offPin();
     };
-  }, [socket.isConnected, selectedRoomId, selectedDM]);
+  }, [isSocketConnected, selectedRoomId, selectedDM, user?.id]);
 
   // Typing indicator handler
   const handleInputChange = (value: string) => {
     setInput(value);
-    if (socket.isConnected && !selectedDM) {
+    if (isSocketConnected && !selectedDM) {
       socket.startTyping(selectedRoomId);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
@@ -348,7 +406,7 @@ const CommunityLounge: React.FC = () => {
     }
   };
 
-  const addReaction = (msgId: number, emoji: string) => {
+  const addReaction = (msgId: string, emoji: string) => {
     setMessages(prev => prev.map(m => {
       if (m.id !== msgId) return m;
       const existing = m.reactions?.find(r => r.emoji === emoji);
@@ -368,12 +426,12 @@ const CommunityLounge: React.FC = () => {
     setShowMessageMenu(null);
   };
 
-  const deleteMessage = (msgId: number) => {
+  const deleteMessage = (msgId: string) => {
     setMessages(prev => prev.filter(m => m.id !== msgId));
     setShowMessageMenu(null);
   };
 
-  const pinMessage = (msgId: number) => {
+  const pinMessage = (msgId: string) => {
     setMessages(prev => prev.map(m => 
       m.id === msgId ? { ...m, isPinned: !m.isPinned } : m
     ));
@@ -990,7 +1048,7 @@ const CommunityLounge: React.FC = () => {
                 send();
               }
             }}
-            placeholder={socket.isConnected ? "Type a message (live)..." : "Type a message..."} 
+            placeholder={isSocketConnected ? "Type a message (live)..." : "Type a message..."} 
             className="flex-1 bg-transparent text-sm outline-none min-h-[44px] py-2"
             style={{ color: 'white' }}
           />

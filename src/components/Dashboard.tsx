@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
+import { usersApi } from '@/lib/api';
 
 
 import {
@@ -935,17 +937,51 @@ const DetailsPageContent = ({ transactions }: { transactions: typeof recentTrans
 // MAIN DASHBOARD COMPONENT
 // =============================================
 const Dashboard = ({ onBack }: { onBack?: () => void }) => {
+  const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'plans' | 'network' | 'rewards'>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
   const [showSkills, setShowSkills] = useState(false);
+  const [liveTransactions, setLiveTransactions] = useState<typeof recentTransactions>(recentTransactions);
   
-  // Use hardcoded data
+  useEffect(() => {
+    if (!token) return;
+
+    usersApi
+      .getTransactions(token, 4)
+      .then((response) => {
+        if (!response.transactions.length) {
+          setLiveTransactions([]);
+          return;
+        }
+
+        const mapped = response.transactions.map((tx, index) => {
+          const isDebit = tx.type === 'WITHDRAWAL' || tx.type === 'SYSTEM_FEE' || tx.type === 'FLUSHOUT';
+          const signedAmount = `${isDebit ? '-' : '+'}$${Math.abs(tx.amount).toFixed(2)}`;
+          const timeLabel = new Date(tx.createdAt).toLocaleString();
+
+          return {
+            id: index + 1,
+            type: tx.type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (ch) => ch.toUpperCase()),
+            amount: signedAmount,
+            time: timeLabel,
+          };
+        });
+
+        setLiveTransactions(mapped);
+      })
+      .catch(() => {
+        setLiveTransactions(recentTransactions);
+      });
+  }, [token]);
+
   const activePlans: PlanData[] = plansData;
-  const activeTransactions = recentTransactions;
-  const balance = 2580.5;
-  const displayName = 'Arushi Tyagi';
-  const walletAddr = '0x1A4...B9F2';
+  const activeTransactions = liveTransactions;
+  const balance = Number(user?.balance || 0);
+  const displayName = user?.name || 'Wallet User';
+  const walletAddr = user?.walletAddress
+    ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
+    : '—';
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-slate-200">

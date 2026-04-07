@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Camera, Users, Award, Wallet, Copy, Check, 
   Settings, ChevronRight, ShieldCheck, Headphones, X, Edit3,
   Link, ArrowUpRight, History, LockKeyhole, LogOut
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 15 },
@@ -12,14 +14,19 @@ const fadeUp = {
 };
 
 const ProfilePanel: React.FC = () => {
+  const { user } = useAuth();
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [copiedWallet, setCopiedWallet] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [userName, setUserName] = useState('Arushi tyagi');
+  const [userName, setUserName] = useState(user?.name || 'Wallet User');
   const [userBio, setUserBio] = useState('Web3 enthusiast & crypto trader. Building the decentralized future.');
   const [editingBio, setEditingBio] = useState(false);
-  const [userId] = useState(() => Math.floor(100000 + Math.random() * 900000));
+  const [userId] = useState(() => user?.id || Math.floor(100000 + Math.random() * 900000).toString());
+
+  useEffect(() => {
+    if (user?.name) setUserName(user.name);
+  }, [user?.name]);
 
   const handleProfilePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,7 +89,7 @@ const ProfilePanel: React.FC = () => {
               </div>
 
               {/* User ID */}
-              <p className="text-xs font-mono text-slate-400 mt-1">User ID: #{userId}</p>
+              <p className="text-xs font-mono text-slate-400 mt-1">User ID: #{String(userId).slice(0, 10)}</p>
               
               {/* Bio */}
               <div className="mt-2 w-full">
@@ -113,10 +120,10 @@ const ProfilePanel: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Referral Link</p>
-                    <p className="text-sm font-mono text-slate-200 mt-0.5 truncate max-w-[200px] sm:max-w-xs">e-akhuwat.com/ref/PK992</p>
+                    <p className="text-sm font-mono text-slate-200 mt-0.5 truncate max-w-[200px] sm:max-w-xs">{user?.referralLink || 'Referral link unavailable'}</p>
                   </div>
                   <button 
-                    onClick={() => copyToClipboard('e-akhuwat.com/ref/PK992', 'link')}
+                    onClick={() => copyToClipboard(user?.referralLink || '', 'link')}
                     className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 rounded-xl text-xs font-semibold text-slate-200 transition-colors"
                   >
                     {copiedLink ? <><Check className="w-3.5 h-3.5 text-sky-300" /> Copied</> : <><Link className="w-3.5 h-3.5" /> Copy Link</>}
@@ -142,11 +149,11 @@ const ProfilePanel: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Direct Partners</p>
-                <p className="text-2xl font-bold text-white mt-1">24</p>
+                <p className="text-2xl font-bold text-white mt-1">{user?.directReferrals ?? 0}</p>
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Total Team</p>
-                <p className="text-2xl font-bold text-white mt-1">1,240</p>
+                <p className="text-2xl font-bold text-white mt-1">{user?.directReferrals ?? 0}</p>
               </div>
             </div>
           </div>
@@ -175,18 +182,20 @@ const ProfilePanel: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Wallet</span>
-              <button onClick={() => copyToClipboard('0x1A4F...B9F2', 'wallet')} className="flex items-center gap-1 text-xs font-mono text-slate-200 hover:text-white bg-white/[0.05] px-2 py-1 rounded-lg border border-white/10">
-                0x1A4F...B9F2 {copiedWallet ? <Check className="w-3 h-3 text-sky-300" /> : <Copy className="w-3 h-3" />}
-              </button>
+                <button onClick={() => copyToClipboard(user?.walletAddress || '', 'wallet')} className="flex items-center gap-1 text-xs font-mono text-slate-200 hover:text-white bg-white/[0.05] px-2 py-1 rounded-lg border border-white/10">
+                  {user?.walletAddress
+                    ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
+                    : '—'} {copiedWallet ? <Check className="w-3 h-3 text-sky-300" /> : <Copy className="w-3 h-3" />}
+                </button>
+              </div>
             </div>
-          </div>
           
           <div className="p-6">
             {/* Balance Highlight (Fixed Button Color) */}
             <div className="mb-6 p-4 rounded-2xl border border-sky-400/20 bg-sky-500/10 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-sky-200 uppercase tracking-widest">Available Balance</p>
-                <p className="text-3xl font-bold text-white mt-1">$1,240.50</p>
+                <p className="text-3xl font-bold text-white mt-1">${Number(user?.balance || 0).toFixed(2)}</p>
               </div>
               <button className="flex items-center gap-1.5 px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-white text-sm font-bold rounded-xl transition-all shadow-[0_0_15px_rgba(14,165,233,0.3)] hover:scale-105 border border-transparent">
                 Withdraw <ArrowUpRight className="w-4 h-4" />
@@ -196,15 +205,15 @@ const ProfilePanel: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8">
               <div className="flex justify-between items-center py-2 border-b border-white/10">
                 <span className="text-xs font-medium text-slate-400">Total Matrix Earnings</span>
-                <span className="text-sm font-bold text-white">$4,892.50</span>
+                <span className="text-sm font-bold text-white">${Number(user?.totalEarned || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-white/10">
                 <span className="text-xs font-medium text-slate-400">Direct Referral Income</span>
-                <span className="text-sm font-bold text-white">$1,200.00</span>
+                <span className="text-sm font-bold text-white">${Number(user?.totalEarned || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-white/10">
                 <span className="text-xs font-medium text-slate-400">Total Withdrawn</span>
-                <span className="text-sm font-bold text-slate-300">$3,652.00</span>
+                <span className="text-sm font-bold text-slate-300">${Number(user?.totalWithdrawn || 0).toFixed(2)}</span>
               </div>
               <div className="py-2 border-b border-white/10">
                 <span className="text-xs font-medium text-slate-400 block mb-1.5">Active Packages</span>
