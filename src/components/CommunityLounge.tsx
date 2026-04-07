@@ -224,23 +224,102 @@ const CommunityLounge: React.FC = () => {
   const send = () => {
     if (!input.trim()) return;
     const targetRoomId = selectedDM ? `dm:${selectedDM}` : selectedRoomId;
-    setMessages((prev) => [...prev, { 
-      id: Date.now(), 
-      roomId: targetRoomId, 
-      user: 'You', 
-      initials: 'YO', 
-      text: input.trim(), 
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
-      isOwn: true, 
-      userId: 'you', 
-      role: 'You', 
-      wallet: '—', 
-      replyToId: replyTo?.id 
-    }]);
+    
+    if (socket.isConnected) {
+      // Use Socket.IO for real-time
+      if (selectedDM) {
+        socket.sendDM(selectedDM, input.trim());
+      } else {
+        socket.sendMessage(selectedRoomId, input.trim(), replyTo?.id?.toString());
+      }
+      socket.stopTyping(selectedRoomId);
+    } else {
+      // Fallback: local-only message
+      setMessages((prev) => [...prev, { 
+        id: Date.now(), 
+        roomId: targetRoomId, 
+        user: user?.name || 'You', 
+        initials: (user?.name || 'YO').slice(0, 2).toUpperCase(), 
+        text: input.trim(), 
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+        isOwn: true, 
+        userId: user?.id || 'you', 
+        role: 'You', 
+        wallet: user?.walletAddress || '—', 
+        replyToId: replyTo?.id 
+      }]);
+    }
+    
     setInput(''); 
     setReplyTo(null);
     setShowEmojiPicker(null);
   };
+
+  // Socket.IO listeners
+  useEffect(() => {
+    if (!socket.isConnected) return;
+
+    // Join current room
+    if (!selectedDM) socket.joinRoom(selectedRoomId);
+
+    // Listen for new messages
+    socket.onMessage((msg) => {
+      setMessages((prev) => [...prev, {
+        id: Date.now() + Math.random(),
+        roomId: msg.roomId,
+        user: msg.user?.name || msg.user?.walletAddress?.slice(0, 8) || 'Unknown',
+        initials: (msg.user?.name || 'UN').slice(0, 2).toUpperCase(),
+        text: msg.text,
+        time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isOwn: msg.userId === user?.id,
+        userId: msg.userId,
+        isPinned: msg.isPinned,
+      }]);
+    });
+
+    socket.onDM((dm) => {
+      setMessages((prev) => [...prev, {
+        id: Date.now() + Math.random(),
+        roomId: `dm:${dm.senderId === user?.id ? dm.receiverId : dm.senderId}`,
+        user: dm.sender?.name || dm.sender?.walletAddress?.slice(0, 8) || 'Unknown',
+        initials: (dm.sender?.name || 'UN').slice(0, 2).toUpperCase(),
+        text: dm.text,
+        time: new Date(dm.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isOwn: dm.senderId === user?.id,
+        userId: dm.senderId,
+      }]);
+    });
+
+    socket.onDelete(({ messageId }) => {
+      setMessages(prev => prev.filter(m => String(m.id) !== messageId));
+    });
+
+    socket.onPin(({ messageId, isPinned }) => {
+      setMessages(prev => prev.map(m => 
+        String(m.id) === messageId ? { ...m, isPinned } : m
+      ));
+    });
+
+    return () => {
+      if (!selectedDM) socket.leaveRoom(selectedRoomId);
+    };
+  }, [socket.isConnected, selectedRoomId, selectedDM]);
+
+  // Typing indicator handler
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    if (socket.isConnected && !selectedDM) {
+      socket.startTyping(selectedRoomId);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.stopTyping(selectedRoomId);
+      }, 2000);
+    }
+  };
+
+  // Get typing users for current room
+  const currentTypingUsers = socket.typingUsers.get(selectedRoomId);
+  const typingCount = currentTypingUsers?.size || 0;
 
   const handleCreateRoom = () => {
     if (!newRoomName.trim()) return;
