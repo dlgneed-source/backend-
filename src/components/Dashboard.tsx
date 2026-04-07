@@ -565,7 +565,7 @@ const RewardsIncentivesCard = () => {
 // =============================================
 // FLUSHOUT SCHEDULE CARD
 // =============================================
-const FlushoutScheduleCard = () => (
+const FlushoutScheduleCard = ({ plans }: { plans: PlanData[] }) => (
   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(59,130,246,0.2)', background: 'linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(99,102,241,0.03) 50%, rgba(0,0,0,0.2) 100%)' }}>
     <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400" />
     <div className="mb-4 flex items-start gap-3">
@@ -579,7 +579,7 @@ const FlushoutScheduleCard = () => (
       </div>
     </div>
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-      {activePlans.map((plan, i) => (
+      {plans.map((plan, i) => (
         <div key={i} className="relative rounded-lg border p-2.5 text-center" style={{ borderColor: `${plan.theme.primary}25`, background: `linear-gradient(135deg, ${plan.theme.bgGlow}30, rgba(0,0,0,0.1))` }}>
           <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${plan.theme.primary}, transparent)` }} />
           <p className="text-[9px]" style={{ color: plan.theme.primary }}>P{plan.level}</p>
@@ -1162,7 +1162,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
             <motion.div key="plans" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
               <div><h1 className="text-xl font-bold text-white">Earning & Learning Programme</h1><p className="text-xs text-slate-400">Choose a plan that fits your goals</p></div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{activePlans.map((plan, i) => <PremiumPlanCard key={plan.level} plan={plan} index={i} />)}</div>
-              <FlushoutScheduleCard />
+              <FlushoutScheduleCard plans={activePlans} />
             </motion.div>
           )}
 
