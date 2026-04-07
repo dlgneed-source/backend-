@@ -2,6 +2,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { teamApi, usersApi } from '@/lib/api';
+import { getDirectReferralIncome, toSafeNonEmptyString, toSafeNonNegativeNumber } from '@/lib/referral';
 import { DashboardPoolMetrics, fetchDashboardPoolMetrics } from '@/lib/poolStats';
 import {
   buildReferralRootNode,
@@ -1049,10 +1050,98 @@ const WithdrawalPageContent = ({ balance }: { balance: number }) => {
 // =============================================
 // REFER PAGE CONTENT
 // =============================================
-const ReferPageContent = () => {
-  const code = 'EA2026REF';
-  const link = 'https://app.example.com/ref/EA2026REF';
-  const copyText = (text: string) => navigator.clipboard.writeText(text);
+type ReferralInsightsData = {
+  referralCode: string | null;
+  referralLink: string | null;
+  directReferrals: number | null;
+  totalTeam: number | null;
+  activeEnrollments: number | null;
+  directReferralIncome: number | null;
+  totalReferralIncome: number | null;
+};
+
+const SOURCE_REFERRAL_LINK = 'referral link';
+const SOURCE_COMMISSIONS = 'commissions';
+const SOURCE_TEAM_STATS = 'team stats';
+
+const ReferPageContent = ({
+  data,
+  isLoading,
+  error,
+  onRetry,
+}: {
+  data: ReferralInsightsData | null;
+  isLoading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) => {
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const safeCopy = useCallback(async (text: string): Promise<boolean> => {
+    if (!text) return false;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // Fall through to execCommand fallback.
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const copied = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return copied;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const showFeedback = useCallback((message: string) => {
+    setFeedback(message);
+    window.setTimeout(() => setFeedback(null), 2000);
+  }, []);
+
+  const copyValue = useCallback(async (text: string, label: string) => {
+    const copied = await safeCopy(text);
+    showFeedback(copied ? `${label} copied` : `Failed to copy ${label.toLowerCase()}`);
+  }, [safeCopy, showFeedback]);
+
+  const code = data?.referralCode ?? '';
+  const link = data?.referralLink ?? '';
+  const shareText = link ? `Join with my referral link: ${link}` : code ? `Use my referral code: ${code}` : '';
+
+  const shareVia = useCallback((type: 'whatsapp' | 'telegram' | 'more') => {
+    if (!shareText) return;
+    if (type === 'whatsapp') {
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (type === 'telegram') {
+      const telegramUrl = link
+        ? `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`
+        : `https://t.me/share/url?text=${encodeURIComponent(shareText)}`;
+      window.open(telegramUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator
+        .share({ text: shareText, url: link || undefined })
+        .catch(() => showFeedback('Share action was not completed'));
+      return;
+    }
+    void copyValue(shareText, 'Share text');
+  }, [copyValue, link, shareText, showFeedback]);
+
+  const formatCount = (value: number | null): string => (value === null ? '—' : value.toLocaleString());
+  const formatCurrency = (value: number | null): string => (value === null ? '—' : `$${value.toFixed(2)}`);
 
   return (
     <div className="max-w-lg mx-auto">
@@ -1060,29 +1149,59 @@ const ReferPageContent = () => {
         <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/15 via-pink-500/15 to-rose-500/15 blur-lg" />
         <div className="relative rounded-2xl border p-5 backdrop-blur-xl" style={{ borderColor: 'rgba(139,92,246,0.25)', background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(236,72,153,0.04) 50%, rgba(0,0,0,0.3) 100%)' }}>
           <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400" />
+          {isLoading && (
+            <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-center">
+              <p className="text-xs font-semibold text-slate-200">Loading referral summary...</p>
+            </div>
+          )}
+          {!isLoading && error && (
+            <div className="mb-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3">
+              <p className="text-xs font-semibold text-rose-300">Could not load referral data</p>
+              <p className="mt-1 text-[11px] text-rose-200/80">{error}</p>
+              <button
+                onClick={onRetry}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-1.5 text-[11px] font-semibold text-rose-200 hover:bg-rose-500/20"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Retry
+              </button>
+            </div>
+          )}
           <div className="mb-5 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center"><p className="text-2xl font-bold text-purple-400">12</p><p className="text-[10px] text-slate-500">Total Referrals</p></div>
-            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center"><p className="text-2xl font-bold text-emerald-400">$245</p><p className="text-[10px] text-slate-500">Earnings</p></div>
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center">
+              <p className="text-2xl font-bold text-purple-400">{formatCount(data?.directReferrals ?? null)}</p>
+              <p className="text-[10px] text-slate-500">Direct Referrals</p>
+            </div>
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center">
+              <p className="text-2xl font-bold text-emerald-400">{formatCurrency(data?.directReferralIncome ?? null)}</p>
+              <p className="text-[10px] text-slate-500">Direct Referral Income</p>
+            </div>
           </div>
+          {!isLoading && !error && !code && !link && (
+            <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-xs text-slate-300">Referral code/link is not available yet.</p>
+            </div>
+          )}
           <div className="mb-4">
             <label className="mb-2 block text-xs text-slate-400">Your Referral Code</label>
             <div className="flex gap-2">
-              <div className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-center"><span className="text-lg font-bold tracking-wider text-white">{code}</span></div>
-              <button onClick={() => copyText(code)} className="flex items-center justify-center rounded-xl border border-purple-500/20 bg-purple-500/10 px-4 text-purple-300"><Copy className="h-5 w-5" /></button>
+              <div className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-center"><span className="text-lg font-bold tracking-wider text-white">{code || '—'}</span></div>
+              <button disabled={!code} onClick={() => void copyValue(code, 'Code')} className="flex items-center justify-center rounded-xl border border-purple-500/20 bg-purple-500/10 px-4 text-purple-300 disabled:opacity-40 disabled:cursor-not-allowed"><Copy className="h-5 w-5" /></button>
             </div>
           </div>
           <div className="mb-5">
             <label className="mb-2 block text-xs text-slate-400">Referral Link</label>
             <div className="flex gap-2">
-              <div className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3"><span className="text-xs text-slate-300 truncate block">{link}</span></div>
-              <button onClick={() => copyText(link)} className="flex items-center justify-center rounded-xl border border-purple-500/20 bg-purple-500/10 px-4 text-purple-300"><Copy className="h-5 w-5" /></button>
+              <div className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3"><span className="text-xs text-slate-300 truncate block">{link || '—'}</span></div>
+              <button disabled={!link} onClick={() => void copyValue(link, 'Link')} className="flex items-center justify-center rounded-xl border border-purple-500/20 bg-purple-500/10 px-4 text-purple-300 disabled:opacity-40 disabled:cursor-not-allowed"><Copy className="h-5 w-5" /></button>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <button className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-xs text-slate-300"><MessageSquare className="h-4 w-4" />WhatsApp</button>
-            <button className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-xs text-slate-300"><Send className="h-4 w-4" />Telegram</button>
-            <button className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-xs text-slate-300"><Share2 className="h-4 w-4" />More</button>
+            <button disabled={!shareText} onClick={() => shareVia('whatsapp')} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-xs text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed"><MessageSquare className="h-4 w-4" />WhatsApp</button>
+            <button disabled={!shareText} onClick={() => shareVia('telegram')} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-xs text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed"><Send className="h-4 w-4" />Telegram</button>
+            <button disabled={!shareText} onClick={() => shareVia('more')} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-xs text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed"><Share2 className="h-4 w-4" />More</button>
           </div>
+          {feedback && <p className="mt-3 text-[11px] text-cyan-300">{feedback}</p>}
         </div>
       </div>
     </div>
@@ -1164,6 +1283,9 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
   const [showSkills, setShowSkills] = useState(false);
   const [liveTransactions, setLiveTransactions] = useState<typeof recentTransactions>(recentTransactions);
+  const [referralData, setReferralData] = useState<ReferralInsightsData | null>(null);
+  const [isReferralLoading, setIsReferralLoading] = useState(false);
+  const [referralError, setReferralError] = useState<string | null>(null);
   
   useEffect(() => {
     if (!token) return;
@@ -1196,9 +1318,71 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
       });
   }, [token]);
 
+  const loadReferralData = useCallback(async () => {
+    if (!token) {
+      setReferralData(null);
+      setReferralError(null);
+      setIsReferralLoading(false);
+      return;
+    }
+
+    setIsReferralLoading(true);
+    setReferralError(null);
+
+    const [referralResult, commissionsResult, statsResult] = await Promise.allSettled([
+      usersApi.getReferralLink(token),
+      teamApi.getCommissions(token, 20),
+      teamApi.getStats(token),
+    ]);
+
+    const failedSources: string[] = [];
+    if (referralResult.status === 'rejected') failedSources.push(SOURCE_REFERRAL_LINK);
+    if (commissionsResult.status === 'rejected') failedSources.push(SOURCE_COMMISSIONS);
+    if (statsResult.status === 'rejected') failedSources.push(SOURCE_TEAM_STATS);
+
+    if (failedSources.length === 3) {
+      setReferralData(null);
+      setReferralError('All referral APIs failed. Please try again.');
+      setIsReferralLoading(false);
+      return;
+    }
+
+    const referralPayload = referralResult.status === 'fulfilled' ? referralResult.value : undefined;
+    const commissionsPayload = commissionsResult.status === 'fulfilled' ? commissionsResult.value : undefined;
+    const statsPayload = statsResult.status === 'fulfilled' ? statsResult.value.stats : undefined;
+
+    setReferralData({
+      referralCode: toSafeNonEmptyString(referralPayload?.referralCode),
+      referralLink: toSafeNonEmptyString(referralPayload?.referralLink),
+      directReferrals: toSafeNonNegativeNumber(statsPayload?.level1Count ?? null),
+      totalTeam: toSafeNonNegativeNumber(statsPayload?.totalMembers ?? null),
+      activeEnrollments: toSafeNonNegativeNumber(statsPayload?.activeEnrollments ?? null),
+      directReferralIncome: getDirectReferralIncome(commissionsPayload?.commissionSummary),
+      totalReferralIncome: toSafeNonNegativeNumber(commissionsPayload?.totalEarned ?? null),
+    });
+
+    setReferralError(
+      failedSources.length > 0
+        ? `Some referral data is temporarily unavailable (${failedSources.join(', ')}).`
+        : null,
+    );
+    setIsReferralLoading(false);
+  }, [token]);
+
+  useEffect(() => {
+    void loadReferralData();
+  }, [loadReferralData]);
+
   const activePlans: PlanData[] = plansData;
   const activeTransactions = liveTransactions;
   const balance = Number(user?.balance || 0);
+  const formatStatValue = useCallback(
+    (value: number | null | undefined, formatter?: (n: number) => string): string => {
+      if (value === null || value === undefined) return '—';
+      return formatter ? formatter(value) : value.toLocaleString();
+    },
+    [],
+  );
   const displayName = user?.name || 'Wallet User';
   const walletAddr = user?.walletAddress
     ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
@@ -1372,14 +1556,40 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
               <ReferralNetworkCard />
               <LevelCommissionCard />
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {[{ label: 'Direct Referrals', value: '12', color: '#22d3ee' }, { label: 'Total Team', value: '48', color: '#34d399' }, { label: 'Active Plans', value: '6', color: '#fbbf24' }, { label: 'Total Earnings', value: '$3,240', color: '#e879f9' }].map((s, i) => (
+                {[
+                  {
+                    label: 'Direct Referrals',
+                    value: formatStatValue(referralData?.directReferrals),
+                    color: '#22d3ee',
+                  },
+                  {
+                    label: 'Total Team',
+                    value: formatStatValue(referralData?.totalTeam),
+                    color: '#34d399',
+                  },
+                  {
+                    label: 'Active Plans',
+                    value: formatStatValue(referralData?.activeEnrollments),
+                    color: '#fbbf24',
+                  },
+                  {
+                    label: 'Total Earnings',
+                    value: formatStatValue(referralData?.totalReferralIncome, (amount) => `$${amount.toFixed(2)}`),
+                    color: '#e879f9',
+                  },
+                ].map((s, i) => (
                   <div key={i} className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
                     <p className="text-[9px] text-slate-500">{s.label}</p>
                     <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
                   </div>
                 ))}
               </div>
-              <ReferPageContent />
+              <ReferPageContent
+                data={referralData}
+                isLoading={isReferralLoading}
+                error={referralError}
+                onRetry={() => { void loadReferralData(); }}
+              />
             </motion.div>
           )}
 

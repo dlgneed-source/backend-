@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { teamApi } from '@/lib/api';
+import { getDirectReferralIncome, toSafeNonNegativeNumber } from '@/lib/referral';
 import {
   AlertOctagon, Ban, Briefcase, ChevronRight, Copy, Gift, Radio, RefreshCw,
   Search, Send, Shield, TrendingUp, Wallet, Zap, Users, LayoutDashboard,
@@ -1377,6 +1378,7 @@ function CommissionsManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalEarned, setTotalEarned] = useState(0);
+  const [directReferralIncome, setDirectReferralIncome] = useState(0);
   const [levels, setLevels] = useState<Array<{ key: string; label: string; percentage: number | null; amount: number }>>([]);
   const [records, setRecords] = useState<Array<{
     id: string;
@@ -1387,12 +1389,15 @@ function CommissionsManagement() {
     amount: number;
     createdAt: string;
   }>>([]);
+  const formatMoney = (value: number | null | undefined): string =>
+    `$${(toSafeNonNegativeNumber(value) ?? 0).toFixed(6)}`;
 
   const loadCommissions = async () => {
     if (!token) {
       setLevels([]);
       setRecords([]);
       setTotalEarned(0);
+      setDirectReferralIncome(0);
       return;
     }
 
@@ -1418,6 +1423,7 @@ function CommissionsManagement() {
         );
       };
       setTotalEarned(typeof response.totalEarned === 'number' && Number.isFinite(response.totalEarned) ? Math.max(0, response.totalEarned) : 0);
+      setDirectReferralIncome(getDirectReferralIncome(response.commissionSummary) ?? 0);
       setLevels(
         Array.isArray(summaryLevels)
           ? summaryLevels.filter(isValidCommissionLevel).map((level) => ({
@@ -1446,6 +1452,7 @@ function CommissionsManagement() {
       setLevels([]);
       setRecords([]);
       setTotalEarned(0);
+      setDirectReferralIncome(0);
     } finally {
       setIsLoading(false);
     }
@@ -1463,9 +1470,15 @@ function CommissionsManagement() {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Commission Distribution</h1>
           <p className="text-sm text-slate-400">Track multi-level commission payouts</p>
         </div>
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 sm:px-4 py-2">
-          <p className="text-[10px] sm:text-xs text-emerald-400">Total Earned</p>
-          <p className="font-mono text-lg sm:text-xl font-bold text-emerald-300">${totalEarned.toFixed(6)}</p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 sm:px-4 py-2">
+            <p className="text-[10px] sm:text-xs text-emerald-400">Total Earned</p>
+            <p className="font-mono text-lg sm:text-xl font-bold text-emerald-300">{formatMoney(totalEarned)}</p>
+          </div>
+          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 sm:px-4 py-2">
+            <p className="text-[10px] sm:text-xs text-cyan-300">Direct Referral Income</p>
+            <p className="font-mono text-lg sm:text-xl font-bold text-cyan-200">{formatMoney(directReferralIncome)}</p>
+          </div>
         </div>
       </div>
 
