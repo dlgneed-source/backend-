@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useSocket } from '@/hooks/useSocket';
+import { useAuth } from '@/contexts/AuthContext';
 import NotificationPanel from '@/components/NotificationPanel';
 import {
   ArrowLeft, BadgeCheck, ChevronDown, Hash, Lock, Pin, Plus, Reply, 
@@ -110,6 +112,11 @@ const CommunityLounge: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Socket.IO & Auth
+  const socket = useSocket();
+  const { user, isAuthenticated } = useAuth();
 
   // Check mobile on mount and resize
   useEffect(() => {
@@ -217,23 +224,102 @@ const CommunityLounge: React.FC = () => {
   const send = () => {
     if (!input.trim()) return;
     const targetRoomId = selectedDM ? `dm:${selectedDM}` : selectedRoomId;
-    setMessages((prev) => [...prev, { 
-      id: Date.now(), 
-      roomId: targetRoomId, 
-      user: 'You', 
-      initials: 'YO', 
-      text: input.trim(), 
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
-      isOwn: true, 
-      userId: 'you', 
-      role: 'You', 
-      wallet: '—', 
-      replyToId: replyTo?.id 
-    }]);
+    
+    if (socket.isConnected) {
+      // Use Socket.IO for real-time
+      if (selectedDM) {
+        socket.sendDM(selectedDM, input.trim());
+      } else {
+        socket.sendMessage(selectedRoomId, input.trim(), replyTo?.id?.toString());
+      }
+      socket.stopTyping(selectedRoomId);
+    } else {
+      // Fallback: local-only message
+      setMessages((prev) => [...prev, { 
+        id: Date.now(), 
+        roomId: targetRoomId, 
+        user: user?.name || 'You', 
+        initials: (user?.name || 'YO').slice(0, 2).toUpperCase(), 
+        text: input.trim(), 
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+        isOwn: true, 
+        userId: user?.id || 'you', 
+        role: 'You', 
+        wallet: user?.walletAddress || '—', 
+        replyToId: replyTo?.id 
+      }]);
+    }
+    
     setInput(''); 
     setReplyTo(null);
     setShowEmojiPicker(null);
   };
+
+  // Socket.IO listeners
+  useEffect(() => {
+    if (!socket.isConnected) return;
+
+    // Join current room
+    if (!selectedDM) socket.joinRoom(selectedRoomId);
+
+    // Listen for new messages
+    socket.onMessage((msg) => {
+      setMessages((prev) => [...prev, {
+        id: Date.now() + Math.random(),
+        roomId: msg.roomId,
+        user: msg.user?.name || msg.user?.walletAddress?.slice(0, 8) || 'Unknown',
+        initials: (msg.user?.name || 'UN').slice(0, 2).toUpperCase(),
+        text: msg.text,
+        time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isOwn: msg.userId === user?.id,
+        userId: msg.userId,
+        isPinned: msg.isPinned,
+      }]);
+    });
+
+    socket.onDM((dm) => {
+      setMessages((prev) => [...prev, {
+        id: Date.now() + Math.random(),
+        roomId: `dm:${dm.senderId === user?.id ? dm.receiverId : dm.senderId}`,
+        user: dm.sender?.name || dm.sender?.walletAddress?.slice(0, 8) || 'Unknown',
+        initials: (dm.sender?.name || 'UN').slice(0, 2).toUpperCase(),
+        text: dm.text,
+        time: new Date(dm.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isOwn: dm.senderId === user?.id,
+        userId: dm.senderId,
+      }]);
+    });
+
+    socket.onDelete(({ messageId }) => {
+      setMessages(prev => prev.filter(m => String(m.id) !== messageId));
+    });
+
+    socket.onPin(({ messageId, isPinned }) => {
+      setMessages(prev => prev.map(m => 
+        String(m.id) === messageId ? { ...m, isPinned } : m
+      ));
+    });
+
+    return () => {
+      if (!selectedDM) socket.leaveRoom(selectedRoomId);
+    };
+  }, [socket.isConnected, selectedRoomId, selectedDM]);
+
+  // Typing indicator handler
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    if (socket.isConnected && !selectedDM) {
+      socket.startTyping(selectedRoomId);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.stopTyping(selectedRoomId);
+      }, 2000);
+    }
+  };
+
+  // Get typing users for current room
+  const currentTypingUsers = socket.typingUsers.get(selectedRoomId);
+  const typingCount = currentTypingUsers?.size || 0;
 
   const handleCreateRoom = () => {
     if (!newRoomName.trim()) return;
@@ -601,14 +687,19 @@ const CommunityLounge: React.FC = () => {
               {activeRoom?.isVip && <Crown className="h-4 w-4" style={{ color: '#fbbf24' }} />}
             </h1>
             <p className="truncate text-xs flex items-center gap-1.5" style={{ color: '#94a3b8' }}>
-              {selectedDM ? (
+              {typingCount > 0 ? (
+                <span className="text-violet-400 animate-pulse">
+                  {typingCount === 1 ? 'Someone is typing...' : `${typingCount} people typing...`}
+                </span>
+              ) : selectedDM ? (
                 <>
-                  <span className={`w-2 h-2 rounded-full ${activeDMObj?.online ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-                  {activeDMObj?.online ? 'Online' : `Last seen ${activeDMObj?.lastSeen}`}
+                  <span className={`w-2 h-2 rounded-full ${socket.isConnected && socket.onlineUsers.includes(selectedDM) ? 'bg-emerald-500' : activeDMObj?.online ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                  {socket.isConnected && socket.onlineUsers.includes(selectedDM) ? 'Online' : activeDMObj?.online ? 'Online' : `Last seen ${activeDMObj?.lastSeen}`}
                 </>
               ) : (
                 <>
                   <Users className="w-3 h-3" /> {activeRoom?.memberCount?.toLocaleString()} members
+                  {socket.isConnected && <span className="ml-1 text-emerald-400">• Live</span>}
                 </>
               )}
             </p>
@@ -892,14 +983,14 @@ const CommunityLounge: React.FC = () => {
           
           <input 
             value={input} 
-            onChange={(e) => setInput(e.target.value)} 
+            onChange={(e) => handleInputChange(e.target.value)} 
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 send();
               }
             }}
-            placeholder="Type a message..." 
+            placeholder={socket.isConnected ? "Type a message (live)..." : "Type a message..."} 
             className="flex-1 bg-transparent text-sm outline-none min-h-[44px] py-2"
             style={{ color: 'white' }}
           />

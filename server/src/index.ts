@@ -1,4 +1,5 @@
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -7,6 +8,7 @@ import { logger } from './utils/logger';
 import { initializeCronJobs } from './utils/cronJobs';
 import { AppError } from './utils/errors';
 import { errorResponse } from './utils/response';
+import { initSocketIO } from './socket/socketHandler';
 
 // Middleware
 import { authMiddleware, adminMiddleware } from './middleware/auth';
@@ -22,8 +24,10 @@ import {
   getFlushouts, getCommissions, getSecurityLogs,
   getPools, requestWithdrawal,
 } from './controllers/adminController';
+import { getRooms, createRoom, joinRoom, getRoomMessages, getDMMessages } from './controllers/chatController';
 
 const app = express();
+const httpServer = createServer(app);
 
 // ============================================================================
 // MIDDLEWARE
@@ -85,6 +89,13 @@ app.get('/api/admin/flushouts', authMiddleware, adminMiddleware, getFlushouts);
 app.get('/api/admin/commissions', authMiddleware, adminMiddleware, getCommissions);
 app.get('/api/admin/security-logs', authMiddleware, adminMiddleware, getSecurityLogs);
 
+// Chat / Community Routes
+app.get('/api/rooms', authMiddleware, getRooms);
+app.post('/api/rooms', authMiddleware, createRoom);
+app.post('/api/rooms/:roomId/join', authMiddleware, joinRoom);
+app.get('/api/rooms/:roomId/messages', authMiddleware, getRoomMessages);
+app.get('/api/dm/:targetUserId/messages', authMiddleware, getDMMessages);
+
 // ============================================================================
 // ERROR HANDLING
 // ============================================================================
@@ -99,8 +110,12 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // ============================================================================
 // START SERVER
 // ============================================================================
-app.listen(config.port, () => {
+// Initialize Socket.IO
+initSocketIO(httpServer);
+
+httpServer.listen(config.port, () => {
   logger.info(`🚀 eAkhuwat Backend running on port ${config.port}`);
+  logger.info(`🔌 Socket.IO ready for real-time connections`);
   logger.info(`Environment: ${config.nodeEnv}`);
   initializeCronJobs();
 });
