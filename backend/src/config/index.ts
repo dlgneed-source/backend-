@@ -30,7 +30,7 @@ const config = {
   RPC_URL: process.env.RPC_URL || "https://mainnet.infura.io/v3/YOUR_INFURA_KEY",
   CONTRACT_ADDRESS: process.env.CONTRACT_ADDRESS || "",
   TREASURY_WALLET: process.env.TREASURY_WALLET || "",
-  CHAIN_ID: parseIntEnv(process.env.CHAIN_ID, -1),
+  CHAIN_ID: parseIntEnv(process.env.CHAIN_ID, 0),
   SIGNER_PRIVATE_KEY: process.env.SIGNER_PRIVATE_KEY || "",
 
   // EIP-712

@@ -59,14 +59,14 @@ describe("EIP-712 withdrawal signing hardening", () => {
 
   it("rejects invalid chainId config", async () => {
     const eip712 = await loadEip712({ CHAIN_ID: "abc" });
-    await expect(eip712.signWithdrawal("0x0000000000000000000000000000000000000020", 10, 1))
+    await expect(eip712.signWithdrawal("0x0000000000000000000000000000000000000020", 10, 1, 300))
       .rejects
       .toMatchObject({ code: "EIP712_CONFIG_INVALID" });
   });
 
   it("rejects wrong contract address config", async () => {
     const eip712 = await loadEip712({ CONTRACT_ADDRESS: "0x1234" });
-    await expect(eip712.signWithdrawal("0x0000000000000000000000000000000000000020", 10, 1))
+    await expect(eip712.signWithdrawal("0x0000000000000000000000000000000000000020", 10, 1, 300))
       .rejects
       .toMatchObject({ code: "EIP712_CONFIG_INVALID" });
   });
@@ -123,7 +123,7 @@ describe("EIP-712 withdrawal signing hardening", () => {
 
   it("rejects missing signer config", async () => {
     const eip712 = await loadEip712({ SIGNER_PRIVATE_KEY: undefined });
-    await expect(eip712.signWithdrawal("0x0000000000000000000000000000000000000020", 5, 1))
+    await expect(eip712.signWithdrawal("0x0000000000000000000000000000000000000020", 5, 1, 300))
       .rejects
       .toMatchObject({ code: "EIP712_CONFIG_INVALID" });
   });

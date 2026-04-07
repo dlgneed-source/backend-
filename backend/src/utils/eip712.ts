@@ -3,7 +3,7 @@
  * Used for atomic withdrawal authorization
  */
 
-import { randomInt } from "crypto";
+import { randomBytes } from "crypto";
 import { ethers } from "ethers";
 import config from "../config";
 
@@ -312,8 +312,9 @@ export function validateWithdrawalDeadline(deadline: number): void {
  * Generate a unique nonce for withdrawal
  */
 export function generateWithdrawalNonce(): number {
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  return nowSeconds * 1_000_000 + randomInt(0, 1_000_000);
+  const randomHex = Buffer.from(randomBytes(8)).toString("hex");
+  const nonce53Bit = BigInt(`0x${randomHex}`) & ((1n << 53n) - 1n);
+  return Number(nonce53Bit);
 }
 
 export async function ensureNonceNotUsed(
