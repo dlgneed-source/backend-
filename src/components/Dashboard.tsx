@@ -1069,8 +1069,8 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
                   <User className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white truncate">Arushi Tyagi</p>
-                  <p className="text-[11px] font-mono text-slate-400">ID: EA2026 • 0x1A4...B9F2</p>
+                  <p className="text-sm font-semibold text-white truncate">{displayName}</p>
+                  <p className="text-[11px] font-mono text-slate-400">ID: {user?.id?.slice(0,6) || 'EA2026'} • {walletAddr}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-[10px] text-slate-500">Balance</p>
