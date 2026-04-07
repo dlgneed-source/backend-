@@ -1,4 +1,5 @@
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -7,6 +8,7 @@ import { logger } from './utils/logger';
 import { initializeCronJobs } from './utils/cronJobs';
 import { AppError } from './utils/errors';
 import { errorResponse } from './utils/response';
+import { initSocketIO } from './socket/socketHandler';
 
 // Middleware
 import { authMiddleware, adminMiddleware } from './middleware/auth';
@@ -22,8 +24,10 @@ import {
   getFlushouts, getCommissions, getSecurityLogs,
   getPools, requestWithdrawal,
 } from './controllers/adminController';
+import { getRooms, createRoom, joinRoom, getRoomMessages, getDMMessages } from './controllers/chatController';
 
 const app = express();
+const httpServer = createServer(app);
 
 // ============================================================================
 // MIDDLEWARE
