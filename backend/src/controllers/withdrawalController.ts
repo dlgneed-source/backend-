@@ -15,6 +15,7 @@ import {
 } from "../utils/eip712";
 
 const prisma = new PrismaClient();
+const MAX_NONCE_GENERATION_ATTEMPTS = 5;
 
 const WITHDRAWAL_MIN = parseFloat(process.env.WITHDRAWAL_MIN_AMOUNT || "5");
 const WITHDRAWAL_MAX = parseFloat(process.env.WITHDRAWAL_MAX_AMOUNT || "10000");
@@ -114,7 +115,7 @@ export async function signWithdrawalRequest(req: AuthenticatedRequest, res: Resp
 
     let nonce = generateWithdrawalNonce();
     let nonceAttempts = 0;
-    while (nonceAttempts < 5) {
+    while (nonceAttempts < MAX_NONCE_GENERATION_ATTEMPTS) {
       try {
         // eslint-disable-next-line no-await-in-loop
         await ensureNonceNotUsed(nonce, async (candidateNonce: string) => {
@@ -134,7 +135,7 @@ export async function signWithdrawalRequest(req: AuthenticatedRequest, res: Resp
       }
     }
 
-    if (nonceAttempts >= 5) {
+    if (nonceAttempts >= MAX_NONCE_GENERATION_ATTEMPTS) {
       res.status(503).json({
         success: false,
         message: "Could not allocate a unique nonce, please retry",
@@ -162,7 +163,7 @@ export async function signWithdrawalRequest(req: AuthenticatedRequest, res: Resp
       where: { id: withdrawalId, status: "APPROVED", signature: null, nonce: null },
       data: { signature, nonce: nonce.toString(), status: "PROCESSING" },
     });
-    if (updateResult.count !== 1) {
+    if (updateResult.count === 0) {
       res.status(409).json({ success: false, message: "Withdrawal signing state changed, retry" });
       return;
     }
