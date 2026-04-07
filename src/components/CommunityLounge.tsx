@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useSocket } from '@/hooks/useSocket';
+
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationPanel from '@/components/NotificationPanel';
 import {
