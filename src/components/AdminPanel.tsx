@@ -470,9 +470,11 @@ function Sidebar({ activeTab, setActiveTab, collapsed, setCollapsed, mobileOpen,
           <button aria-label={collapsed ? 'Expand admin sidebar' : 'Collapse admin sidebar'} onClick={() => { onMobileClose(); setCollapsed(!collapsed); }} className="text-slate-400 hover:text-white hidden lg:block">
             {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </button>
-          <button aria-label="Close admin menu" onClick={onMobileClose} className="text-slate-400 hover:text-white lg:hidden">
-            <X className="h-5 w-5" />
-          </button>
+          {mobileOpen && (
+            <button aria-label="Close admin menu" onClick={onMobileClose} className="text-slate-400 hover:text-white lg:hidden">
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
