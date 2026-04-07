@@ -1,0 +1,149 @@
+// Prisma Schema — production-ready with exact financial math (Decimal 20,8)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SlotStatus {
+  ACTIVE
+  FLUSHED
+}
+
+enum FlushoutReason {
+  TEAM_FILLED
+  TIME_EXPIRED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  SIGNED
+  COMPLETED
+  FAILED
+}
+
+// ─── Core Models ──────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique
+  role          UserRole @default(USER)
+  uplineId      String?
+  upline        User?    @relation("Referral", fields: [uplineId], references: [id])
+  downlines     User[]   @relation("Referral")
+  nonce         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  slots             Slot[]
+  uplineCommissions UplineCommission[] @relation("CommissionReceiver")
+  withdrawals       Withdrawal[]
+}
+
+/// Income plan configuration — one row per plan, seeded at deploy time
+model Plan {
+  id   Int    @id
+  name String
+
+  // Entry amounts (exact USD cents stored as Decimal)
+  entryFee     Decimal @db.Decimal(20, 8)
+  uplineCut    Decimal @db.Decimal(20, 8)
+  systemCut    Decimal @db.Decimal(20, 8)
+  levelCut     Decimal @db.Decimal(20, 8)
+  slotAmount   Decimal @db.Decimal(20, 8)
+
+  // Flushout distribution
+  memberProfit Decimal @db.Decimal(20, 8)
+  systemFee    Decimal @db.Decimal(20, 8)
+  leaderPool   Decimal @db.Decimal(20, 8)
+  rewardPool   Decimal @db.Decimal(20, 8)
+  sponsorPool  Decimal @db.Decimal(20, 8)
+
+  // Number of members required for TEAM_FILLED flushout
+  teamSize     Int
+  // Days until TIME_EXPIRED flushout
+  expiryDays   Int
+
+  slots Slot[]
+}
+
+/// A single user slot in a plan
+model Slot {
+  id        String     @id @default(uuid())
+  userId    String
+  planId    Int
+  status    SlotStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  expiresAt DateTime
+
+  user      User       @relation(fields: [userId], references: [id])
+  plan      Plan       @relation(fields: [planId], references: [id])
+  flushout  Flushout?
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+}
+
+/// Records a completed flushout event for idempotency
+model Flushout {
+  id        String         @id @default(uuid())
+  slotId    String         @unique
+  reason    FlushoutReason
+  processedAt DateTime     @default(now())
+
+  slot      Slot           @relation(fields: [slotId], references: [id])
+}
+
+/// Tracks upline direct-commission credits per slot entry
+model UplineCommission {
+  id         String   @id @default(uuid())
+  receiverId String
+  slotId     String
+  amount     Decimal  @db.Decimal(20, 8)
+  level      Int      // 1–7
+  createdAt  DateTime @default(now())
+
+  receiver   User     @relation("CommissionReceiver", fields: [receiverId], references: [id])
+
+  @@index([receiverId])
+}
+
+/// Accumulates system fees for admin withdrawal
+model SystemFeeLedger {
+  id        String   @id @default(uuid())
+  planId    Int
+  amount    Decimal  @db.Decimal(20, 8)
+  reason    String   // "ENTRY" | "FLUSHOUT"
+  createdAt DateTime @default(now())
+
+  @@index([planId])
+}
+
+/// Tracks on-chain withdrawal requests and their EIP-712 signatures
+model Withdrawal {
+  id        String           @id @default(uuid())
+  userId    String
+  amount    Decimal          @db.Decimal(20, 8)
+  nonce     Int
+  signature String?
+  status    WithdrawalStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user      User             @relation(fields: [userId], references: [id])
+
+  @@unique([userId, nonce])
+  @@index([userId])
+}
