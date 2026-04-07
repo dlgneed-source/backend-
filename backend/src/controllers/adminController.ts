@@ -514,8 +514,13 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
 
   try {
     const plan = await prisma.plan.findUnique({ where: { id: planId } });
-    if (!plan || !plan.isActive) {
-      res.status(404).json({ success: false, message: "Plan not found or inactive" });
+    if (!plan) {
+      res.status(404).json({ success: false, message: "Plan not found" });
+      return;
+    }
+
+    if (!plan.isActive) {
+      res.status(409).json({ success: false, message: "Plan is inactive" });
       return;
     }
 

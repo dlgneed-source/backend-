@@ -1855,26 +1855,26 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Custom Code (Optional)</label>
-                  <input value={newCode.code} onChange={e => setNewCode({ ...newCode, code: e.target.value })} placeholder="e.g. WELCOME50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono uppercase text-white tracking-wider placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                  <label htmlFor="gift-code-custom-code" className="text-xs text-slate-400 mb-1 block">Custom Code (Optional)</label>
+                  <input id="gift-code-custom-code" value={newCode.code} onChange={e => setNewCode({ ...newCode, code: e.target.value })} placeholder="e.g. WELCOME50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono uppercase text-white tracking-wider placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Plan</label>
-                    <select value={newCode.planId} onChange={e => setNewCode({ ...newCode, planId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-emerald-500/40 focus:outline-none">
+                    <label htmlFor="gift-code-plan" className="text-xs text-slate-400 mb-1 block">Plan</label>
+                    <select id="gift-code-plan" value={newCode.planId} onChange={e => setNewCode({ ...newCode, planId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-emerald-500/40 focus:outline-none">
                       {[1, 2, 3, 4, 5, 6].map((planId) => (
                         <option key={planId} value={String(planId)} className="bg-[#0a0a0f]">Plan {planId}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Quantity</label>
-                    <input type="number" value={newCode.quantity} min={1} max={50} onChange={e => setNewCode({ ...newCode, quantity: e.target.value })} placeholder="1" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                    <label htmlFor="gift-code-quantity" className="text-xs text-slate-400 mb-1 block">Quantity</label>
+                    <input id="gift-code-quantity" type="number" value={newCode.quantity} min={1} max={50} onChange={e => setNewCode({ ...newCode, quantity: e.target.value })} placeholder="1" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Valid For (Days)</label>
-                  <input type="number" value={newCode.days} onChange={e => setNewCode({ ...newCode, days: e.target.value })} placeholder="30" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                  <label htmlFor="gift-code-days" className="text-xs text-slate-400 mb-1 block">Valid For (Days)</label>
+                  <input id="gift-code-days" type="number" value={newCode.days} onChange={e => setNewCode({ ...newCode, days: e.target.value })} placeholder="30" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button onClick={() => setShowCreate(false)} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white">Cancel</button>
