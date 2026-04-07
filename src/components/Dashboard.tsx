@@ -579,7 +579,7 @@ const FlushoutScheduleCard = () => (
       </div>
     </div>
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-      {plansData.map((plan, i) => (
+      {activePlans.map((plan, i) => (
         <div key={i} className="relative rounded-lg border p-2.5 text-center" style={{ borderColor: `${plan.theme.primary}25`, background: `linear-gradient(135deg, ${plan.theme.bgGlow}30, rgba(0,0,0,0.1))` }}>
           <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${plan.theme.primary}, transparent)` }} />
           <p className="text-[9px]" style={{ color: plan.theme.primary }}>P{plan.level}</p>
@@ -897,7 +897,7 @@ const DetailsPageContent = () => (
             <h4 className="text-sm font-semibold text-white">Recent Activity</h4>
             <button 
               onClick={() => {
-                const csv = 'Type,Amount,Time\n' + recentTransactions.map(tx => `${tx.type},${tx.amount},${tx.time}`).join('\n');
+                const csv = 'Type,Amount,Time\n' + activeTransactions.map(tx => `${tx.type},${tx.amount},${tx.time}`).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -912,7 +912,7 @@ const DetailsPageContent = () => (
             </button>
           </div>
           <div className="space-y-2">
-            {recentTransactions.slice(0, 3).map((tx) => (
+            {activeTransactions.slice(0, 3).map((tx) => (
               <div key={tx.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
                 <div className="flex items-center gap-3">
                   <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tx.type === 'Withdrawal' ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`}>
@@ -1161,7 +1161,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
           {activeTab === 'plans' && (
             <motion.div key="plans" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
               <div><h1 className="text-xl font-bold text-white">Earning & Learning Programme</h1><p className="text-xs text-slate-400">Choose a plan that fits your goals</p></div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{plansData.map((plan, i) => <PremiumPlanCard key={plan.level} plan={plan} index={i} />)}</div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{activePlans.map((plan, i) => <PremiumPlanCard key={plan.level} plan={plan} index={i} />)}</div>
               <FlushoutScheduleCard />
             </motion.div>
           )}
