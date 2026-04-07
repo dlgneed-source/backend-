@@ -162,10 +162,14 @@ export async function getTeamCommissions(req: AuthenticatedRequest, res: Respons
         amount: row._sum.amount,
       })),
     });
+    const normalizedCommissions = commissions.map((commission) => ({
+      ...commission,
+      displayLevel: commission.level + 1,
+    }));
 
     res.json({
       success: true,
-      commissions,
+      commissions: normalizedCommissions,
       totalEarned: parseFloat(
         ((totalEarned._sum.amount || 0) + (uplineEarned._sum.amount || 0)).toFixed(6),
       ),

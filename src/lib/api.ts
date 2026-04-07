@@ -118,6 +118,7 @@ export const teamApi = {
       commissions: Array<{
         id: string;
         level: number;
+        displayLevel?: number;
         percentage: number;
         amount: number;
         planId: number;

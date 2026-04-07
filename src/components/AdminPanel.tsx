@@ -1382,6 +1382,7 @@ function CommissionsManagement() {
     id: string;
     fromUser?: { walletAddress: string; name?: string | null } | null;
     level: number;
+    displayLevel: number;
     planId: number;
     amount: number;
     createdAt: string;
@@ -1417,6 +1418,7 @@ function CommissionsManagement() {
               id: commission.id,
               fromUser: commission.fromUser,
               level: commission.level,
+              displayLevel: typeof commission.displayLevel === 'number' ? commission.displayLevel : commission.level + 1,
               planId: commission.planId,
               amount: typeof commission.amount === 'number' && Number.isFinite(commission.amount) && commission.amount > 0 ? commission.amount : 0,
               createdAt: commission.createdAt,
@@ -1520,7 +1522,7 @@ function CommissionsManagement() {
                     <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">{record.fromUser?.walletAddress || '-'}</td>
                     <td className="px-4 sm:px-6 py-4">
                       <span className="inline-flex rounded-full border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-300">
-                        Level {record.level + 1}
+                        Level {record.displayLevel}
                       </span>
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-slate-300">Plan {record.planId}</td>
