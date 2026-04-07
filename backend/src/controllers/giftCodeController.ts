@@ -7,6 +7,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { v4 as uuidv4 } from "uuid";
+import { getGiftCodeRedeemability } from "../utils/giftCodeRules";
 
 const prisma = new PrismaClient();
 
@@ -66,6 +67,15 @@ export async function redeemGiftCode(req: AuthenticatedRequest, res: Response): 
   const userId = req.user!.id;
 
   try {
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { status: true, referredById: true },
+    });
+    if (!currentUser || currentUser.status !== "ACTIVE") {
+      res.status(403).json({ success: false, message: "Inactive users cannot redeem gift codes" });
+      return;
+    }
+
     const giftCode = await prisma.giftCode.findUnique({
       where: { code },
       include: { plan: true },
@@ -76,14 +86,17 @@ export async function redeemGiftCode(req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    if (giftCode.status !== "ACTIVE") {
-      res.status(400).json({ success: false, message: `Gift code is ${giftCode.status.toLowerCase()}` });
+    if (!giftCode.plan.isActive) {
+      res.status(409).json({ success: false, message: "Plan is inactive" });
       return;
     }
 
-    if (giftCode.expiresAt && giftCode.expiresAt < new Date()) {
-      await prisma.giftCode.update({ where: { id: giftCode.id }, data: { status: "EXPIRED" } });
-      res.status(400).json({ success: false, message: "Gift code has expired" });
+    const redeemability = getGiftCodeRedeemability(giftCode.status, giftCode.expiresAt, new Date());
+    if (!redeemability.redeemable) {
+      if (redeemability.effectiveStatus === "EXPIRED" && giftCode.status !== "EXPIRED") {
+        await prisma.giftCode.update({ where: { id: giftCode.id }, data: { status: "EXPIRED" } });
+      }
+      res.status(400).json({ success: false, message: `Gift code is ${redeemability.effectiveStatus.toLowerCase()}` });
       return;
     }
 
@@ -127,8 +140,64 @@ export async function redeemGiftCode(req: AuthenticatedRequest, res: Response): 
       },
     });
 
+    // Upline commission (direct referrer gets configured plan commission)
+    const directUpline = currentUser.referredById
+      ? await prisma.user.findUnique({
+          where: { id: currentUser.referredById },
+          select: { id: true, status: true },
+        })
+      : null;
+
+    if (directUpline?.status === "ACTIVE" && giftCode.plan.uplineCommission > 0) {
+      await prisma.uplineCommission.create({
+        data: {
+          enrollmentId: enrollment.id,
+          recipientId: directUpline.id,
+          amount: giftCode.plan.uplineCommission,
+          planId: giftCode.planId,
+        },
+      });
+
+      await prisma.transaction.create({
+        data: {
+          userId: directUpline.id,
+          type: "UPLINE_COMMISSION",
+          amount: giftCode.plan.uplineCommission,
+          description: `Upline commission from Plan ${giftCode.planId} enrollment`,
+          status: "COMPLETED",
+          metadata: { enrollmentId: enrollment.id, planId: giftCode.planId },
+        },
+      });
+    }
+
     // Distribute commissions (gift code counts as enrollment, uses slotFee)
     await distributeCommissions(enrollment.id, userId, giftCode.plan.slotFee, giftCode.planId);
+
+    // System fee to treasury ledger
+    await prisma.systemFeeLedger.create({
+      data: {
+        enrollmentId: enrollment.id,
+        planId: giftCode.planId,
+        amount: giftCode.plan.systemFee,
+        description: "System fee on enrollment",
+      },
+    });
+
+    // SYSTEM pool gets systemFee
+    await prisma.pool.upsert({
+      where: { planId_type: { planId: giftCode.planId, type: "SYSTEM" } },
+      update: {
+        balance: { increment: giftCode.plan.systemFee },
+        totalReceived: { increment: giftCode.plan.systemFee },
+      },
+      create: {
+        planId: giftCode.planId,
+        type: "SYSTEM",
+        balance: giftCode.plan.systemFee,
+        totalReceived: giftCode.plan.systemFee,
+        totalDistributed: 0,
+      },
+    });
 
     // Record transaction
     await prisma.transaction.create({
@@ -210,13 +279,13 @@ export async function validateGiftCode(req: Request, res: Response): Promise<voi
       return;
     }
 
-    const isExpired = giftCode.expiresAt && giftCode.expiresAt < new Date();
-    const isValid = giftCode.status === "ACTIVE" && !isExpired;
+    const redeemability = getGiftCodeRedeemability(giftCode.status, giftCode.expiresAt, new Date());
+    const isValid = redeemability.redeemable;
 
     res.json({
       success: true,
       valid: isValid,
-      status: isExpired ? "EXPIRED" : giftCode.status,
+      status: redeemability.effectiveStatus,
       plan: isValid ? giftCode.plan : null,
       expiresAt: giftCode.expiresAt,
     });
