@@ -19,31 +19,30 @@ const panelVariants = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.2 } },
   exit: { opacity: 0, y: -8, transition: { duration: 0.12 } },
 };
-const WALLET_ADDRESS_BYTES = 20;
+function truncateAddress(address: string): string {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
 
 const Index: React.FC = () => {
   const [activePanel, setActivePanel] = useState<PanelId>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
-  const { isAuthenticated, login, logout, isLoading } = useAuth();
-
-  const handleLogin = async () => {
-    const key = 'ea_wallet_address';
-    let wallet = localStorage.getItem(key);
-
-    if (!wallet) {
-      const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(WALLET_ADDRESS_BYTES)))
-        .map((n) => n.toString(16).padStart(2, '0'))
-        .join('');
-      wallet = `0x${randomHex}`;
-      localStorage.setItem(key, wallet);
-    }
-
-    await login(wallet);
-  };
+  const { isAuthenticated, login, logout, isLoading, walletAddress, walletError, clearWalletError } = useAuth();
 
   if (!isAuthenticated) {
-    return <Landing onLogin={() => { if (!isLoading) void handleLogin(); }} />;
+    return (
+      <Landing
+        onLogin={() => {
+          if (!isLoading) {
+            clearWalletError();
+            void login();
+          }
+        }}
+        isLoading={isLoading}
+        walletAddress={walletAddress}
+        walletError={walletError}
+      />
+    );
   }
 
   return (
@@ -60,6 +59,7 @@ const Index: React.FC = () => {
           <InternalHeader
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             sidebarOpen={sidebarOpen}
+            connectedAddress={walletAddress ? truncateAddress(walletAddress) : undefined}
           />
         )}
         <AnimatePresence mode="wait">

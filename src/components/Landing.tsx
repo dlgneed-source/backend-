@@ -27,10 +27,25 @@ const menuItems = [
 
 interface LandingProps {
   onLogin: () => void;
+  isLoading?: boolean;
+  walletAddress?: string | null;
+  walletError?: string | null;
 }
 
-const Landing: React.FC<LandingProps> = ({ onLogin }) => {
+function truncateAddress(address: string): string {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+const Landing: React.FC<LandingProps> = ({ onLogin, isLoading = false, walletAddress, walletError }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const hasConnectedWallet = !!walletAddress;
+  const connectButtonLabel = isLoading
+    ? 'Connecting...'
+    : walletError
+      ? 'Retry Wallet Connect'
+      : hasConnectedWallet
+        ? `Connected: ${truncateAddress(walletAddress)}`
+        : 'Connect Wallet';
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans flex flex-col relative overflow-hidden">
@@ -116,14 +131,23 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
         >
           <button
             onClick={onLogin}
-            className="flex-1 bg-gradient-to-r from-accent to-primary hover:from-accent/90 hover:to-primary/90 text-primary-foreground py-3.5 rounded-2xl font-bold transition-all glow-fuchsia border border-primary/30 text-sm"
+            disabled={isLoading}
+            className="flex-1 bg-gradient-to-r from-accent to-primary hover:from-accent/90 hover:to-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-primary-foreground py-3.5 rounded-2xl font-bold transition-all glow-fuchsia border border-primary/30 text-sm"
           >
-            Wallet Connect
+            {connectButtonLabel}
           </button>
-          <button className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground py-3.5 rounded-2xl font-bold border border-primary/20 text-sm transition-colors">
+          <button
+            disabled={!hasConnectedWallet}
+            className="flex-1 bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-foreground py-3.5 rounded-2xl font-bold border border-primary/20 text-sm transition-colors"
+          >
             Explore AI Hub
           </button>
         </motion.div>
+        {walletError && (
+          <p className="text-destructive text-xs mt-3 font-semibold tracking-wide">
+            {walletError}
+          </p>
+        )}
 
         {/* Marquee */}
         <div className="w-full mt-12 sm:mt-16 relative overflow-hidden flex flex-col items-center gap-4">
