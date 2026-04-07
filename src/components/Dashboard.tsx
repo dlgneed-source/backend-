@@ -940,72 +940,15 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
   const [showSkills, setShowSkills] = useState(false);
   
-  // API hooks
-  const { data: backendOnline } = useBackendStatus();
-  const { data: apiPlans } = usePlans();
-  const { data: apiTransactions } = useTransactions();
-  const { user } = useAuth();
-  
-  // Theme map for plans (DB doesn't store themes)
-  const planThemes: Record<number, PlanData['theme']> = {
-    1: { primary: '#fbbf24', secondary: '#f59e0b', glow: 'rgba(251, 191, 36, 0.5)', bgGlow: 'rgba(251, 191, 36, 0.15)', text: '#fef3c7' },
-    2: { primary: '#22d3ee', secondary: '#0ea5e9', glow: 'rgba(34, 211, 238, 0.5)', bgGlow: 'rgba(34, 211, 238, 0.15)', text: '#cffafe' },
-    3: { primary: '#34d399', secondary: '#10b981', glow: 'rgba(52, 211, 153, 0.5)', bgGlow: 'rgba(52, 211, 153, 0.15)', text: '#d1fae5' },
-    4: { primary: '#e879f9', secondary: '#a855f7', glow: 'rgba(232, 121, 249, 0.5)', bgGlow: 'rgba(232, 121, 249, 0.15)', text: '#fae8ff' },
-    5: { primary: '#f472b6', secondary: '#ec4899', glow: 'rgba(244, 114, 182, 0.5)', bgGlow: 'rgba(244, 114, 182, 0.15)', text: '#fce7f3' },
-    6: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
-  };
-
-  // Merge API plans with themes, fallback to hardcoded
-  const activePlans: PlanData[] = apiPlans?.length
-    ? apiPlans.map((p: any) => ({
-        level: p.id,
-        name: p.name,
-        joiningFee: Number(p.joiningFee),
-        teamSize: p.teamSize,
-        uplineCommission: Number(p.uplineCommission),
-        systemFee: Number(p.systemFee),
-        levelCommission: Number(p.levelCommission),
-        slotFee: Number(p.slotFee),
-        totalCollection: Number(p.totalCollection),
-        memberProfit: Number(p.memberProfit),
-        leaderPool: Number(p.leaderPool),
-        rewardPool: Number(p.rewardPool),
-        sponsorPool: Number(p.sponsorPool),
-        roi: Number(p.roi),
-        flushoutDays: p.flushoutDays,
-        theme: planThemes[p.id] || planThemes[1],
-      }))
-    : plansData;
-
-  // Merge API transactions with fallback
-  const activeTransactions = apiTransactions?.length
-    ? apiTransactions.map((tx: any, i: number) => ({
-        id: tx.id || i,
-        type: tx.type || tx.description || 'Transaction',
-        amount: tx.amount >= 0 ? `+$${Math.abs(tx.amount).toFixed(2)}` : `-$${Math.abs(tx.amount).toFixed(2)}`,
-        time: tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : '',
-      }))
-    : recentTransactions;
-
-  // Use API data if available, fallback to hardcoded
-  const balance = user ? Number(user.balance) : 2580.5;
-  const displayName = user?.name || 'Arushi Tyagi';
-  const walletAddr = user?.walletAddress ? `${user.walletAddress.slice(0,5)}...${user.walletAddress.slice(-4)}` : '0x1A4...B9F2';
+  // Use hardcoded data
+  const activePlans: PlanData[] = plansData;
+  const activeTransactions = recentTransactions;
+  const balance = 2580.5;
+  const displayName = 'Arushi Tyagi';
+  const walletAddr = '0x1A4...B9F2';
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-slate-200">
-      {/* Backend Status Banner */}
-      {backendOnline === false && (
-        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-center">
-          <p className="text-xs text-amber-300">⚠️ Backend offline — showing demo data. Start your server on Kali to see real data.</p>
-        </div>
-      )}
-      {backendOnline === true && (
-        <div className="bg-emerald-500/15 border-b border-emerald-500/30 px-4 py-1.5 text-center">
-          <p className="text-xs text-emerald-300">✅ Connected to backend — live data active</p>
-        </div>
-      )}
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none"><div className="absolute -top-1/2 -left-1/2 h-full w-full rounded-full bg-violet-500/3 blur-[100px]" /><div className="absolute -bottom-1/2 -right-1/2 h-full w-full rounded-full bg-cyan-500/3 blur-[100px]" /></div>
       
