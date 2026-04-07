@@ -869,7 +869,7 @@ const ReferPageContent = () => {
 // =============================================
 // DETAILS PAGE CONTENT
 // =============================================
-const DetailsPageContent = () => (
+const DetailsPageContent = ({ transactions }: { transactions: typeof recentTransactions }) => (
   <div className="max-w-lg mx-auto">
     <div className="relative">
       <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-orange-500/15 blur-lg" />
@@ -897,7 +897,7 @@ const DetailsPageContent = () => (
             <h4 className="text-sm font-semibold text-white">Recent Activity</h4>
             <button 
               onClick={() => {
-                const csv = 'Type,Amount,Time\n' + activeTransactions.map(tx => `${tx.type},${tx.amount},${tx.time}`).join('\n');
+                const csv = 'Type,Amount,Time\n' + transactions.map(tx => `${tx.type},${tx.amount},${tx.time}`).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -912,7 +912,7 @@ const DetailsPageContent = () => (
             </button>
           </div>
           <div className="space-y-2">
-            {activeTransactions.slice(0, 3).map((tx) => (
+            {transactions.slice(0, 3).map((tx) => (
               <div key={tx.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
                 <div className="flex items-center gap-3">
                   <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tx.type === 'Withdrawal' ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`}>
@@ -1063,7 +1063,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
 
             {subView === 'details' && (
               <div className="overflow-x-auto -mx-3 px-3">
-                <DetailsPageContent />
+                <DetailsPageContent transactions={activeTransactions} />
               </div>
             )}
             {subView === 'withdrawal' && <WithdrawalPageContent balance={balance} />}
