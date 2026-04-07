@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ethers } from "ethers";
 
+// Test-only key from local Hardhat defaults; never used in production.
 const SIGNER_PRIVATE_KEY = "0x59c6995e998f97a5a0044966f0945382d7f9f691f8f8f7f2a5f4e5f5a5c5d5e5";
 const TEST_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000010";
 const BASE_ENV = { ...process.env };

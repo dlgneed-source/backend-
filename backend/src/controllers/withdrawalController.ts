@@ -4,7 +4,7 @@
  */
 
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
 import {
   signWithdrawal,
@@ -182,6 +182,15 @@ export async function signWithdrawalRequest(req: AuthenticatedRequest, res: Resp
       },
     });
   } catch (err: unknown) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      res.status(409).json({
+        success: false,
+        message: "Nonce collision detected, please retry signing",
+        code: "EIP712_NONCE_REPLAY",
+      });
+      return;
+    }
+
     if (err instanceof EIP712ValidationError) {
       res.status(err.statusCode).json({
         success: false,
