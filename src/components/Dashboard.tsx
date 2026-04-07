@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { teamApi, usersApi } from '@/lib/api';
@@ -808,7 +808,7 @@ const ReferralNetworkCard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadTeamData = async () => {
+  const loadTeamData = useCallback(async () => {
     if (!token) {
       setTeamTree([]);
       setStats({ level1: 0, level2: 0, total: 0 });
@@ -831,11 +831,11 @@ const ReferralNetworkCard = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     void loadTeamData();
-  }, [token]);
+  }, [loadTeamData]);
 
   const mappedNodes = mapTeamTreeNodes(teamTree);
   const hasReferrals = mappedNodes.length > 0;

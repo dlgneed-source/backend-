@@ -1,3 +1,5 @@
+import type { TeamTreeApiNode } from '@/lib/teamTree';
+
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
@@ -5,15 +7,6 @@ type RequestOptions = {
   method?: string;
   token?: string | null;
   body?: unknown;
-};
-
-type TeamTreeApiNode = {
-  id: string;
-  walletAddress: string;
-  name: string | null;
-  level: number;
-  enrollmentCount: number;
-  children?: TeamTreeApiNode[];
 };
 
 async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
