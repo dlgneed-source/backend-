@@ -978,14 +978,14 @@ const CommunityLounge: React.FC = () => {
           
           <input 
             value={input} 
-            onChange={(e) => setInput(e.target.value)} 
+            onChange={(e) => handleInputChange(e.target.value)} 
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 send();
               }
             }}
-            placeholder="Type a message..." 
+            placeholder={socket.isConnected ? "Type a message (live)..." : "Type a message..."} 
             className="flex-1 bg-transparent text-sm outline-none min-h-[44px] py-2"
             style={{ color: 'white' }}
           />
