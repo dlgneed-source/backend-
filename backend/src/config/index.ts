@@ -2,6 +2,12 @@ import dotenv from "dotenv";
 import type { StringValue } from "ms";
 dotenv.config();
 
+function parseIntEnv(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 const config = {
   // Server
   PORT: parseInt(process.env.PORT || "3001"),
@@ -22,14 +28,16 @@ const config = {
 
   // Blockchain / Smart Contract
   RPC_URL: process.env.RPC_URL || "https://mainnet.infura.io/v3/YOUR_INFURA_KEY",
-  CONTRACT_ADDRESS: process.env.CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000",
-  TREASURY_WALLET: process.env.TREASURY_WALLET || "0x0000000000000000000000000000000000000002",
-  CHAIN_ID: parseInt(process.env.CHAIN_ID || "1"),
+  CONTRACT_ADDRESS: process.env.CONTRACT_ADDRESS || "",
+  TREASURY_WALLET: process.env.TREASURY_WALLET || "",
+  CHAIN_ID: parseIntEnv(process.env.CHAIN_ID, 0),
   SIGNER_PRIVATE_KEY: process.env.SIGNER_PRIVATE_KEY || "",
 
   // EIP-712
   EIP712_DOMAIN_NAME: process.env.EIP712_DOMAIN_NAME || "eAkhuwat",
   EIP712_DOMAIN_VERSION: process.env.EIP712_DOMAIN_VERSION || "1",
+  EIP712_WITHDRAWAL_TTL_SECONDS: parseIntEnv(process.env.EIP712_WITHDRAWAL_TTL_SECONDS, 3600),
+  EIP712_MAX_DEADLINE_SECONDS: parseIntEnv(process.env.EIP712_MAX_DEADLINE_SECONDS, 86400),
 
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000"), // 15 min

@@ -4,12 +4,18 @@
  */
 
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
-import { signWithdrawal, isDeadlineValid } from "../utils/eip712";
-import { createError } from "../middleware/errorHandler";
+import {
+  signWithdrawal,
+  verifySignedWithdrawal,
+  generateWithdrawalNonce,
+  ensureNonceNotUsed,
+  EIP712ValidationError,
+} from "../utils/eip712";
 
 const prisma = new PrismaClient();
+const MAX_NONCE_GENERATION_ATTEMPTS = 5;
 
 const WITHDRAWAL_MIN = parseFloat(process.env.WITHDRAWAL_MIN_AMOUNT || "5");
 const WITHDRAWAL_MAX = parseFloat(process.env.WITHDRAWAL_MAX_AMOUNT || "10000");
@@ -102,21 +108,65 @@ export async function signWithdrawalRequest(req: AuthenticatedRequest, res: Resp
       return;
     }
 
-    // Generate nonce based on withdrawal ID
-    const nonce = parseInt(withdrawal.id.replace(/[^0-9]/g, "").slice(0, 10)) || Date.now();
+    if (withdrawal.signature || withdrawal.nonce) {
+      res.status(409).json({ success: false, message: "Withdrawal is already signed" });
+      return;
+    }
+
+    let nonce = generateWithdrawalNonce();
+    let nonceAttempts = 0;
+    while (nonceAttempts < MAX_NONCE_GENERATION_ATTEMPTS) {
+      try {
+        // eslint-disable-next-line no-await-in-loop -- sequential nonce checks avoid concurrent reuse.
+        await ensureNonceNotUsed(nonce, async (candidateNonce: string) => {
+          const existing = await prisma.withdrawal.findFirst({
+            where: { nonce: candidateNonce },
+            select: { id: true },
+          });
+          return Boolean(existing);
+        });
+        break;
+      } catch (nonceErr) {
+        if (!(nonceErr instanceof EIP712ValidationError) || nonceErr.code !== "EIP712_NONCE_REPLAY") {
+          throw nonceErr;
+        }
+        nonceAttempts += 1;
+        nonce = generateWithdrawalNonce();
+      }
+    }
+
+    if (nonceAttempts >= MAX_NONCE_GENERATION_ATTEMPTS) {
+      res.status(503).json({
+        success: false,
+        message: "Could not allocate a unique nonce, please retry",
+        code: "EIP712_NONCE_GENERATION_FAILED",
+      });
+      return;
+    }
 
     const { signature, deadline, hash } = await signWithdrawal(
       withdrawal.walletAddress,
       withdrawal.amount,
-      nonce,
-      3600 // 1 hour validity
+      nonce
     );
 
-    // Update withdrawal with signature
-    await prisma.withdrawal.update({
-      where: { id: withdrawalId },
+    verifySignedWithdrawal({
+      recipient: withdrawal.walletAddress,
+      amountUsdc: withdrawal.amount,
+      nonce,
+      deadline,
+      signature,
+    });
+
+    // Update withdrawal with signature only if still unsigned and approved
+    const updateResult = await prisma.withdrawal.updateMany({
+      where: { id: withdrawalId, status: "APPROVED", signature: null, nonce: null },
       data: { signature, nonce: nonce.toString(), status: "PROCESSING" },
     });
+    if (updateResult.count === 0) {
+      res.status(409).json({ success: false, message: "Withdrawal signing state changed, retry" });
+      return;
+    }
 
     res.json({
       success: true,
@@ -131,11 +181,25 @@ export async function signWithdrawalRequest(req: AuthenticatedRequest, res: Resp
         walletAddress: withdrawal.walletAddress,
       },
     });
-  } catch (err: any) {
-    if (err.message?.includes("Signer private key not configured")) {
-      res.status(503).json({ success: false, message: "Signing service not configured" });
+  } catch (err: unknown) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      res.status(409).json({
+        success: false,
+        message: "Nonce collision detected, please retry signing",
+        code: "EIP712_NONCE_REPLAY",
+      });
       return;
     }
+
+    if (err instanceof EIP712ValidationError) {
+      res.status(err.statusCode).json({
+        success: false,
+        message: err.message,
+        code: err.code,
+      });
+      return;
+    }
+
     res.status(500).json({ success: false, message: "Failed to sign withdrawal" });
   }
 }
