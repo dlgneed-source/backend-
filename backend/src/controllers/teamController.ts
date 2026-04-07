@@ -55,9 +55,22 @@ export async function getDirectReferrals(req: AuthenticatedRequest, res: Respons
 export async function getTeamStats(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const teamIds = await getAllTeamMemberIds(req.user!.id);
+    const level1Referrals = await prisma.user.findMany({
+      where: { referredById: req.user!.id },
+      select: { id: true },
+    });
+    const level1Count = level1Referrals.length;
+    const level1Ids = level1Referrals.map((referral) => referral.id);
 
-    const [totalMembers, enrollmentsByPlan, activeEnrollments] = await Promise.all([
+    const [totalMembers, level2Count, enrollmentsByPlan, activeEnrollments] = await Promise.all([
       Promise.resolve(teamIds.length),
+      level1Ids.length
+        ? prisma.user.count({
+            where: {
+              referredById: { in: level1Ids },
+            },
+          })
+        : Promise.resolve(0),
       prisma.enrollment.groupBy({
         by: ["planId"],
         where: {
@@ -75,6 +88,8 @@ export async function getTeamStats(req: AuthenticatedRequest, res: Response): Pr
       success: true,
       stats: {
         totalMembers,
+        level1Count,
+        level2Count,
         activeEnrollments,
         enrollmentsByPlan: enrollmentsByPlan.map((e) => ({
           planId: e.planId,

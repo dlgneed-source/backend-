@@ -7,6 +7,15 @@ type RequestOptions = {
   body?: unknown;
 };
 
+type TeamTreeApiNode = {
+  id: string;
+  walletAddress: string;
+  name: string | null;
+  level: number;
+  enrollmentCount: number;
+  children?: TeamTreeApiNode[];
+};
+
 async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method || 'GET',
@@ -94,8 +103,21 @@ export const teamApi = {
       success: boolean;
       stats: {
         totalMembers: number;
+        level1Count?: number;
+        level2Count?: number;
+        activeEnrollments?: number;
+        enrollmentsByPlan?: Array<{
+          planId: number;
+          count: number;
+        }>;
       };
     }>('/api/team/stats', { token }),
+
+  getTree: (token: string, depth = 3) =>
+    apiRequest<{
+      success: boolean;
+      tree: TeamTreeApiNode[];
+    }>(`/api/team/tree?depth=${depth}`, { token }),
 
   getCommissions: (token: string) =>
     apiRequest<{
