@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         usersApi.getBalance(loginResponse.token),
         usersApi.getReferralLink(loginResponse.token),
         teamApi.getStats(loginResponse.token),
-        teamApi.getCommissions(loginResponse.token),
+        teamApi.getCommissions(loginResponse.token, 1),
       ]);
 
       const profile = profileResult.status === 'fulfilled' ? profileResult.value.user : undefined;

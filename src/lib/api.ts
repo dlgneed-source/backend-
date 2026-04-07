@@ -112,11 +112,30 @@ export const teamApi = {
       tree: TeamTreeApiNode[];
     }>(`/api/team/tree?depth=${depth}`, { token }),
 
-  getCommissions: (token: string) =>
+  getCommissions: (token: string, limit = 20) =>
     apiRequest<{
       success: boolean;
+      commissions: Array<{
+        id: string;
+        level: number;
+        displayLevel?: number;
+        percentage: number;
+        amount: number;
+        planId: number;
+        createdAt: string;
+        fromUser?: { walletAddress: string; name?: string | null } | null;
+      }>;
       totalEarned: number;
-    }>('/api/team/commissions?limit=1', { token }),
+      commissionSummary?: {
+        totalEarned: number;
+        levels: Array<{
+          key: string;
+          label: string;
+          percentage: number | null;
+          amount: number;
+        }>;
+      };
+    }>(`/api/team/commissions?limit=${limit}`, { token }),
 };
 
 export const poolsApi = {

@@ -7,6 +7,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { getAllTeamMemberIds } from "../utils/incentiveLogic";
+import { buildCommissionLevelSummary } from "../utils/commissionSummary";
 
 const prisma = new PrismaClient();
 
@@ -127,7 +128,7 @@ export async function getTeamCommissions(req: AuthenticatedRequest, res: Respons
   const skip = (page - 1) * limit;
 
   try {
-    const [commissions, total] = await Promise.all([
+    const [commissions, total, uplineEarned, byLevel] = await Promise.all([
       prisma.commission.findMany({
         where: { toUserId: req.user!.id },
         include: {
@@ -139,17 +140,34 @@ export async function getTeamCommissions(req: AuthenticatedRequest, res: Respons
         take: limit,
       }),
       prisma.commission.count({ where: { toUserId: req.user!.id } }),
+      prisma.uplineCommission.aggregate({
+        where: { recipientId: req.user!.id },
+        _sum: { amount: true },
+      }),
+      prisma.commission.groupBy({
+        by: ["level"],
+        where: { toUserId: req.user!.id },
+        _sum: { amount: true },
+      }),
     ]);
 
-    const totalEarned = await prisma.commission.aggregate({
-      where: { toUserId: req.user!.id },
-      _sum: { amount: true },
+    const summary = buildCommissionLevelSummary({
+      uplineAmount: uplineEarned._sum.amount,
+      levelAmounts: byLevel.map((row) => ({
+        level: row.level,
+        amount: row._sum.amount,
+      })),
     });
+    const normalizedCommissions = commissions.map((commission) => ({
+      ...commission,
+      displayLevel: commission.level + 1,
+    }));
 
     res.json({
       success: true,
-      commissions,
-      totalEarned: totalEarned._sum.amount || 0,
+      commissions: normalizedCommissions,
+      totalEarned: summary.totalEarned,
+      commissionSummary: summary,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
