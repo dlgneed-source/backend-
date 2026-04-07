@@ -1,0 +1,589 @@
+/**
+ * Admin Controller
+ * Administrative operations: user management, withdrawal approval, system config
+ */
+
+import { Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
+import { AuthenticatedRequest } from "../middleware/auth";
+import { generateAdminToken } from "../middleware/auth";
+import { verifyWalletSignature, generateSignInMessage } from "../utils/eip712";
+import { processFlushout } from "../utils/flushoutLogic";
+import { v4 as uuidv4 } from "uuid";
+
+const prisma = new PrismaClient();
+
+// =============================================
+// ADMIN AUTH
+// =============================================
+
+/**
+ * GET /admin/nonce/:walletAddress
+ */
+export async function getAdminNonce(req: Request, res: Response): Promise<void> {
+  const { walletAddress } = req.params;
+
+  try {
+    const nonce = uuidv4();
+    const message = generateSignInMessage(walletAddress, nonce);
+
+    await prisma.admin.update({
+      where: { walletAddress: walletAddress.toLowerCase() },
+      data: {},
+    });
+
+    res.json({ success: true, nonce, message });
+  } catch {
+    res.status(404).json({ success: false, message: "Admin not found" });
+  }
+}
+
+/**
+ * POST /admin/login
+ */
+export async function adminLogin(req: Request, res: Response): Promise<void> {
+  const { walletAddress, signature, message } = req.body;
+
+  try {
+    const normalizedWallet = walletAddress.toLowerCase();
+
+    const admin = await prisma.admin.findUnique({
+      where: { walletAddress: normalizedWallet },
+    });
+
+    if (!admin || !admin.isActive) {
+      res.status(401).json({ success: false, message: "Admin not found or inactive" });
+      return;
+    }
+
+    let signerAddress: string;
+    try {
+      signerAddress = verifyWalletSignature(message, signature);
+    } catch {
+      res.status(401).json({ success: false, message: "Invalid signature" });
+      return;
+    }
+
+    if (signerAddress.toLowerCase() !== normalizedWallet) {
+      res.status(401).json({ success: false, message: "Signature mismatch" });
+      return;
+    }
+
+    await prisma.admin.update({
+      where: { id: admin.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const token = generateAdminToken(admin.id, admin.walletAddress, admin.role);
+
+    res.json({ success: true, token, admin: { id: admin.id, walletAddress: admin.walletAddress, role: admin.role } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Admin login failed" });
+  }
+}
+
+// =============================================
+// DASHBOARD
+// =============================================
+
+/**
+ * GET /admin/dashboard
+ */
+export async function getDashboard(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const [users, enrollments, withdrawals, treasury, pools] = await Promise.all([
+      prisma.user.count(),
+      prisma.enrollment.groupBy({ by: ["status"], _count: true }),
+      prisma.withdrawal.groupBy({ by: ["status"], _count: true }),
+      prisma.treasury.findFirst(),
+      prisma.pool.groupBy({ by: ["type"], _sum: { balance: true } }),
+    ]);
+
+    const enrollmentMap: Record<string, number> = {};
+    enrollments.forEach((e) => { enrollmentMap[e.status] = e._count; });
+
+    const withdrawalMap: Record<string, number> = {};
+    withdrawals.forEach((w) => { withdrawalMap[w.status] = w._count; });
+
+    const poolMap: Record<string, number> = {};
+    pools.forEach((p) => { poolMap[p.type] = p._sum.balance || 0; });
+
+    res.json({
+      success: true,
+      dashboard: {
+        users,
+        enrollments: enrollmentMap,
+        withdrawals: withdrawalMap,
+        treasury,
+        pools: poolMap,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch dashboard" });
+  }
+}
+
+// =============================================
+// USER MANAGEMENT
+// =============================================
+
+/**
+ * GET /admin/users
+ */
+export async function getUsers(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const skip = (page - 1) * limit;
+  const search = req.query.search as string;
+
+  try {
+    const where = search
+      ? {
+          OR: [
+            { walletAddress: { contains: search, mode: "insensitive" as const } },
+            { name: { contains: search, mode: "insensitive" as const } },
+            { email: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
+      : {};
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          walletAddress: true,
+          name: true,
+          email: true,
+          status: true,
+          referralCode: true,
+          createdAt: true,
+          lastLoginAt: true,
+          _count: { select: { enrollments: true, referrals: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    res.json({ success: true, users, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch users" });
+  }
+}
+
+/**
+ * PATCH /admin/users/:userId/status
+ */
+export async function updateUserStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { userId } = req.params;
+  const { status, reason } = req.body;
+
+  try {
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { status },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        userId,
+        action: status === "SUSPENDED" ? "USER_SUSPENDED" : "USER_BLOCKED",
+        description: `User status changed to ${status}. Reason: ${reason || "N/A"}`,
+        metadata: { previousStatus: updated.status, reason },
+      },
+    });
+
+    res.json({ success: true, message: `User status updated to ${status}`, user: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to update user status" });
+  }
+}
+
+// =============================================
+// WITHDRAWAL MANAGEMENT
+// =============================================
+
+/**
+ * GET /admin/withdrawals
+ */
+export async function getWithdrawals(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const skip = (page - 1) * limit;
+  const status = req.query.status as string;
+
+  try {
+    const where = status ? { status: status as any } : {};
+
+    const [withdrawals, total] = await Promise.all([
+      prisma.withdrawal.findMany({
+        where,
+        include: { user: { select: { walletAddress: true, name: true } } },
+        orderBy: { requestedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.withdrawal.count({ where }),
+    ]);
+
+    res.json({ success: true, withdrawals, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch withdrawals" });
+  }
+}
+
+/**
+ * PATCH /admin/withdrawals/:withdrawalId/approve
+ */
+export async function approveWithdrawal(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { withdrawalId } = req.params;
+  const { txHash } = req.body;
+
+  try {
+    const withdrawal = await prisma.withdrawal.findUnique({ where: { id: withdrawalId } });
+    if (!withdrawal) {
+      res.status(404).json({ success: false, message: "Withdrawal not found" });
+      return;
+    }
+
+    if (withdrawal.status !== "PENDING") {
+      res.status(400).json({ success: false, message: "Only pending withdrawals can be approved" });
+      return;
+    }
+
+    const updated = await prisma.withdrawal.update({
+      where: { id: withdrawalId },
+      data: { status: "APPROVED", processedAt: new Date(), txHash },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        userId: withdrawal.userId,
+        action: "WITHDRAWAL_APPROVED",
+        description: `Withdrawal #${withdrawalId} of $${withdrawal.amount} approved`,
+        metadata: { withdrawalId, amount: withdrawal.amount, txHash },
+      },
+    });
+
+    res.json({ success: true, message: "Withdrawal approved", withdrawal: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to approve withdrawal" });
+  }
+}
+
+/**
+ * PATCH /admin/withdrawals/:withdrawalId/reject
+ */
+export async function rejectWithdrawal(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { withdrawalId } = req.params;
+  const { reason } = req.body;
+
+  try {
+    const withdrawal = await prisma.withdrawal.findUnique({ where: { id: withdrawalId } });
+    if (!withdrawal) {
+      res.status(404).json({ success: false, message: "Withdrawal not found" });
+      return;
+    }
+
+    if (!["PENDING", "PROCESSING"].includes(withdrawal.status)) {
+      res.status(400).json({ success: false, message: "Cannot reject this withdrawal" });
+      return;
+    }
+
+    const updated = await prisma.withdrawal.update({
+      where: { id: withdrawalId },
+      data: { status: "REJECTED", rejectedAt: new Date(), rejectionNote: reason },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        userId: withdrawal.userId,
+        action: "WITHDRAWAL_REJECTED",
+        description: `Withdrawal #${withdrawalId} rejected. Reason: ${reason}`,
+        metadata: { withdrawalId, amount: withdrawal.amount, reason },
+      },
+    });
+
+    res.json({ success: true, message: "Withdrawal rejected", withdrawal: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to reject withdrawal" });
+  }
+}
+
+// =============================================
+// FLUSHOUT MANAGEMENT
+// =============================================
+
+/**
+ * POST /admin/flushout/:enrollmentId
+ * Manually trigger flushout for an enrollment
+ */
+export async function manualFlushout(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { enrollmentId } = req.params;
+
+  try {
+    const result = await processFlushout(enrollmentId);
+
+    if (result.status === "failed") {
+      res.status(400).json({ success: false, message: result.message });
+      return;
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        action: "ENROLLMENT_FLUSHED",
+        description: `Manual flushout for enrollment #${enrollmentId}`,
+        metadata: { enrollmentId, memberProfit: result.memberProfit },
+      },
+    });
+
+    res.json({ success: true, message: "Flushout processed", result });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to process flushout" });
+  }
+}
+
+// =============================================
+// INCENTIVE MANAGEMENT
+// =============================================
+
+/**
+ * GET /admin/incentive-claims
+ */
+export async function getIncentiveClaims(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const skip = (page - 1) * limit;
+  const status = req.query.status as string;
+
+  try {
+    const where = status ? { status: status as any } : {};
+
+    const [claims, total] = await Promise.all([
+      prisma.incentiveClaim.findMany({
+        where,
+        include: { user: { select: { walletAddress: true, name: true } } },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.incentiveClaim.count({ where }),
+    ]);
+
+    res.json({ success: true, claims, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch claims" });
+  }
+}
+
+/**
+ * PATCH /admin/incentive-claims/:claimId/approve
+ */
+export async function approveIncentiveClaim(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { claimId } = req.params;
+
+  try {
+    const claim = await prisma.incentiveClaim.findUnique({ where: { id: claimId } });
+    if (!claim) {
+      res.status(404).json({ success: false, message: "Claim not found" });
+      return;
+    }
+
+    if (claim.status !== "PENDING") {
+      res.status(400).json({ success: false, message: "Only pending claims can be approved" });
+      return;
+    }
+
+    const updated = await prisma.incentiveClaim.update({
+      where: { id: claimId },
+      data: { status: "APPROVED", approvedAt: new Date() },
+    });
+
+    await prisma.transaction.create({
+      data: {
+        userId: claim.userId,
+        type: "INCENTIVE",
+        amount: claim.reward,
+        description: `${claim.rank} club incentive approved`,
+        status: "COMPLETED",
+        metadata: { claimId, rank: claim.rank },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        userId: claim.userId,
+        action: "INCENTIVE_APPROVED",
+        description: `Incentive claim #${claimId} (${claim.rank} - $${claim.reward}) approved`,
+        metadata: { claimId, rank: claim.rank, reward: claim.reward },
+      },
+    });
+
+    res.json({ success: true, message: "Incentive claim approved", claim: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to approve claim" });
+  }
+}
+
+// =============================================
+// GIFT CODE MANAGEMENT
+// =============================================
+
+/**
+ * POST /admin/gift-codes
+ * Admin creates gift codes
+ */
+export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { planId, expiryDays = 30, quantity = 1 } = req.body;
+
+  try {
+    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan) {
+      res.status(404).json({ success: false, message: "Plan not found" });
+      return;
+    }
+
+    // Find admin's user record (admin wallet may also have a user record)
+    const adminUser = await prisma.user.findFirst({
+      where: { walletAddress: req.admin!.walletAddress },
+    });
+
+    if (!adminUser) {
+      res.status(400).json({ success: false, message: "Admin user profile not found" });
+      return;
+    }
+
+    const codes = [];
+    for (let i = 0; i < Math.min(quantity, 50); i++) {
+      const code = `EA${planId}-${uuidv4().replace(/-/g, "").toUpperCase().slice(0, 8)}`;
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + expiryDays);
+
+      const giftCode = await prisma.giftCode.create({
+        data: { code, planId, generatedById: adminUser.id, expiresAt, status: "ACTIVE" },
+      });
+      codes.push(giftCode.code);
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        action: "GIFT_CODE_CREATED",
+        description: `Created ${codes.length} gift code(s) for Plan ${planId}`,
+        metadata: { planId, quantity: codes.length },
+      },
+    });
+
+    res.status(201).json({ success: true, codes });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to create gift codes" });
+  }
+}
+
+// =============================================
+// SYSTEM CONFIG
+// =============================================
+
+/**
+ * GET /admin/config
+ */
+export async function getSystemConfig(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const configs = await prisma.systemConfig.findMany({ orderBy: { key: "asc" } });
+    res.json({ success: true, configs });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch config" });
+  }
+}
+
+/**
+ * PUT /admin/config/:key
+ */
+export async function updateSystemConfig(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { key } = req.params;
+  const { value, description } = req.body;
+
+  try {
+    const updated = await prisma.systemConfig.upsert({
+      where: { key },
+      update: { value, description, updatedBy: req.admin!.id },
+      create: { key, value, description, updatedBy: req.admin!.id },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        action: "SYSTEM_CONFIG_UPDATED",
+        description: `Config "${key}" updated`,
+        metadata: { key, newValue: value },
+      },
+    });
+
+    res.json({ success: true, config: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to update config" });
+  }
+}
+
+// =============================================
+// AUDIT LOGS
+// =============================================
+
+/**
+ * GET /admin/audit-logs
+ */
+export async function getAuditLogs(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 50;
+  const skip = (page - 1) * limit;
+
+  try {
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        include: {
+          admin: { select: { walletAddress: true, name: true } },
+          user: { select: { walletAddress: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.auditLog.count(),
+    ]);
+
+    res.json({ success: true, logs, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch audit logs" });
+  }
+}
+
+// =============================================
+// TREASURY
+// =============================================
+
+/**
+ * GET /admin/treasury
+ */
+export async function getTreasury(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const [treasury, recentLedger] = await Promise.all([
+      prisma.treasury.findFirst(),
+      prisma.treasuryLedger.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+    ]);
+
+    res.json({ success: true, treasury, recentLedger });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch treasury" });
+  }
+}
