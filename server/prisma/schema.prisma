@@ -487,3 +487,109 @@ enum TreasuryEntryType {
   WITHDRAWAL_FEE
   MANUAL_ADJUSTMENT
 }
+
+// ============================================================================
+// CHAT ROOM MODEL
+// ============================================================================
+model ChatRoom {
+  id          String           @id @default(uuid())
+  name        String
+  description String           @default("")
+  isVip       Boolean          @default(false)
+  isPinned    Boolean          @default(false)
+  icon        String           @default("hash")
+  createdBy   String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  members     ChatRoomMember[]
+  messages    ChatMessage[]
+
+  @@index([isVip])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// CHAT ROOM MEMBER MODEL
+// ============================================================================
+model ChatRoomMember {
+  id       String         @id @default(uuid())
+  roomId   String
+  room     ChatRoom       @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     ChatMemberRole @default(MEMBER)
+  joinedAt DateTime       @default(now())
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+}
+
+// ============================================================================
+// CHAT MESSAGE MODEL
+// ============================================================================
+model ChatMessage {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  text      String
+  replyToId String?
+  isPinned  Boolean  @default(false)
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reactions MessageReaction[]
+
+  @@index([roomId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// MESSAGE REACTION MODEL
+// ============================================================================
+model MessageReaction {
+  id        String      @id @default(uuid())
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  emoji     String
+  createdAt DateTime    @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+// ============================================================================
+// DIRECT MESSAGE MODEL
+// ============================================================================
+model DirectMessage {
+  id         String   @id @default(uuid())
+  senderId   String
+  sender     User     @relation("DMSender", fields: [senderId], references: [id])
+  receiverId String
+  receiver   User     @relation("DMReceiver", fields: [receiverId], references: [id])
+  text       String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([senderId, receiverId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// CHAT ENUMS
+// ============================================================================
+enum ChatMemberRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+}
