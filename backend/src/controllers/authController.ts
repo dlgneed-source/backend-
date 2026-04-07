@@ -205,7 +205,12 @@ export async function devLogin(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Development login failed" });
+    console.error("dev-login failed:", err);
+    const detail = err instanceof Error ? err.message : "unknown error";
+    res.status(500).json({
+      success: false,
+      message: config.NODE_ENV === "development" ? `Development login failed: ${detail}` : "Development login failed",
+    });
   }
 }
 

@@ -201,7 +201,7 @@ const CommunityLounge: React.FC = () => {
 
     socket.connect({
       id: user.id,
-      name: user.name || user.walletAddress.slice(0, 8),
+      name: user.name || user.walletAddress?.slice(0, 8) || 'Anonymous',
       walletAddress: user.walletAddress,
     });
 
@@ -319,7 +319,7 @@ const CommunityLounge: React.FC = () => {
     // Listen for new messages
     const offMessage = socket.onMessage((msg) => {
       setMessages((prev) => [...prev, {
-        id: String(msg.id || Date.now()),
+        id: String(msg.id),
         roomId: msg.roomId,
         user: msg.user?.name || msg.user?.walletAddress?.slice(0, 8) || 'Unknown',
         initials: (msg.user?.name || 'UN').slice(0, 2).toUpperCase(),
@@ -333,7 +333,7 @@ const CommunityLounge: React.FC = () => {
 
     const offDM = socket.onDM((dm) => {
       setMessages((prev) => [...prev, {
-        id: String(dm.id || Date.now()),
+        id: String(dm.id),
         roomId: `dm:${dm.senderId === user?.id ? dm.receiverId : dm.senderId}`,
         user: dm.sender?.name || dm.sender?.walletAddress?.slice(0, 8) || 'Unknown',
         initials: (dm.sender?.name || 'UN').slice(0, 2).toUpperCase(),

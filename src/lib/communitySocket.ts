@@ -7,6 +7,31 @@ type SocketUser = {
   walletAddress?: string;
 };
 
+interface SocketMessage {
+  id: string;
+  roomId: string;
+  text: string;
+  createdAt: string;
+  userId: string;
+  isPinned?: boolean;
+  user?: {
+    name?: string;
+    walletAddress?: string;
+  };
+}
+
+interface SocketDM {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  text: string;
+  createdAt: string;
+  sender?: {
+    name?: string;
+    walletAddress?: string;
+  };
+}
+
 class CommunitySocketClient {
   private socket: Socket | null = null;
   public typingUsers = new Map<string, Set<string>>();
@@ -98,13 +123,13 @@ class CommunitySocketClient {
     this.socket?.emit('typing_stop', { roomId });
   }
 
-  onMessage(cb: (message: any) => void) {
+  onMessage(cb: (message: SocketMessage) => void) {
     if (!this.socket) return () => {};
     this.socket.on('message_created', cb);
     return () => this.socket?.off('message_created', cb);
   }
 
-  onDM(cb: (dm: any) => void) {
+  onDM(cb: (dm: SocketDM) => void) {
     if (!this.socket) return () => {};
     this.socket.on('dm_created', cb);
     return () => this.socket?.off('dm_created', cb);

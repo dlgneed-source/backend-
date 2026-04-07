@@ -1,4 +1,5 @@
 import { Server, Socket } from "socket.io";
+import { randomUUID } from "crypto";
 import { addMessage, deleteMessage, pinMessage, roomExists } from "../services/communityStore";
 
 interface ConnectedUser {
@@ -8,6 +9,7 @@ interface ConnectedUser {
 }
 
 const DEFAULT_ROOM = "announcements";
+const MAX_MESSAGE_LENGTH = 2000;
 
 function getSocketUser(socket: Socket): ConnectedUser {
   const authUser = socket.handshake.auth?.user;
@@ -49,7 +51,7 @@ export function initCommunitySocket(io: Server): void {
 
       const message = addMessage({
         roomId,
-        text: normalizedText.slice(0, 2000),
+        text: normalizedText.slice(0, MAX_MESSAGE_LENGTH),
         userId: connectedUser.id,
         userName: connectedUser.name,
         walletAddress: connectedUser.walletAddress,
@@ -64,10 +66,10 @@ export function initCommunitySocket(io: Server): void {
       if (!receiverId || !normalizedText) return;
 
       const dmPayload = {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: randomUUID(),
         senderId: connectedUser.id,
         receiverId,
-        text: normalizedText.slice(0, 2000),
+        text: normalizedText.slice(0, MAX_MESSAGE_LENGTH),
         createdAt: new Date().toISOString(),
         sender: {
           id: connectedUser.id,

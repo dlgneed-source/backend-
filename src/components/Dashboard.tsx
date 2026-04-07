@@ -955,13 +955,13 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
           return;
         }
 
-        const mapped = response.transactions.map((tx, index) => {
+        const mapped = response.transactions.map((tx) => {
           const isDebit = tx.type === 'WITHDRAWAL' || tx.type === 'SYSTEM_FEE' || tx.type === 'FLUSHOUT';
           const signedAmount = `${isDebit ? '-' : '+'}$${Math.abs(tx.amount).toFixed(2)}`;
           const timeLabel = new Date(tx.createdAt).toLocaleString();
 
           return {
-            id: index + 1,
+            id: tx.id,
             type: tx.type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (ch) => ch.toUpperCase()),
             amount: signedAmount,
             time: timeLabel,

@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Camera, Users, Award, Wallet, Copy, Check, 
@@ -22,7 +21,7 @@ const ProfilePanel: React.FC = () => {
   const [userName, setUserName] = useState(user?.name || 'Wallet User');
   const [userBio, setUserBio] = useState('Web3 enthusiast & crypto trader. Building the decentralized future.');
   const [editingBio, setEditingBio] = useState(false);
-  const [userId] = useState(() => user?.id || Math.floor(100000 + Math.random() * 900000).toString());
+  const userId = user?.id || 'N/A';
 
   useEffect(() => {
     if (user?.name) setUserName(user.name);
@@ -153,7 +152,7 @@ const ProfilePanel: React.FC = () => {
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Total Team</p>
-                <p className="text-2xl font-bold text-white mt-1">{user?.directReferrals ?? 0}</p>
+                <p className="text-2xl font-bold text-white mt-1">{user?.totalTeam ?? 0}</p>
               </div>
             </div>
           </div>
@@ -209,7 +208,7 @@ const ProfilePanel: React.FC = () => {
               </div>
               <div className="flex justify-between items-center py-2 border-b border-white/10">
                 <span className="text-xs font-medium text-slate-400">Direct Referral Income</span>
-                <span className="text-sm font-bold text-white">${Number(user?.totalEarned || 0).toFixed(2)}</span>
+                <span className="text-sm font-bold text-white">${Number(user?.directReferralIncome || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-white/10">
                 <span className="text-xs font-medium text-slate-400">Total Withdrawn</span>

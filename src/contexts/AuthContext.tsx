@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { authApi, usersApi } from '@/lib/api';
+import { authApi, teamApi, usersApi } from '@/lib/api';
 
 interface AuthUser {
   id: string;
@@ -14,6 +14,8 @@ interface AuthUser {
   referralCode?: string;
   referralLink?: string;
   directReferrals?: number;
+  totalTeam?: number;
+  directReferralIncome?: string;
 }
 
 interface AuthContextType {
@@ -37,15 +39,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const loginResponse = await authApi.devLogin(walletAddress, 'Wallet User');
 
-      const [profileResult, balanceResult, referralResult] = await Promise.allSettled([
+      const [profileResult, balanceResult, referralResult, teamStatsResult, teamCommissionsResult] = await Promise.allSettled([
         usersApi.getProfile(loginResponse.token),
         usersApi.getBalance(loginResponse.token),
         usersApi.getReferralLink(loginResponse.token),
+        teamApi.getStats(loginResponse.token),
+        teamApi.getCommissions(loginResponse.token),
       ]);
 
       const profile = profileResult.status === 'fulfilled' ? profileResult.value.user : undefined;
       const balance = balanceResult.status === 'fulfilled' ? balanceResult.value.balance : undefined;
       const referral = referralResult.status === 'fulfilled' ? referralResult.value : undefined;
+      const teamStats = teamStatsResult.status === 'fulfilled' ? teamStatsResult.value.stats : undefined;
+      const teamCommissions = teamCommissionsResult.status === 'fulfilled' ? teamCommissionsResult.value : undefined;
 
       const authenticatedUser: AuthUser = {
         id: loginResponse.user.id,
@@ -59,6 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         referralCode: referral?.referralCode || profile?.referralCode,
         referralLink: referral?.referralLink,
         directReferrals: profile?._count?.referrals || 0,
+        totalTeam: teamStats?.totalMembers || 0,
+        directReferralIncome: String(teamCommissions?.totalEarned ?? 0),
       };
 
       setToken(loginResponse.token);

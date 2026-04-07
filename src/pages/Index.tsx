@@ -19,6 +19,7 @@ const panelVariants = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.2 } },
   exit: { opacity: 0, y: -8, transition: { duration: 0.12 } },
 };
+const WALLET_ADDRESS_BYTES = 20;
 
 const Index: React.FC = () => {
   const [activePanel, setActivePanel] = useState<PanelId>('dashboard');
@@ -31,7 +32,7 @@ const Index: React.FC = () => {
     let wallet = localStorage.getItem(key);
 
     if (!wallet) {
-      const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(20)))
+      const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(WALLET_ADDRESS_BYTES)))
         .map((n) => n.toString(16).padStart(2, '0'))
         .join('');
       wallet = `0x${randomHex}`;

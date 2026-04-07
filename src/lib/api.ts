@@ -88,6 +88,22 @@ export const usersApi = {
     }>('/api/users/referral-link', { token }),
 };
 
+export const teamApi = {
+  getStats: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      stats: {
+        totalMembers: number;
+      };
+    }>('/api/team/stats', { token }),
+
+  getCommissions: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      totalEarned: number;
+    }>('/api/team/commissions?limit=1', { token }),
+};
+
 export const communityApi = {
   getBootstrap: () =>
     apiRequest<{
