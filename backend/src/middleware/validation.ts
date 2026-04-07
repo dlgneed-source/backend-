@@ -84,6 +84,14 @@ export const rejectWithdrawalSchema = z.object({
 export const createGiftCodeSchema = z.object({
   planId: z.number().int().min(1).max(6),
   expiryDays: z.number().int().min(1).max(365).optional().default(30),
+  quantity: z.number().int().min(1).max(50).optional().default(1),
+  code: z
+    .string()
+    .trim()
+    .min(4, "Code must be at least 4 characters")
+    .max(32, "Code must be at most 32 characters")
+    .regex(/^[A-Z0-9_-]+$/, "Code can only contain uppercase letters, numbers, underscore and hyphen")
+    .optional(),
 });
 
 export const updateUserStatusSchema = z.object({
@@ -104,6 +112,10 @@ export const systemConfigSchema = z.object({
 
 export const redeemGiftCodeSchema = z.object({
   code: z.string().min(1, "Gift code required"),
+});
+
+export const adminUpdateGiftCodeStatusSchema = z.object({
+  status: z.enum(["ACTIVE", "DISABLED"]),
 });
 
 // =============================================

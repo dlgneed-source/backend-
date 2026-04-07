@@ -438,16 +438,89 @@ export async function approveIncentiveClaim(req: AuthenticatedRequest, res: Resp
 // =============================================
 
 /**
+ * GET /admin/gift-codes
+ * Admin gift code listing
+ */
+export async function getAdminGiftCodes(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+  const skip = (page - 1) * limit;
+  const status = (req.query.status as string | undefined)?.toUpperCase();
+  const search = (req.query.search as string | undefined)?.trim();
+
+  try {
+    await prisma.giftCode.updateMany({
+      where: {
+        status: "ACTIVE",
+        expiresAt: { lt: new Date() },
+      },
+      data: { status: "EXPIRED" },
+    });
+
+    const where = {
+      ...(status && ["ACTIVE", "USED", "EXPIRED", "DISABLED"].includes(status) ? { status: status as "ACTIVE" | "USED" | "EXPIRED" | "DISABLED" } : {}),
+      ...(search ? { code: { contains: search, mode: "insensitive" as const } } : {}),
+    };
+
+    const [giftCodes, total] = await Promise.all([
+      prisma.giftCode.findMany({
+        where,
+        include: {
+          plan: { select: { id: true, name: true, joiningFee: true } },
+          redemption: {
+            select: {
+              redeemedAt: true,
+              redeemedBy: { select: { id: true, walletAddress: true, name: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.giftCode.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      giftCodes: giftCodes.map((giftCode) => ({
+        id: giftCode.id,
+        code: giftCode.code,
+        planId: giftCode.planId,
+        planName: giftCode.plan.name,
+        amount: giftCode.plan.joiningFee,
+        status: giftCode.status,
+        expiresAt: giftCode.expiresAt,
+        createdAt: giftCode.createdAt,
+        updatedAt: giftCode.updatedAt,
+        usedCount: giftCode.redemption ? 1 : 0,
+        maxUses: 1,
+        redeemedAt: giftCode.redemption?.redeemedAt ?? null,
+        redeemedBy: giftCode.redemption?.redeemedBy ?? null,
+      })),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch gift codes" });
+  }
+}
+
+/**
  * POST /admin/gift-codes
  * Admin creates gift codes
  */
 export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { planId, expiryDays = 30, quantity = 1 } = req.body;
+  const { planId, expiryDays = 30, quantity = 1, code: requestedCode } = req.body;
 
   try {
     const plan = await prisma.plan.findUnique({ where: { id: planId } });
     if (!plan) {
       res.status(404).json({ success: false, message: "Plan not found" });
+      return;
+    }
+
+    if (!plan.isActive) {
+      res.status(409).json({ success: false, message: "Plan is inactive" });
       return;
     }
 
@@ -461,30 +534,164 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    const codes = [];
+    if (requestedCode && quantity > 1) {
+      res.status(400).json({ success: false, message: "Custom code supports quantity 1 only" });
+      return;
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now);
+    expiresAt.setDate(expiresAt.getDate() + expiryDays);
+
+    const createdCodes = [];
     for (let i = 0; i < Math.min(quantity, 50); i++) {
-      const code = `EA${planId}-${uuidv4().replace(/-/g, "").toUpperCase().slice(0, 8)}`;
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + expiryDays);
+      const code = (requestedCode ? requestedCode.trim().toUpperCase() : `EA${planId}-${uuidv4().replace(/-/g, "").toUpperCase().slice(0, 8)}`);
+
+      const existing = await prisma.giftCode.findUnique({ where: { code } });
+      if (existing) {
+        res.status(409).json({
+          success: false,
+          message: `Gift code "${code}" already exists`,
+        });
+        return;
+      }
 
       const giftCode = await prisma.giftCode.create({
         data: { code, planId, generatedById: adminUser.id, expiresAt, status: "ACTIVE" },
+        include: { plan: { select: { id: true, name: true, joiningFee: true } } },
       });
-      codes.push(giftCode.code);
+
+      createdCodes.push({
+        id: giftCode.id,
+        code: giftCode.code,
+        planId: giftCode.planId,
+        planName: giftCode.plan.name,
+        amount: giftCode.plan.joiningFee,
+        status: giftCode.status,
+        expiresAt: giftCode.expiresAt,
+        createdAt: giftCode.createdAt,
+        usedCount: 0,
+        maxUses: 1,
+      });
+
+      if (requestedCode) {
+        break;
+      }
     }
 
     await prisma.auditLog.create({
       data: {
         adminId: req.admin!.id,
         action: "GIFT_CODE_CREATED",
-        description: `Created ${codes.length} gift code(s) for Plan ${planId}`,
-        metadata: { planId, quantity: codes.length },
+        description: `Created ${createdCodes.length} gift code(s) for Plan ${planId}`,
+        metadata: { planId, quantity: createdCodes.length, codes: createdCodes.map((item) => item.code) },
       },
     });
 
-    res.status(201).json({ success: true, codes });
+    res.status(201).json({ success: true, giftCodes: createdCodes });
   } catch (err) {
     res.status(500).json({ success: false, message: "Failed to create gift codes" });
+  }
+}
+
+/**
+ * PATCH /admin/gift-codes/:giftCodeId/status
+ * Update admin gift code status
+ */
+export async function updateAdminGiftCodeStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { giftCodeId } = req.params;
+  const { status } = req.body as { status: "ACTIVE" | "DISABLED" };
+
+  try {
+    const giftCode = await prisma.giftCode.findUnique({
+      where: { id: giftCodeId },
+      include: {
+        plan: { select: { id: true, name: true, joiningFee: true } },
+        redemption: { select: { redeemedAt: true, redeemedBy: { select: { id: true, walletAddress: true, name: true } } } },
+      },
+    });
+
+    if (!giftCode) {
+      res.status(404).json({ success: false, message: "Gift code not found" });
+      return;
+    }
+
+    if (giftCode.status === "ACTIVE" && giftCode.expiresAt && giftCode.expiresAt < new Date()) {
+      await prisma.giftCode.update({
+        where: { id: giftCode.id },
+        data: { status: "EXPIRED" },
+      });
+      res.status(409).json({ success: false, message: "Gift code is expired. Refresh and try again." });
+      return;
+    }
+
+    if (giftCode.status === "USED" || giftCode.status === "EXPIRED") {
+      res.status(400).json({ success: false, message: `Cannot change status for ${giftCode.status.toLowerCase()} gift code` });
+      return;
+    }
+
+    if (giftCode.status === status) {
+      res.json({
+        success: true,
+        message: "Gift code status unchanged",
+        giftCode: {
+          id: giftCode.id,
+          code: giftCode.code,
+          planId: giftCode.planId,
+          planName: giftCode.plan.name,
+          amount: giftCode.plan.joiningFee,
+          status: giftCode.status,
+          expiresAt: giftCode.expiresAt,
+          createdAt: giftCode.createdAt,
+          usedCount: giftCode.redemption ? 1 : 0,
+          maxUses: 1,
+          redeemedAt: giftCode.redemption?.redeemedAt ?? null,
+          redeemedBy: giftCode.redemption?.redeemedBy ?? null,
+        },
+      });
+      return;
+    }
+
+    const updated = await prisma.giftCode.update({
+      where: { id: giftCode.id },
+      data: { status },
+      include: {
+        plan: { select: { id: true, name: true, joiningFee: true } },
+        redemption: { select: { redeemedAt: true, redeemedBy: { select: { id: true, walletAddress: true, name: true } } } },
+      },
+    });
+
+    if (status === "DISABLED") {
+      await prisma.auditLog.create({
+        data: {
+          adminId: req.admin!.id,
+          action: "GIFT_CODE_DISABLED",
+          description: `Gift code ${updated.code} disabled`,
+          metadata: { giftCodeId: updated.id, fromStatus: giftCode.status, toStatus: status },
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Gift code status updated",
+      giftCode: {
+        id: updated.id,
+        code: updated.code,
+        planId: updated.planId,
+        planName: updated.plan.name,
+        amount: updated.plan.joiningFee,
+        status: updated.status,
+        expiresAt: updated.expiresAt,
+        createdAt: updated.createdAt,
+        usedCount: updated.redemption ? 1 : 0,
+        maxUses: 1,
+        redeemedAt: updated.redemption?.redeemedAt ?? null,
+        redeemedBy: updated.redemption?.redeemedBy ?? null,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to update gift code status" });
   }
 }
 

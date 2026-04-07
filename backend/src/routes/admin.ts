@@ -11,13 +11,15 @@ import {
   manualFlushout,
   getIncentiveClaims,
   approveIncentiveClaim,
+  getAdminGiftCodes,
   adminCreateGiftCode,
+  updateAdminGiftCodeStatus,
   getSystemConfig,
   updateSystemConfig,
   getAuditLogs,
   getTreasury,
 } from "../controllers/adminController";
-import { authenticateAdmin, requireSuperAdmin } from "../middleware/auth";
+import { authenticateAdmin, requireAdminRoles, requireSuperAdmin } from "../middleware/auth";
 import { authRateLimiter } from "../middleware/security";
 import {
   validate,
@@ -27,6 +29,7 @@ import {
   rejectWithdrawalSchema,
   systemConfigSchema,
   createGiftCodeSchema,
+  adminUpdateGiftCodeStatusSchema,
 } from "../middleware/validation";
 
 const router = Router();
@@ -55,7 +58,9 @@ router.get("/incentive-claims", authenticateAdmin, getIncentiveClaims);
 router.patch("/incentive-claims/:claimId/approve", authenticateAdmin, approveIncentiveClaim);
 
 // Gift Codes
-router.post("/gift-codes", authenticateAdmin, validate(createGiftCodeSchema), adminCreateGiftCode);
+router.get("/gift-codes", authenticateAdmin, getAdminGiftCodes);
+router.post("/gift-codes", authenticateAdmin, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(createGiftCodeSchema), adminCreateGiftCode);
+router.patch("/gift-codes/:giftCodeId/status", authenticateAdmin, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(adminUpdateGiftCodeStatusSchema), updateAdminGiftCodeStatus);
 
 // Config (super admin only)
 router.get("/config", authenticateAdmin, requireSuperAdmin, getSystemConfig);

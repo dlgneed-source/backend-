@@ -9,6 +9,18 @@ type RequestOptions = {
   body?: unknown;
 };
 
+export class ApiError extends Error {
+  status: number;
+  details?: unknown;
+
+  constructor(message: string, status: number, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.details = details;
+  }
+}
+
 async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method || 'GET',
@@ -23,7 +35,7 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
 
   if (!response.ok || json?.success === false) {
     const message = json?.message || `Request failed (${response.status})`;
-    throw new Error(message);
+    throw new ApiError(message, response.status, json?.errors);
   }
 
   return json as T;
@@ -208,4 +220,106 @@ export const communityApi = {
         isPinned?: boolean;
       }>;
     }>('/api/community/bootstrap'),
+};
+
+export const adminApi = {
+  getGiftCodes: (token: string, params?: { page?: number; limit?: number; status?: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED'; search?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.status) query.set('status', params.status);
+    if (params?.search) query.set('search', params.search);
+    const queryString = query.toString();
+    return apiRequest<{
+      success: boolean;
+      giftCodes: Array<{
+        id: string;
+        code: string;
+        planId: number;
+        planName: string;
+        amount: number;
+        status: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED';
+        expiresAt: string | null;
+        createdAt: string;
+        updatedAt?: string;
+        usedCount: number;
+        maxUses: number;
+        redeemedAt?: string | null;
+        redeemedBy?: { id: string; walletAddress: string; name?: string | null } | null;
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }>(`/api/admin/gift-codes${queryString ? `?${queryString}` : ''}`, { token });
+  },
+
+  createGiftCode: (token: string, payload: { planId: number; expiryDays: number; quantity?: number; code?: string }) =>
+    apiRequest<{
+      success: boolean;
+      giftCodes: Array<{
+        id: string;
+        code: string;
+        planId: number;
+        planName: string;
+        amount: number;
+        status: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED';
+        expiresAt: string | null;
+        createdAt: string;
+        usedCount: number;
+        maxUses: number;
+      }>;
+    }>('/api/admin/gift-codes', {
+      method: 'POST',
+      token,
+      body: payload,
+    }),
+
+  updateGiftCodeStatus: (token: string, giftCodeId: string, status: 'ACTIVE' | 'DISABLED') =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      giftCode: {
+        id: string;
+        code: string;
+        planId: number;
+        planName: string;
+        amount: number;
+        status: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED';
+        expiresAt: string | null;
+        createdAt: string;
+        usedCount: number;
+        maxUses: number;
+      };
+    }>(`/api/admin/gift-codes/${giftCodeId}/status`, {
+      method: 'PATCH',
+      token,
+      body: { status },
+    }),
+
+  getAuditLogs: (token: string, params?: { page?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.limit) query.set('limit', String(params.limit));
+    const queryString = query.toString();
+    return apiRequest<{
+      success: boolean;
+      logs: Array<{
+        id: string;
+        action: string;
+        description: string;
+        createdAt: string;
+        admin?: { walletAddress: string; name?: string | null } | null;
+        user?: { walletAddress: string; name?: string | null } | null;
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }>(`/api/admin/audit-logs${queryString ? `?${queryString}` : ''}`, { token });
+  },
 };
