@@ -59,6 +59,9 @@ function normalizeAddress(value: unknown): string | null {
 function normalizeChainId(chainId: string | undefined): string | null {
   if (!chainId) return null;
   if (chainId.startsWith('0x')) {
+    if (!/^0x[0-9a-f]+$/i.test(chainId)) {
+      return null;
+    }
     return chainId.toLowerCase();
   }
 

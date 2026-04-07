@@ -73,7 +73,10 @@ export async function login(req: Request, res: Response): Promise<void> {
     let signerAddress: string;
     try {
       signerAddress = verifyWalletSignature(expectedMessage, signature);
-    } catch {
+    } catch (err) {
+      if (config.NODE_ENV === "development") {
+        console.error("Signature verification failed:", err);
+      }
       res.status(401).json({ success: false, message: "Invalid signature" });
       return;
     }
