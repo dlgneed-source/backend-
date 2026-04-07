@@ -225,3 +225,44 @@ export async function getPlanStats(req: Request, res: Response): Promise<void> {
     res.status(500).json({ success: false, message: "Failed to fetch plan stats" });
   }
 }
+
+/**
+ * GET /plans/members
+ * Enrollment-based member counts by plan
+ */
+export async function getPlanMembers(req: Request, res: Response): Promise<void> {
+  try {
+    const [plans, enrollmentCounts] = await Promise.all([
+      prisma.plan.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true },
+        orderBy: { id: "asc" },
+      }),
+      prisma.enrollment.groupBy({
+        by: ["planId"],
+        _count: { _all: true },
+      }),
+    ]);
+
+    const countByPlan = new Map<number, number>();
+    enrollmentCounts.forEach((row) => countByPlan.set(row.planId, row._count._all || 0));
+
+    const plansWithMembers = plans.map((plan) => ({
+      planId: plan.id,
+      planName: plan.name,
+      enrollments: countByPlan.get(plan.id) || 0,
+    }));
+
+    const totalEnrollments = plansWithMembers.reduce((sum, plan) => sum + (plan.enrollments || 0), 0);
+
+    res.json({
+      success: true,
+      members: {
+        plans: plansWithMembers,
+        totalEnrollments,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch plan members" });
+  }
+}

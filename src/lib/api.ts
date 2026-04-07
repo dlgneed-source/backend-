@@ -104,6 +104,44 @@ export const teamApi = {
     }>('/api/team/commissions?limit=1', { token }),
 };
 
+export const poolsApi = {
+  getStats: () =>
+    apiRequest<{
+      success: boolean;
+      stats: {
+        plans: Array<{
+          planId: number;
+          planName: string;
+          pools: {
+            leaderPool?: number | null;
+            rewardPool?: number | null;
+            sponsorPool?: number | null;
+          };
+        }>;
+        totals: {
+          leaderPool?: number | null;
+          rewardPool?: number | null;
+          sponsorPool?: number | null;
+        };
+      };
+    }>('/api/pools/stats'),
+};
+
+export const plansApi = {
+  getMembers: () =>
+    apiRequest<{
+      success: boolean;
+      members: {
+        plans: Array<{
+          planId: number;
+          planName: string;
+          enrollments?: number | null;
+        }>;
+        totalEnrollments?: number | null;
+      };
+    }>('/api/plans/members'),
+};
+
 export const communityApi = {
   getBootstrap: () =>
     apiRequest<{

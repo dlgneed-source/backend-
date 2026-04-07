@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { usersApi } from '@/lib/api';
+import { DashboardPoolMetrics, fetchDashboardPoolMetrics } from '@/lib/poolStats';
 
 
 import {
@@ -696,12 +697,45 @@ const RedeemGiftCodeButton = () => {
 // POOL STATS CARD
 // =============================================
 const PoolStatsCard = () => {
-  const stats = [
-    { label: 'Leader Pool', value: '$2,180', subtext: 'Plan 1-6', icon: Crown, color: '#fbbf24' },
-    { label: 'Reward Pool', value: '$1,450', subtext: 'Plan 1-6', icon: Gem, color: '#22d3ee' },
-    { label: 'Sponsor Pool', value: '$320', subtext: 'Plan 4-6', icon: Award, color: '#34d399' },
-    { label: 'Auto Fill', value: '142', subtext: 'Total Members', icon: Network, color: '#e879f9' },
-  ];
+  const [metrics, setMetrics] = useState<DashboardPoolMetrics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadStats = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchDashboardPoolMetrics();
+      setMetrics(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load pool stats';
+      setMetrics(null);
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 2,
+    }).format(value);
+
+  const stats = metrics
+    ? [
+        { label: 'Leader Pool', value: formatCurrency(metrics.leaderPool), subtext: `${metrics.leaderPlans} plan(s)`, icon: Crown, color: '#fbbf24' },
+        { label: 'Reward Pool', value: formatCurrency(metrics.rewardPool), subtext: `${metrics.rewardPlans} plan(s)`, icon: Gem, color: '#22d3ee' },
+        { label: 'Sponsor Pool', value: formatCurrency(metrics.sponsorPool), subtext: `${metrics.sponsorPlans} plan(s)`, icon: Award, color: '#34d399' },
+        { label: 'Auto Fill', value: metrics.totalMembers.toLocaleString('en-US'), subtext: 'Total Enrollments', icon: Network, color: '#e879f9' },
+      ]
+    : [];
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(6,182,212,0.2)', background: 'linear-gradient(135deg, rgba(6,182,212,0.06) 0%, rgba(59,130,246,0.03) 50%, rgba(0,0,0,0.2) 100%)' }}>
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400" />
@@ -715,20 +749,56 @@ const PoolStatsCard = () => {
           <p className="text-xs text-slate-400">Real-time Pool Balances</p>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {stats.map((s, i) => {
-          const Icon = s.icon;
-          return (
-            <div key={i} className="relative rounded-lg border border-white/5 bg-white/[0.03] p-3">
-              <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${s.color}, transparent)` }} />
-              <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${s.color}15` }}><Icon className="h-4 w-4" style={{ color: s.color }} /></div>
-              <p className="text-[9px] text-slate-500">{s.label}</p>
-              <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
-              <p className="text-[9px] text-slate-500">{s.subtext}</p>
+      {isLoading && (
+        <div className="grid grid-cols-2 gap-2" role="status" aria-label="Loading pool stats">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-white/5 bg-white/[0.03] p-3">
+              <div className="mb-2 h-8 w-8 animate-pulse rounded-lg bg-white/10" />
+              <div className="mb-1 h-3 w-20 animate-pulse rounded bg-white/10" />
+              <div className="mb-1 h-6 w-24 animate-pulse rounded bg-white/10" />
+              <div className="h-3 w-16 animate-pulse rounded bg-white/10" />
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && error && (
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4">
+          <p className="text-xs font-semibold text-rose-300">Could not load pool stats</p>
+          <p className="mt-1 text-[11px] text-rose-200/80">{error}</p>
+          <button
+            onClick={loadStats}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-1.5 text-[11px] font-semibold text-rose-200 hover:bg-rose-500/20"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!isLoading && !error && metrics && !metrics.hasData && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
+          <p className="text-sm font-semibold text-slate-200">No pool data available</p>
+          <p className="mt-1 text-[11px] text-slate-400">Pool balances and enrollments will appear once data is available.</p>
+        </div>
+      )}
+
+      {!isLoading && !error && metrics && metrics.hasData && (
+        <div className="grid grid-cols-2 gap-2">
+          {stats.map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <div key={i} className="relative rounded-lg border border-white/5 bg-white/[0.03] p-3">
+                <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${s.color}, transparent)` }} />
+                <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${s.color}15` }}><Icon className="h-4 w-4" style={{ color: s.color }} /></div>
+                <p className="text-[9px] text-slate-500">{s.label}</p>
+                <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
+                <p className="text-[9px] text-slate-500">{s.subtext}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </motion.div>
   );
 };

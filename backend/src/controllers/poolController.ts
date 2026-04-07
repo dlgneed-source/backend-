@@ -5,7 +5,6 @@
 
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import { AuthenticatedRequest } from "../middleware/auth";
 
 const prisma = new PrismaClient();
 
@@ -100,5 +99,67 @@ export async function getPoolSummary(req: Request, res: Response): Promise<void>
     res.json({ success: true, summary });
   } catch (err) {
     res.status(500).json({ success: false, message: "Failed to fetch pool summary" });
+  }
+}
+
+/**
+ * GET /pools/stats
+ * Get plan-wise pool balances and overall totals
+ */
+export async function getPoolStats(req: Request, res: Response): Promise<void> {
+  try {
+    const [plans, pools] = await Promise.all([
+      prisma.plan.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true },
+        orderBy: { id: "asc" },
+      }),
+      prisma.pool.findMany({
+        select: { planId: true, type: true, balance: true },
+      }),
+    ]);
+
+    const plansWithPools = plans.map((plan) => ({
+      planId: plan.id,
+      planName: plan.name,
+      pools: {
+        leaderPool: 0,
+        rewardPool: 0,
+        sponsorPool: 0,
+      },
+    }));
+
+    const byPlan = new Map<number, (typeof plansWithPools)[number]>();
+    plansWithPools.forEach((plan) => byPlan.set(plan.planId, plan));
+
+    pools.forEach((pool) => {
+      const target = byPlan.get(pool.planId);
+      if (!target) return;
+
+      const safeBalance = Number(pool.balance) || 0;
+      if (pool.type === "LEADER") target.pools.leaderPool = safeBalance;
+      if (pool.type === "REWARD") target.pools.rewardPool = safeBalance;
+      if (pool.type === "SPONSOR") target.pools.sponsorPool = safeBalance;
+    });
+
+    const totals = plansWithPools.reduce(
+      (acc, plan) => {
+        acc.leaderPool += Number(plan.pools.leaderPool) || 0;
+        acc.rewardPool += Number(plan.pools.rewardPool) || 0;
+        acc.sponsorPool += Number(plan.pools.sponsorPool) || 0;
+        return acc;
+      },
+      { leaderPool: 0, rewardPool: 0, sponsorPool: 0 }
+    );
+
+    res.json({
+      success: true,
+      stats: {
+        plans: plansWithPools,
+        totals,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch pool stats" });
   }
 }
