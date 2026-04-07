@@ -347,6 +347,5 @@ export function generateSignInMessage(walletAddress: string, nonce: string): str
     "",
     `Wallet: ${walletAddress}`,
     `Nonce: ${nonce}`,
-    `Time: ${new Date().toISOString()}`,
   ].join("\n");
 }

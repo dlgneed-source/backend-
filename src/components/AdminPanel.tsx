@@ -252,41 +252,13 @@ const plansData: Plan[] = [
 // USERS DATA
 // =============================================
 
-const usersData: User[] = [
-  { id: 'USR001', wallet: '0x7B2...F1A3', name: 'John Doe', email: 'john@example.com', status: 'Active', joinedAt: '2026-01-15', totalInvested: 155, totalEarned: 420, balance: 265, activePlans: [1, 2, 3], referralCount: 12, teamSize: 45, kimiLevel: 3, lastActive: '2 min ago' },
-  { id: 'USR002', wallet: '0x5E6...A8D4', name: 'Jane Smith', email: 'jane@example.com', status: 'Active', joinedAt: '2026-01-20', totalInvested: 80, totalEarned: 180, balance: 100, activePlans: [1, 2], referralCount: 8, teamSize: 23, kimiLevel: 2, lastActive: '5 min ago' },
-  { id: 'USR003', wallet: '0x8A3...B7F6', name: 'Mike Johnson', email: 'mike@example.com', status: 'Suspended', joinedAt: '2026-02-01', totalInvested: 40, totalEarned: 45, balance: 5, activePlans: [1], referralCount: 3, teamSize: 8, kimiLevel: 1, lastActive: '2 days ago' },
-  { id: 'USR004', wallet: '0x3C1...E4B2', name: 'Sarah Williams', email: 'sarah@example.com', status: 'Active', joinedAt: '2026-02-10', totalInvested: 320, totalEarned: 850, balance: 530, activePlans: [1, 2, 3, 4], referralCount: 25, teamSize: 89, kimiLevel: 4, lastActive: 'Just now' },
-  { id: 'USR005', wallet: '0x9F8...D2C1', name: 'David Brown', email: 'david@example.com', status: 'Active', joinedAt: '2026-02-15', totalInvested: 200, totalEarned: 380, balance: 180, activePlans: [2, 3], referralCount: 15, teamSize: 52, kimiLevel: 3, lastActive: '1 hour ago' },
-];
+const usersData: User[] = [];
 
 // =============================================
 // POOLS DATA
 // =============================================
 
-const poolsData: Pool[] = [
-  { id: 'SYS-1', name: 'System Fund - Plan 1', planId: 1, balance: 12450, totalDistributed: 45600, type: 'System', theme: { primary: '#22d3ee', bg: 'bg-sky-500/10', border: 'border-sky-400/20' } },
-  { id: 'LDR-1', name: 'Leader Pool - Plan 1', planId: 1, balance: 8920, totalDistributed: 23400, type: 'Leader', theme: { primary: '#fbbf24', bg: 'bg-amber-500/10', border: 'border-amber-400/20' } },
-  { id: 'REW-1', name: 'Reward Pool - Plan 1', planId: 1, balance: 0, totalDistributed: 12400, type: 'Reward', theme: { primary: '#e879f9', bg: 'bg-purple-500/10', border: 'border-purple-400/20' } },
-  { id: 'SYS-2', name: 'System Fund - Plan 2', planId: 2, balance: 18920, totalDistributed: 67800, type: 'System', theme: { primary: '#22d3ee', bg: 'bg-sky-500/10', border: 'border-sky-400/20' } },
-  { id: 'LDR-2', name: 'Leader Pool - Plan 2', planId: 2, balance: 12450, totalDistributed: 35600, type: 'Leader', theme: { primary: '#fbbf24', bg: 'bg-amber-500/10', border: 'border-amber-400/20' } },
-  { id: 'REW-2', name: 'Reward Pool - Plan 2', planId: 2, balance: 8920, totalDistributed: 18900, type: 'Reward', theme: { primary: '#e879f9', bg: 'bg-purple-500/10', border: 'border-purple-400/20' } },
-  { id: 'SYS-3', name: 'System Fund - Plan 3', planId: 3, balance: 23400, totalDistributed: 89200, type: 'System', theme: { primary: '#22d3ee', bg: 'bg-sky-500/10', border: 'border-sky-400/20' } },
-  { id: 'LDR-3', name: 'Leader Pool - Plan 3', planId: 3, balance: 18920, totalDistributed: 45600, type: 'Leader', theme: { primary: '#fbbf24', bg: 'bg-amber-500/10', border: 'border-amber-400/20' } },
-  { id: 'REW-3', name: 'Reward Pool - Plan 3', planId: 3, balance: 12450, totalDistributed: 28900, type: 'Reward', theme: { primary: '#e879f9', bg: 'bg-purple-500/10', border: 'border-purple-400/20' } },
-  { id: 'SYS-4', name: 'System Fund - Plan 4', planId: 4, balance: 34500, totalDistributed: 124000, type: 'System', theme: { primary: '#22d3ee', bg: 'bg-sky-500/10', border: 'border-sky-400/20' } },
-  { id: 'LDR-4', name: 'Leader Pool - Plan 4', planId: 4, balance: 28900, totalDistributed: 67800, type: 'Leader', theme: { primary: '#fbbf24', bg: 'bg-amber-500/10', border: 'border-amber-400/20' } },
-  { id: 'REW-4', name: 'Reward Pool - Plan 4', planId: 4, balance: 18920, totalDistributed: 35600, type: 'Reward', theme: { primary: '#e879f9', bg: 'bg-purple-500/10', border: 'border-purple-400/20' } },
-  { id: 'SPN-4', name: 'Sponsor Pool - Plan 4', planId: 4, balance: 12450, totalDistributed: 18900, type: 'Sponsor', theme: { primary: '#34d399', bg: 'bg-emerald-500/10', border: 'border-emerald-400/20' } },
-  { id: 'SYS-5', name: 'System Fund - Plan 5', planId: 5, balance: 45600, totalDistributed: 189000, type: 'System', theme: { primary: '#22d3ee', bg: 'bg-sky-500/10', border: 'border-sky-400/20' } },
-  { id: 'LDR-5', name: 'Leader Pool - Plan 5', planId: 5, balance: 38900, totalDistributed: 89200, type: 'Leader', theme: { primary: '#fbbf24', bg: 'bg-amber-500/10', border: 'border-amber-400/20' } },
-  { id: 'REW-5', name: 'Reward Pool - Plan 5', planId: 5, balance: 28900, totalDistributed: 45600, type: 'Reward', theme: { primary: '#e879f9', bg: 'bg-purple-500/10', border: 'border-purple-400/20' } },
-  { id: 'SPN-5', name: 'Sponsor Pool - Plan 5', planId: 5, balance: 18920, totalDistributed: 23400, type: 'Sponsor', theme: { primary: '#34d399', bg: 'bg-emerald-500/10', border: 'border-emerald-400/20' } },
-  { id: 'SYS-6', name: 'System Fund - Plan 6', planId: 6, balance: 67800, totalDistributed: 234000, type: 'System', theme: { primary: '#22d3ee', bg: 'bg-sky-500/10', border: 'border-sky-400/20' } },
-  { id: 'LDR-6', name: 'Leader Pool - Plan 6', planId: 6, balance: 56700, totalDistributed: 124000, type: 'Leader', theme: { primary: '#fbbf24', bg: 'bg-amber-500/10', border: 'border-amber-400/20' } },
-  { id: 'REW-6', name: 'Reward Pool - Plan 6', planId: 6, balance: 38900, totalDistributed: 67800, type: 'Reward', theme: { primary: '#e879f9', bg: 'bg-purple-500/10', border: 'border-purple-400/20' } },
-  { id: 'SPN-6', name: 'Sponsor Pool - Plan 6', planId: 6, balance: 28900, totalDistributed: 35600, type: 'Sponsor', theme: { primary: '#34d399', bg: 'bg-emerald-500/10', border: 'border-emerald-400/20' } },
-];
+const poolsData: Pool[] = [];
 
 // =============================================
 // WITHDRAWAL REQUESTS DATA
@@ -2183,7 +2155,12 @@ export function SecurityLogs({ token }: { token: string | null }) {
       <div className="flex flex-wrap items-center gap-3">
         <select
           value={severityFilter}
-          onChange={(e) => setSeverityFilter(e.target.value as any)}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === 'All' || value === 'Info' || value === 'Warning' || value === 'Critical') {
+              setSeverityFilter(value);
+            }
+          }}
           className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none"
         >
           <option value="All" className="bg-[#0a0a0f]">All Severities</option>

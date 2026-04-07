@@ -5,12 +5,12 @@ import {
   getMyGiftCodes,
   validateGiftCode,
 } from "../controllers/giftCodeController";
-import { authenticateUser } from "../middleware/auth";
+import { authenticateAdmin, authenticateUser, requireAdminRoles } from "../middleware/auth";
 import { validate, createGiftCodeSchema, redeemGiftCodeSchema } from "../middleware/validation";
 
 const router = Router();
 
-router.post("/generate", authenticateUser, validate(createGiftCodeSchema), generateGiftCode);
+router.post("/generate", authenticateAdmin, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(createGiftCodeSchema), generateGiftCode);
 router.post("/redeem", authenticateUser, validate(redeemGiftCodeSchema), redeemGiftCode);
 router.get("/my", authenticateUser, getMyGiftCodes);
 router.get("/:code/validate", validateGiftCode);

@@ -76,6 +76,7 @@ export const usersApi = {
         name?: string | null;
         status: string;
         referralCode?: string;
+        totalInvested?: number;
         _count?: { referrals?: number };
       };
     }>('/api/users/profile', { token }),
