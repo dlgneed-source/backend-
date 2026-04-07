@@ -8,8 +8,20 @@ import { initializeCronJobs } from './utils/cronJobs';
 import { AppError } from './utils/errors';
 import { errorResponse } from './utils/response';
 
-// Import controllers
+// Middleware
+import { authMiddleware, adminMiddleware } from './middleware/auth';
+
+// Controllers
 import { getPlans, getPlanById, enrollInPlan, getUserEnrollments } from './controllers/planController';
+import { login } from './controllers/authController';
+import { getUserProfile, getUserTransactions, getUserReferralTree, getUserStats } from './controllers/userController';
+import {
+  getGiftCodes, createGiftCode, revokeGiftCode, redeemGiftCode,
+  getUsers, suspendUser, unsuspendUser, getDashboardStats,
+  getWithdrawals, approveWithdrawal, rejectWithdrawal,
+  getFlushouts, getCommissions, getSecurityLogs,
+  getPools, requestWithdrawal,
+} from './controllers/adminController';
 
 const app = express();
 
@@ -20,7 +32,6 @@ app.use(helmet());
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 
-// Rate limiting
 const limiter = rateLimit({
   windowMs: config.rateLimitWindowMs,
   max: config.rateLimitMax,
@@ -36,20 +47,43 @@ app.get('/health', (_req, res) => {
 });
 
 // ============================================================================
-// API ROUTES
+// PUBLIC ROUTES
 // ============================================================================
-
-// Plans
+app.post('/api/auth/login', login);
 app.get('/api/plans', getPlans);
 app.get('/api/plans/:planId', getPlanById);
-app.post('/api/plans/enroll', enrollInPlan);  // TODO: Add auth middleware
-app.get('/api/enrollments', getUserEnrollments);  // TODO: Add auth middleware
+app.get('/api/pools', getPools);
 
-// TODO: Add these routes as you build more controllers:
-// app.post('/api/withdraw', withdrawController);
-// app.post('/api/gift-codes/redeem', giftCodeController);
-// app.get('/api/admin/users', adminController);
-// app.post('/api/admin/gift-codes', adminGiftCodeController);
+// ============================================================================
+// AUTHENTICATED USER ROUTES
+// ============================================================================
+app.post('/api/plans/enroll', authMiddleware, enrollInPlan);
+app.get('/api/enrollments', authMiddleware, getUserEnrollments);
+app.get('/api/user/profile', authMiddleware, getUserProfile);
+app.get('/api/user/transactions', authMiddleware, getUserTransactions);
+app.get('/api/user/referral-tree', authMiddleware, getUserReferralTree);
+app.get('/api/user/stats', authMiddleware, getUserStats);
+app.post('/api/withdraw', authMiddleware, requestWithdrawal);
+app.get('/api/withdraw/history', authMiddleware, getUserTransactions); // reuse
+app.post('/api/gift-codes/redeem', authMiddleware, redeemGiftCode);
+
+// ============================================================================
+// ADMIN ROUTES
+// ============================================================================
+app.get('/api/admin/dashboard', authMiddleware, adminMiddleware, getDashboardStats);
+app.get('/api/admin/users', authMiddleware, adminMiddleware, getUsers);
+app.post('/api/admin/users/:id/suspend', authMiddleware, adminMiddleware, suspendUser);
+app.post('/api/admin/users/:id/unsuspend', authMiddleware, adminMiddleware, unsuspendUser);
+app.get('/api/admin/gift-codes', authMiddleware, adminMiddleware, getGiftCodes);
+app.post('/api/admin/gift-codes', authMiddleware, adminMiddleware, createGiftCode);
+app.post('/api/admin/gift-codes/:id/revoke', authMiddleware, adminMiddleware, revokeGiftCode);
+app.get('/api/admin/withdrawals', authMiddleware, adminMiddleware, getWithdrawals);
+app.post('/api/admin/withdrawals/:id/approve', authMiddleware, adminMiddleware, approveWithdrawal);
+app.post('/api/admin/withdrawals/:id/reject', authMiddleware, adminMiddleware, rejectWithdrawal);
+app.get('/api/admin/pools', authMiddleware, adminMiddleware, getPools);
+app.get('/api/admin/flushouts', authMiddleware, adminMiddleware, getFlushouts);
+app.get('/api/admin/commissions', authMiddleware, adminMiddleware, getCommissions);
+app.get('/api/admin/security-logs', authMiddleware, adminMiddleware, getSecurityLogs);
 
 // ============================================================================
 // ERROR HANDLING
@@ -58,7 +92,6 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   if (err instanceof AppError) {
     return errorResponse(res, err.message, err.statusCode, err.code);
   }
-
   logger.error('Unhandled error', { error: err.message, stack: err.stack });
   return errorResponse(res, 'Internal server error', 500);
 });
@@ -69,8 +102,6 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 app.listen(config.port, () => {
   logger.info(`🚀 eAkhuwat Backend running on port ${config.port}`);
   logger.info(`Environment: ${config.nodeEnv}`);
-
-  // Initialize cron jobs
   initializeCronJobs();
 });
 

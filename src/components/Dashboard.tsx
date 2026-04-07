@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useBackendStatus, usePlans, useUserProfile, useTransactions } from '@/hooks/useApi';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Wallet, ArrowUpRight, ArrowDownLeft, Users, TrendingUp, Share2, Clock, X, Download,
   BookOpen, Layers, User, Send, Gift, CheckCircle, ChevronRight, ChevronDown, ChevronUp,
@@ -937,10 +939,30 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
   const [showSkills, setShowSkills] = useState(false);
-  const balance = 2580.5;
+  
+  // API hooks
+  const { data: backendOnline } = useBackendStatus();
+  const { data: apiPlans } = usePlans();
+  const { user } = useAuth();
+  
+  // Use API data if available, fallback to hardcoded
+  const balance = user ? Number(user.balance) : 2580.5;
+  const displayName = user?.name || 'Arushi Tyagi';
+  const walletAddr = user?.walletAddress ? `${user.walletAddress.slice(0,5)}...${user.walletAddress.slice(-4)}` : '0x1A4...B9F2';
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-slate-200">
+      {/* Backend Status Banner */}
+      {backendOnline === false && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-center">
+          <p className="text-xs text-amber-300">⚠️ Backend offline — showing demo data. Start your server on Kali to see real data.</p>
+        </div>
+      )}
+      {backendOnline === true && (
+        <div className="bg-emerald-500/15 border-b border-emerald-500/30 px-4 py-1.5 text-center">
+          <p className="text-xs text-emerald-300">✅ Connected to backend — live data active</p>
+        </div>
+      )}
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none"><div className="absolute -top-1/2 -left-1/2 h-full w-full rounded-full bg-violet-500/3 blur-[100px]" /><div className="absolute -bottom-1/2 -right-1/2 h-full w-full rounded-full bg-cyan-500/3 blur-[100px]" /></div>
       
@@ -1047,8 +1069,8 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
                   <User className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white truncate">Arushi Tyagi</p>
-                  <p className="text-[11px] font-mono text-slate-400">ID: EA2026 • 0x1A4...B9F2</p>
+                  <p className="text-sm font-semibold text-white truncate">{displayName}</p>
+                  <p className="text-[11px] font-mono text-slate-400">ID: {user?.id?.slice(0,6) || 'EA2026'} • {walletAddr}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-[10px] text-slate-500">Balance</p>
