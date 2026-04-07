@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useSocket } from '@/hooks/useSocket';
+
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationPanel from '@/components/NotificationPanel';
 import {
@@ -114,8 +114,8 @@ const CommunityLounge: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Socket.IO & Auth
-  const socket = useSocket();
+  // Auth
+  const socket = null; // Socket removed - will be added with backend
   const { user, isAuthenticated } = useAuth();
 
   // Check mobile on mount and resize

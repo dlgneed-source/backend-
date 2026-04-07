@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { authApi } from '@/lib/api';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 
 interface AuthUser {
@@ -18,60 +17,41 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (walletAddress: string, signature: string) => Promise<void>;
+  login: (walletAddress: string) => void;
   logout: () => void;
-  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('eakhuwat_token'));
-  const [isLoading, setIsLoading] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading] = useState(false);
 
-  const refreshProfile = useCallback(async () => {
-    if (!token) return;
-    try {
-      const profile = await authApi.getProfile();
-      setUser(profile);
-    } catch {
-      // Token might be expired
-      localStorage.removeItem('eakhuwat_token');
-      setToken(null);
-      setUser(null);
-    }
-  }, [token]);
+  const login = useCallback((walletAddress: string) => {
+    const demoUser: AuthUser = {
+      id: '1',
+      walletAddress,
+      name: 'Demo User',
+      balance: '0.00',
+      totalEarned: '0.00',
+      totalInvested: '0.00',
+      totalWithdrawn: '0.00',
+      status: 'active',
+    };
+    setUser(demoUser);
+    setToken('demo-token');
+    toast.success('Wallet connected!');
+  }, []);
 
-  useEffect(() => {
-    if (token) refreshProfile();
-  }, [token, refreshProfile]);
-
-  const login = async (walletAddress: string, signature: string) => {
-    setIsLoading(true);
-    try {
-      const data = await authApi.login(walletAddress, signature);
-      localStorage.setItem('eakhuwat_token', data.token);
-      setToken(data.token);
-      setUser(data.user);
-      toast.success('Wallet connected successfully!');
-    } catch (err: any) {
-      toast.error(err.message || 'Login failed');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('eakhuwat_token');
-    setToken(null);
+  const logout = useCallback(() => {
     setUser(null);
+    setToken(null);
     toast.info('Disconnected');
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated: !!user, isLoading, login, logout, refreshProfile }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated: !!user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
