@@ -1389,6 +1389,8 @@ function CommissionsManagement() {
     amount: number;
     createdAt: string;
   }>>([]);
+  const formatMoney = (value: number | null | undefined): string =>
+    `$${(toSafeNonNegativeNumber(value) ?? 0).toFixed(6)}`;
 
   const loadCommissions = async () => {
     if (!token) {
@@ -1471,11 +1473,11 @@ function CommissionsManagement() {
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 sm:px-4 py-2">
             <p className="text-[10px] sm:text-xs text-emerald-400">Total Earned</p>
-            <p className="font-mono text-lg sm:text-xl font-bold text-emerald-300">${toSafeNonNegativeNumber(totalEarned)?.toFixed(6) ?? '0.000000'}</p>
+            <p className="font-mono text-lg sm:text-xl font-bold text-emerald-300">{formatMoney(totalEarned)}</p>
           </div>
           <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 sm:px-4 py-2">
             <p className="text-[10px] sm:text-xs text-cyan-300">Direct Referral Income</p>
-            <p className="font-mono text-lg sm:text-xl font-bold text-cyan-200">${toSafeNonNegativeNumber(directReferralIncome)?.toFixed(6) ?? '0.000000'}</p>
+            <p className="font-mono text-lg sm:text-xl font-bold text-cyan-200">{formatMoney(directReferralIncome)}</p>
           </div>
         </div>
       </div>

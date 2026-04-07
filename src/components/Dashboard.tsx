@@ -2,7 +2,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { teamApi, usersApi } from '@/lib/api';
-import { getDirectReferralIncome, toSafeNonNegativeNumber } from '@/lib/referral';
+import { getDirectReferralIncome, toSafeNonEmptyString, toSafeNonNegativeNumber } from '@/lib/referral';
 import { DashboardPoolMetrics, fetchDashboardPoolMetrics } from '@/lib/poolStats';
 import {
   buildReferralRootNode,
@@ -1060,6 +1060,10 @@ type ReferralInsightsData = {
   totalReferralIncome: number | null;
 };
 
+const SOURCE_REFERRAL_LINK = 'referral link';
+const SOURCE_COMMISSIONS = 'commissions';
+const SOURCE_TEAM_STATS = 'team stats';
+
 const ReferPageContent = ({
   data,
   isLoading,
@@ -1121,18 +1125,23 @@ const ReferPageContent = ({
       return;
     }
     if (type === 'telegram') {
-      window.open(`https://t.me/share/url?url=${encodeURIComponent(link || window.location.href)}&text=${encodeURIComponent(shareText)}`, '_blank', 'noopener,noreferrer');
+      const telegramUrl = link
+        ? `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`
+        : `https://t.me/share/url?text=${encodeURIComponent(shareText)}`;
+      window.open(telegramUrl, '_blank', 'noopener,noreferrer');
       return;
     }
     if (typeof navigator !== 'undefined' && navigator.share) {
-      navigator.share({ text: shareText, url: link || undefined }).catch(() => {});
+      navigator
+        .share({ text: shareText, url: link || undefined })
+        .catch(() => showFeedback('Share action was not completed'));
       return;
     }
     void copyValue(shareText, 'Share text');
-  }, [copyValue, link, shareText]);
+  }, [copyValue, link, shareText, showFeedback]);
 
   const formatCount = (value: number | null): string => (value === null ? '—' : value.toLocaleString());
-  const formatCurrency = (value: number | null): string => (value === null ? '—' : `$${value.toFixed(6)}`);
+  const formatCurrency = (value: number | null): string => (value === null ? '—' : `$${value.toFixed(2)}`);
 
   return (
     <div className="max-w-lg mx-auto">
@@ -1159,8 +1168,14 @@ const ReferPageContent = ({
             </div>
           )}
           <div className="mb-5 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center"><p className="text-2xl font-bold text-purple-400">{formatCount(data?.directReferrals ?? null)}</p><p className="text-[10px] text-slate-500">Direct Referrals</p></div>
-            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center"><p className="text-2xl font-bold text-emerald-400">{formatCurrency(data?.directReferralIncome ?? null)}</p><p className="text-[10px] text-slate-500">Direct Referral Income</p></div>
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center">
+              <p className="text-2xl font-bold text-purple-400">{formatCount(data?.directReferrals ?? null)}</p>
+              <p className="text-[10px] text-slate-500">Direct Referrals</p>
+            </div>
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-center">
+              <p className="text-2xl font-bold text-emerald-400">{formatCurrency(data?.directReferralIncome ?? null)}</p>
+              <p className="text-[10px] text-slate-500">Direct Referral Income</p>
+            </div>
           </div>
           {!isLoading && !error && !code && !link && (
             <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
@@ -1321,9 +1336,9 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
     ]);
 
     const failedSources: string[] = [];
-    if (referralResult.status === 'rejected') failedSources.push('referral link');
-    if (commissionsResult.status === 'rejected') failedSources.push('commissions');
-    if (statsResult.status === 'rejected') failedSources.push('team stats');
+    if (referralResult.status === 'rejected') failedSources.push(SOURCE_REFERRAL_LINK);
+    if (commissionsResult.status === 'rejected') failedSources.push(SOURCE_COMMISSIONS);
+    if (statsResult.status === 'rejected') failedSources.push(SOURCE_TEAM_STATS);
 
     if (failedSources.length === 3) {
       setReferralData(null);
@@ -1337,12 +1352,8 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
     const statsPayload = statsResult.status === 'fulfilled' ? statsResult.value.stats : undefined;
 
     setReferralData({
-      referralCode: typeof referralPayload?.referralCode === 'string' && referralPayload.referralCode.trim().length > 0
-        ? referralPayload.referralCode
-        : null,
-      referralLink: typeof referralPayload?.referralLink === 'string' && referralPayload.referralLink.trim().length > 0
-        ? referralPayload.referralLink
-        : null,
+      referralCode: toSafeNonEmptyString(referralPayload?.referralCode),
+      referralLink: toSafeNonEmptyString(referralPayload?.referralLink),
       directReferrals: toSafeNonNegativeNumber(statsPayload?.level1Count ?? null),
       totalTeam: toSafeNonNegativeNumber(statsPayload?.totalMembers ?? null),
       activeEnrollments: toSafeNonNegativeNumber(statsPayload?.activeEnrollments ?? null),
@@ -1365,6 +1376,13 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const activePlans: PlanData[] = plansData;
   const activeTransactions = liveTransactions;
   const balance = Number(user?.balance || 0);
+  const formatStatValue = useCallback(
+    (value: number | null | undefined, formatter?: (n: number) => string): string => {
+      if (value === null || value === undefined) return '—';
+      return formatter ? formatter(value) : value.toLocaleString();
+    },
+    [],
+  );
   const displayName = user?.name || 'Wallet User';
   const walletAddr = user?.walletAddress
     ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
@@ -1541,22 +1559,22 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
                 {[
                   {
                     label: 'Direct Referrals',
-                    value: referralData?.directReferrals === null || referralData?.directReferrals === undefined ? '—' : referralData.directReferrals.toLocaleString(),
+                    value: formatStatValue(referralData?.directReferrals),
                     color: '#22d3ee',
                   },
                   {
                     label: 'Total Team',
-                    value: referralData?.totalTeam === null || referralData?.totalTeam === undefined ? '—' : referralData.totalTeam.toLocaleString(),
+                    value: formatStatValue(referralData?.totalTeam),
                     color: '#34d399',
                   },
                   {
                     label: 'Active Plans',
-                    value: referralData?.activeEnrollments === null || referralData?.activeEnrollments === undefined ? '—' : referralData.activeEnrollments.toLocaleString(),
+                    value: formatStatValue(referralData?.activeEnrollments),
                     color: '#fbbf24',
                   },
                   {
                     label: 'Total Earnings',
-                    value: referralData?.totalReferralIncome === null || referralData?.totalReferralIncome === undefined ? '—' : `$${referralData.totalReferralIncome.toFixed(6)}`,
+                    value: formatStatValue(referralData?.totalReferralIncome, (amount) => `$${amount.toFixed(2)}`),
                     color: '#e879f9',
                   },
                 ].map((s, i) => (
