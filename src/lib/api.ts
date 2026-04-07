@@ -1,3 +1,5 @@
+import type { TeamTreeApiNode } from '@/lib/teamTree';
+
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
@@ -94,8 +96,21 @@ export const teamApi = {
       success: boolean;
       stats: {
         totalMembers: number;
+        level1Count?: number;
+        level2Count?: number;
+        activeEnrollments?: number;
+        enrollmentsByPlan?: Array<{
+          planId: number;
+          count: number;
+        }>;
       };
     }>('/api/team/stats', { token }),
+
+  getTree: (token: string, depth = 3) =>
+    apiRequest<{
+      success: boolean;
+      tree: TeamTreeApiNode[];
+    }>(`/api/team/tree?depth=${depth}`, { token }),
 
   getCommissions: (token: string) =>
     apiRequest<{

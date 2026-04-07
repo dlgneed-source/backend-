@@ -1,8 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { usersApi } from '@/lib/api';
+import { teamApi, usersApi } from '@/lib/api';
 import { DashboardPoolMetrics, fetchDashboardPoolMetrics } from '@/lib/poolStats';
+import {
+  buildReferralRootNode,
+  hasNestedDownline,
+  mapTeamStatsCounts,
+  mapTeamTreeNodes,
+  type ReferralDisplayNode,
+  type TeamTreeApiNode,
+  type TeamTreeMode,
+} from '@/lib/teamTree';
 
 
 import {
@@ -16,12 +25,7 @@ import {
 // =============================================
 // TYPES & INTERFACES
 // =============================================
-export interface TreeNode {
-  name: string;
-  wallet: string;
-  level: number;
-  children: TreeNode[];
-}
+type TreeNode = ReferralDisplayNode;
 
 export interface PlanData {
   level: number;
@@ -114,18 +118,6 @@ export const individualIncentives = [
   { plan: 'Plan 6', target: 10, reward: 30 },
 ];
 
-export const referralTree = {
-  name: 'You', wallet: '0x1A4...B9F2', level: 0,
-  children: [
-    { name: 'User A', wallet: '0x7B2...F1A3', level: 1, children: [
-      { name: 'User D', wallet: '0x3C1...E4B2', level: 2, children: [] },
-      { name: 'User E', wallet: '0x9F8...D2C1', level: 2, children: [] },
-    ]},
-    { name: 'User B', wallet: '0x5E6...A8D4', level: 1, children: [{ name: 'User F', wallet: '0x2D7...C5E3', level: 2, children: [] }] },
-    { name: 'User C', wallet: '0x8A3...B7F6', level: 1, children: [] },
-  ],
-};
-
 export const recentTransactions = [
   { id: 1, type: 'Deposit', amount: '+$500.00', time: '2h ago' },
   { id: 2, type: 'Commission', amount: '+$24.50', time: '5h ago' },
@@ -192,9 +184,11 @@ const MobileMenuDrawer = ({ isOpen, onClose, activeTab, setActiveTab }: any) => 
 // =============================================
 // TREE NODE ITEM
 // =============================================
-const TreeNodeItem = ({ node, depth = 0 }: any) => {
+const TreeNodeItem = ({ node, depth = 0 }: { node: TreeNode; depth?: number }) => {
   const [expanded, setExpanded] = useState(depth < 1);
-  const hasChildren = node.children.length > 0;
+  const childNodes = Array.isArray(node.children) ? node.children : [];
+  const hasChildren = childNodes.length > 0;
+  const avatarLabel = node.name?.trim()?.[0]?.toUpperCase() || '?';
   return (
     <div className={depth > 0 ? 'ml-3 border-l border-white/10 pl-3 sm:ml-4 sm:pl-4' : ''}>
       <motion.button onClick={() => hasChildren && setExpanded(!expanded)} whileHover={{ x: 2 }} className="group flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left transition-all hover:bg-white/[0.05] sm:gap-3 sm:px-3">
@@ -204,7 +198,7 @@ const TreeNodeItem = ({ node, depth = 0 }: any) => {
           </motion.div>
         ) : <div className="flex h-4 w-4 items-center justify-center"><div className="h-2 w-2 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500" /></div>}
         <div className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl text-xs font-bold ${depth === 0 ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25' : 'bg-white/10 text-slate-300 border border-white/10'}`}>
-          {node.name[0]}
+          {avatarLabel}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs sm:text-sm font-medium text-slate-200">{node.name}</p>
@@ -215,7 +209,7 @@ const TreeNodeItem = ({ node, depth = 0 }: any) => {
       <AnimatePresence>
         {expanded && hasChildren && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }}>
-            {node.children.map((child: any, i: number) => <TreeNodeItem key={i} node={child} depth={depth + 1} />)}
+            {childNodes.map((child) => <TreeNodeItem key={child.id} node={child} depth={depth + 1} />)}
           </motion.div>
         )}
       </AnimatePresence>
@@ -807,7 +801,53 @@ const PoolStatsCard = () => {
 // REFERRAL NETWORK CARD
 // =============================================
 const ReferralNetworkCard = () => {
-  const [mode, setMode] = useState<'Level 1' | 'Downline'>('Level 1');
+  const { token, user } = useAuth();
+  const [mode, setMode] = useState<TeamTreeMode>('Level 1');
+  const [teamTree, setTeamTree] = useState<TeamTreeApiNode[]>([]);
+  const [stats, setStats] = useState({ level1: 0, level2: 0, total: 0 });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadTeamData = useCallback(async () => {
+    if (!token) {
+      setTeamTree([]);
+      setStats({ level1: 0, level2: 0, total: 0 });
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [treeResponse, statsResponse] = await Promise.all([
+        teamApi.getTree(token, 5),
+        teamApi.getStats(token),
+      ]);
+      setTeamTree(Array.isArray(treeResponse.tree) ? treeResponse.tree : []);
+      setStats(mapTeamStatsCounts(statsResponse.stats));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load referral network');
+      setTeamTree([]);
+      setStats({ level1: 0, level2: 0, total: 0 });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadTeamData();
+  }, [loadTeamData]);
+
+  const mappedNodes = mapTeamTreeNodes(teamTree);
+  const hasReferrals = mappedNodes.length > 0;
+  const hasDownline = hasNestedDownline(mappedNodes);
+  const rootNode = buildReferralRootNode({
+    rootId: user?.id || 'self',
+    rootName: user?.name || 'You',
+    rootWallet: user?.walletAddress,
+    nodes: teamTree,
+    mode,
+  });
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(6,182,212,0.15)', background: 'linear-gradient(135deg, rgba(6,182,212,0.04) 0%, rgba(139,92,246,0.02) 50%, rgba(0,0,0,0.2) 100%)' }}>
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400" />
@@ -826,11 +866,45 @@ const ReferralNetworkCard = () => {
           <button onClick={() => setMode('Downline')} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${mode === 'Downline' ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white' : 'text-slate-500'}`}>Full Tree</button>
         </div>
       </div>
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3"><TreeNodeItem node={referralTree} /></div>
+      {isLoading && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
+          <p className="text-sm font-semibold text-slate-200">Loading referral network...</p>
+        </div>
+      )}
+      {!isLoading && error && (
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4">
+          <p className="text-xs font-semibold text-rose-300">Could not load referral network</p>
+          <p className="mt-1 text-[11px] text-rose-200/80">{error}</p>
+          <button
+            onClick={loadTeamData}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-1.5 text-[11px] font-semibold text-rose-200 hover:bg-rose-500/20"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </button>
+        </div>
+      )}
+      {!isLoading && !error && !hasReferrals && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
+          <p className="text-sm font-semibold text-slate-200">No referrals</p>
+          <p className="mt-1 text-[11px] text-slate-400">Your referral tree will appear once you invite members.</p>
+        </div>
+      )}
+      {!isLoading && !error && hasReferrals && mode === 'Downline' && !hasDownline && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
+          <p className="text-sm font-semibold text-slate-200">Downline not found</p>
+          <p className="mt-1 text-[11px] text-slate-400">Your referrals do not have nested members yet.</p>
+        </div>
+      )}
+      {!isLoading && !error && hasReferrals && (mode === 'Level 1' || hasDownline) && (
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+          <TreeNodeItem node={rootNode} />
+        </div>
+      )}
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center"><p className="text-base font-bold text-cyan-300">6</p><p className="text-[9px] text-slate-500">Total</p></div>
-        <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center"><p className="text-base font-bold text-violet-300">3</p><p className="text-[9px] text-slate-500">Level 1</p></div>
-        <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center"><p className="text-base font-bold text-fuchsia-300">3</p><p className="text-[9px] text-slate-500">Level 2</p></div>
+        <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center"><p className="text-base font-bold text-cyan-300">{stats.total}</p><p className="text-[9px] text-slate-500">Total</p></div>
+        <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center"><p className="text-base font-bold text-violet-300">{stats.level1}</p><p className="text-[9px] text-slate-500">L1</p></div>
+        <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-center"><p className="text-base font-bold text-fuchsia-300">{stats.level2}</p><p className="text-[9px] text-slate-500">L2</p></div>
       </div>
     </motion.div>
   );
