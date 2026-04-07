@@ -51,6 +51,13 @@ model User {
   giftCodeRedemptions GiftCodeRedemption[]
   treasuryLedgers    TreasuryLedger[]
 
+  // Chat relations
+  chatRoomMemberships ChatRoomMember[]
+  chatMessages        ChatMessage[]
+  messageReactions    MessageReaction[]
+  sentDMs             DirectMessage[]    @relation("DMSender")
+  receivedDMs         DirectMessage[]    @relation("DMReceiver")
+
   @@index([walletAddress])
   @@index([referrerId])
   @@index([status])
