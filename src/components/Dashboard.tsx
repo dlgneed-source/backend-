@@ -209,7 +209,7 @@ const TreeNodeItem = ({ node, depth = 0 }: { node: TreeNode; depth?: number }) =
       <AnimatePresence>
         {expanded && hasChildren && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }}>
-            {childNodes.map((child, i) => <TreeNodeItem key={child.id || `${child.name}-${i}`} node={child} depth={depth + 1} />)}
+            {childNodes.map((child) => <TreeNodeItem key={child.id} node={child} depth={depth + 1} />)}
           </motion.div>
         )}
       </AnimatePresence>
