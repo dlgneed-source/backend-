@@ -99,15 +99,33 @@ export async function authenticateAdmin(
       type: string;
     };
 
-    if (decoded.type !== "admin") {
+    let admin:
+      | {
+          id: string;
+          walletAddress: string;
+          role: string;
+          isActive: boolean;
+        }
+      | null = null;
+
+    if (decoded.type === "admin") {
+      admin = await prisma.admin.findUnique({
+        where: { id: decoded.id },
+        select: { id: true, walletAddress: true, role: true, isActive: true },
+      });
+    } else if (decoded.type === "user") {
+      admin = await prisma.admin.findUnique({
+        where: { walletAddress: decoded.walletAddress.toLowerCase() },
+        select: { id: true, walletAddress: true, role: true, isActive: true },
+      });
+      if (!admin) {
+        res.status(403).json({ success: false, message: "Admin permission denied" });
+        return;
+      }
+    } else {
       res.status(401).json({ success: false, message: "Invalid token type" });
       return;
     }
-
-    const admin = await prisma.admin.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, walletAddress: true, role: true, isActive: true },
-    });
 
     if (!admin || !admin.isActive) {
       res.status(401).json({ success: false, message: "Admin not found or inactive" });
@@ -134,6 +152,16 @@ export function requireSuperAdmin(
     return;
   }
   next();
+}
+
+export function requireAdminRoles(allowedRoles: string[]) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    if (!req.admin || !allowedRoles.includes(req.admin.role)) {
+      res.status(403).json({ success: false, message: "Insufficient admin permissions" });
+      return;
+    }
+    next();
+  };
 }
 
 /**

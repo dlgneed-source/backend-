@@ -1,7 +1,7 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { teamApi } from '@/lib/api';
+import { ApiError, adminApi, teamApi } from '@/lib/api';
 import { getDirectReferralIncome, toSafeNonNegativeNumber } from '@/lib/referral';
 import {
   AlertOctagon, Ban, Briefcase, ChevronRight, Copy, Gift, Radio, RefreshCw,
@@ -106,15 +106,6 @@ interface FlushoutRecord {
   amount: number;
   flushedAt: string;
   type: 'Auto' | 'Manual';
-}
-
-interface SecurityLog {
-  id: number;
-  timestamp: string;
-  action: string;
-  user: string;
-  details: string;
-  severity: 'Info' | 'Warning' | 'Critical';
 }
 
 interface KIMILevel {
@@ -324,18 +315,6 @@ const flushoutRecords: FlushoutRecord[] = [
 // =============================================
 // COMMISSION RECORDS DATA
 // =============================================
-
-// =============================================
-// SECURITY LOGS DATA
-// =============================================
-
-const securityLogs: SecurityLog[] = [
-  { id: 1, timestamp: '2026-03-30 14:32:01', action: 'CONTRACT_CALL', user: '0xA1b3...7d2F', details: 'Leader Pool distribution +$5.00', severity: 'Info' },
-  { id: 2, timestamp: '2026-03-30 14:31:58', action: 'AUTH_LOGIN', user: '0xA1b3...7d2F', details: 'POST /api/auth - 200 OK', severity: 'Info' },
-  { id: 3, timestamp: '2026-03-30 14:31:45', action: 'WITHDRAWAL_REQUEST', user: '0x71Aa...b08C', details: 'Withdrawal request $150 - Pending', severity: 'Info' },
-  { id: 4, timestamp: '2026-03-30 14:31:30', action: 'ACCESS_DENIED', user: '0xD4e9...1f3A', details: 'GET /api/tree - 403 Forbidden', severity: 'Warning' },
-  { id: 5, timestamp: '2026-03-30 14:30:00', action: 'USER_BLOCKED', user: '0x8A3...B7F6', details: 'User account suspended by admin', severity: 'Critical' },
-];
 
 // =============================================
 // KIMI LEVELS DATA
@@ -1639,49 +1618,127 @@ interface GiftCode {
   amount: number;
   maxUses: number;
   usedCount: number;
-  expiresAt: string;
-  status: 'Active' | 'Expired' | 'Revoked';
+  expiresAt: string | null;
+  status: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED';
+  planId: number;
+  planName: string;
   createdAt: string;
 }
 
-function GiftCodeManagement() {
-  const [codes, setCodes] = useState<GiftCode[]>([
-    { id: 'GC001', code: 'WELCOME50', amount: 50, maxUses: 100, usedCount: 42, expiresAt: '2026-04-30', status: 'Active', createdAt: '2026-03-15' },
-    { id: 'GC002', code: 'BONUS25', amount: 25, maxUses: 50, usedCount: 50, expiresAt: '2026-03-25', status: 'Expired', createdAt: '2026-03-01' },
-    { id: 'GC003', code: 'VIP100', amount: 100, maxUses: 10, usedCount: 3, expiresAt: '2026-05-15', status: 'Active', createdAt: '2026-03-20' },
-    { id: 'GC004', code: 'LAUNCH10', amount: 10, maxUses: 500, usedCount: 128, expiresAt: '2026-04-10', status: 'Revoked', createdAt: '2026-02-28' },
-  ]);
+export function GiftCodeManagement({ token }: { token: string | null }) {
+  const [codes, setCodes] = useState<GiftCode[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [newCode, setNewCode] = useState({ code: '', amount: '', maxUses: '', days: '' });
+  const [newCode, setNewCode] = useState({ code: '', planId: '1', days: '30', quantity: '1' });
   const [revokeId, setRevokeId] = useState<string | null>(null);
 
-  const handleCreate = () => {
-    if (!newCode.code || !newCode.amount || !newCode.maxUses || !newCode.days) return;
-    const expDate = new Date();
-    expDate.setDate(expDate.getDate() + parseInt(newCode.days));
-    const gc: GiftCode = {
-      id: `GC${String(codes.length + 1).padStart(3, '0')}`,
-      code: newCode.code.toUpperCase(),
-      amount: parseFloat(newCode.amount),
-      maxUses: parseInt(newCode.maxUses),
-      usedCount: 0,
-      expiresAt: expDate.toISOString().split('T')[0],
-      status: 'Active',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setCodes([gc, ...codes]);
-    setNewCode({ code: '', amount: '', maxUses: '', days: '' });
-    setShowCreate(false);
+  const loadGiftCodes = useCallback(async () => {
+    if (!token) {
+      setCodes([]);
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getGiftCodes(token, { limit: 100 });
+      setCodes(response.giftCodes);
+    } catch (err) {
+      setCodes([]);
+      setError(err instanceof Error ? err.message : 'Failed to load gift codes');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadGiftCodes();
+  }, [loadGiftCodes]);
+
+  const handleCreate = async () => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    const days = Number(newCode.days);
+    const quantity = Number(newCode.quantity);
+    const planId = Number(newCode.planId);
+    const code = newCode.code.trim().toUpperCase();
+
+    if (!Number.isInteger(planId) || planId < 1 || planId > 6) {
+      setError('Plan must be between 1 and 6.');
+      return;
+    }
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      setError('Valid for days must be between 1 and 365.');
+      return;
+    }
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50) {
+      setError('Quantity must be between 1 and 50.');
+      return;
+    }
+    if (code && !/^[A-Z0-9_-]{4,32}$/.test(code)) {
+      setError('Code must be 4-32 chars and contain only A-Z, 0-9, _ or -.');
+      return;
+    }
+    if (code && quantity !== 1) {
+      setError('Custom code can only be created with quantity 1.');
+      return;
+    }
+
+    setIsCreating(true);
+    setError(null);
+    try {
+      await adminApi.createGiftCode(token, {
+        planId,
+        expiryDays: days,
+        quantity,
+        ...(code ? { code } : {}),
+      });
+      setNewCode({ code: '', planId: '1', days: '30', quantity: '1' });
+      setShowCreate(false);
+      await loadGiftCodes();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to create gift code');
+      }
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleRevoke = (id: string) => {
-    setCodes(codes.map(c => c.id === id ? { ...c, status: 'Revoked' as const } : c));
-    setRevokeId(null);
+  const handleStatusChange = async (id: string, status: 'ACTIVE' | 'DISABLED') => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsUpdating(id);
+    setError(null);
+    try {
+      await adminApi.updateGiftCodeStatus(token, id, status);
+      setRevokeId(null);
+      await loadGiftCodes();
+    } catch (err) {
+      setRevokeId(null);
+      setError(err instanceof Error ? err.message : 'Failed to update gift code status');
+      await loadGiftCodes();
+    } finally {
+      setIsUpdating(null);
+    }
   };
 
-  const gcStatusStyle = (s: string) => {
-    if (s === 'Active') return 'text-emerald-200 bg-emerald-500/10 border-emerald-400/20';
-    if (s === 'Expired') return 'text-amber-200 bg-amber-500/10 border-amber-400/20';
+  const gcStatusStyle = (s: GiftCode['status']) => {
+    if (s === 'ACTIVE') return 'text-emerald-200 bg-emerald-500/10 border-emerald-400/20';
+    if (s === 'EXPIRED') return 'text-amber-200 bg-amber-500/10 border-amber-400/20';
+    if (s === 'USED') return 'text-sky-200 bg-sky-500/10 border-sky-400/20';
     return 'text-rose-200 bg-rose-500/10 border-rose-400/20';
   };
 
@@ -1697,11 +1754,24 @@ function GiftCodeManagement() {
         </button>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-200">
+          <p>{error}</p>
+          <button
+            onClick={() => void loadGiftCodes()}
+            className="mt-2 inline-flex items-center gap-1 rounded-lg border border-rose-400/30 px-2 py-1 text-[11px] font-semibold text-rose-100 hover:bg-rose-500/10"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: 'Total Codes', value: codes.length, color: '#22d3ee' },
-          { label: 'Active', value: codes.filter(c => c.status === 'Active').length, color: '#34d399' },
+          { label: 'Active', value: codes.filter(c => c.status === 'ACTIVE').length, color: '#34d399' },
           { label: 'Total Redeemed', value: codes.reduce((a, c) => a + c.usedCount, 0), color: '#fbbf24' },
           { label: 'Total Amount Given', value: `$${codes.reduce((a, c) => a + c.amount * c.usedCount, 0).toLocaleString()}`, color: '#e879f9' },
         ].map((s, i) => (
@@ -1714,7 +1784,13 @@ function GiftCodeManagement() {
 
       {/* Codes List */}
       <div className="space-y-3">
-        {codes.map((gc) => (
+        {isLoading && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">Loading gift codes...</div>
+        )}
+        {!isLoading && codes.length === 0 && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">No gift codes found.</div>
+        )}
+        {!isLoading && codes.map((gc) => (
           <motion.div key={gc.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -1726,7 +1802,7 @@ function GiftCodeManagement() {
                     <p className="text-base font-bold font-mono text-white tracking-wider">{gc.code}</p>
                     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${gcStatusStyle(gc.status)}`}>{gc.status}</span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">{gc.id} • Created {gc.createdAt}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{gc.planName} • Created {new Date(gc.createdAt).toLocaleDateString()}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -1739,12 +1815,16 @@ function GiftCodeManagement() {
                   <p className="text-[10px] text-slate-500">used</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-slate-300">{gc.expiresAt}</p>
+                  <p className="text-xs text-slate-300">{gc.expiresAt ? new Date(gc.expiresAt).toLocaleDateString() : 'No expiry'}</p>
                   <p className="text-[10px] text-slate-500">expires</p>
                 </div>
-                {gc.status === 'Active' && (
-                  <button onClick={() => setRevokeId(gc.id)} className="flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition-colors">
-                    <Ban className="h-3.5 w-3.5" /> Revoke
+                {gc.status !== 'USED' && gc.status !== 'EXPIRED' && (
+                  <button
+                    disabled={isUpdating === gc.id}
+                    onClick={() => (gc.status === 'ACTIVE' ? setRevokeId(gc.id) : void handleStatusChange(gc.id, 'ACTIVE'))}
+                    className="flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition-colors disabled:opacity-60"
+                  >
+                    <Ban className="h-3.5 w-3.5" /> {gc.status === 'ACTIVE' ? 'Disable' : 'Enable'}
                   </button>
                 )}
               </div>
@@ -1771,24 +1851,28 @@ function GiftCodeManagement() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">Create Gift Code</h3>
-                    <p className="text-xs text-slate-400">Generate a new promo code</p>
+                    <p className="text-xs text-slate-400">Generate code(s) from backend</p>
                   </div>
                 </div>
                 <button onClick={() => setShowCreate(false)} className="p-2 rounded-full bg-white/5 text-slate-400 hover:text-white"><X className="h-5 w-5" /></button>
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Gift Code Name</label>
-                  <input value={newCode.code} onChange={e => setNewCode({ ...newCode, code: e.target.value })} placeholder="e.g. WELCOME50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono text-white uppercase tracking-wider placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                  <label className="text-xs text-slate-400 mb-1 block">Custom Code (Optional)</label>
+                  <input value={newCode.code} onChange={e => setNewCode({ ...newCode, code: e.target.value.toUpperCase() })} placeholder="e.g. WELCOME50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono text-white uppercase tracking-wider placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Amount ($)</label>
-                    <input type="number" value={newCode.amount} onChange={e => setNewCode({ ...newCode, amount: e.target.value })} placeholder="50" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                    <label className="text-xs text-slate-400 mb-1 block">Plan</label>
+                    <select value={newCode.planId} onChange={e => setNewCode({ ...newCode, planId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-emerald-500/40 focus:outline-none">
+                      {[1, 2, 3, 4, 5, 6].map((planId) => (
+                        <option key={planId} value={String(planId)} className="bg-[#0a0a0f]">Plan {planId}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Max Users</label>
-                    <input type="number" value={newCode.maxUses} onChange={e => setNewCode({ ...newCode, maxUses: e.target.value })} placeholder="100" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                    <label className="text-xs text-slate-400 mb-1 block">Quantity</label>
+                    <input type="number" value={newCode.quantity} min={1} max={50} onChange={e => setNewCode({ ...newCode, quantity: e.target.value })} placeholder="1" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
                   </div>
                 </div>
                 <div>
@@ -1797,7 +1881,7 @@ function GiftCodeManagement() {
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button onClick={() => setShowCreate(false)} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white">Cancel</button>
-                  <button onClick={handleCreate} className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3 text-sm font-bold text-white">Create Code</button>
+                  <button disabled={isCreating} onClick={() => void handleCreate()} className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3 text-sm font-bold text-white disabled:opacity-60">{isCreating ? 'Creating...' : 'Create Code'}</button>
                 </div>
               </div>
             </motion.div>
@@ -1818,7 +1902,7 @@ function GiftCodeManagement() {
                 <p className="text-sm text-slate-400">Code <span className="font-mono font-bold text-rose-300">{codes.find(c => c.id === revokeId)?.code}</span> will be permanently deactivated. Users won't be able to redeem it anymore.</p>
                 <div className="flex w-full gap-3 pt-2">
                   <button onClick={() => setRevokeId(null)} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white">Cancel</button>
-                  <button onClick={() => handleRevoke(revokeId)} className="flex-1 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 py-3 text-sm font-bold text-white">Revoke Code</button>
+                  <button disabled={!revokeId || isUpdating === revokeId} onClick={() => revokeId && void handleStatusChange(revokeId, 'DISABLED')} className="flex-1 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 py-3 text-sm font-bold text-white disabled:opacity-60">Disable Code</button>
                 </div>
               </div>
             </motion.div>
@@ -2029,10 +2113,61 @@ function DailyIncomeManagement() {
 // =============================================
 // SECURITY LOGS COMPONENT
 // =============================================
-function SecurityLogs() {
+export function SecurityLogs({ token }: { token: string | null }) {
   const [severityFilter, setSeverityFilter] = useState<'All' | 'Info' | 'Warning' | 'Critical'>('All');
+  const [logs, setLogs] = useState<Array<{
+    id: string;
+    timestamp: string;
+    action: string;
+    user: string;
+    details: string;
+    severity: 'Info' | 'Warning' | 'Critical';
+  }>>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredLogs = securityLogs.filter(log => 
+  const loadAuditLogs = useCallback(async () => {
+    if (!token) {
+      setLogs([]);
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getAuditLogs(token, { limit: 100 });
+      const mappedLogs = response.logs.map((log) => {
+        const action = log.action.toUpperCase();
+        const severity: 'Info' | 'Warning' | 'Critical' = action.includes('BLOCK') || action.includes('REJECT') || action.includes('DENIED')
+          ? 'Critical'
+          : action.includes('DISABLED') || action.includes('SUSPEND')
+            ? 'Warning'
+            : 'Info';
+
+        return {
+          id: log.id,
+          timestamp: log.createdAt,
+          action: log.action,
+          user: log.user?.walletAddress || log.admin?.walletAddress || '-',
+          details: log.description,
+          severity,
+        };
+      });
+      setLogs(mappedLogs);
+    } catch (err) {
+      setLogs([]);
+      setError(err instanceof Error ? err.message : 'Failed to load audit logs');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadAuditLogs();
+  }, [loadAuditLogs]);
+
+  const filteredLogs = logs.filter((log) =>
     severityFilter === 'All' || log.severity === severityFilter
   );
 
@@ -2049,6 +2184,19 @@ function SecurityLogs() {
           Export Logs
         </button>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-200">
+          <p>{error}</p>
+          <button
+            onClick={() => void loadAuditLogs()}
+            className="mt-2 inline-flex items-center gap-1 rounded-lg border border-rose-400/30 px-2 py-1 text-[11px] font-semibold text-rose-100 hover:bg-rose-500/10"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
@@ -2078,19 +2226,29 @@ function SecurityLogs() {
             </tr>
           </thead>
           <tbody>
-            {filteredLogs.map((log) => (
-              <tr key={log.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
-                <td className="px-6 py-4 font-mono text-sm text-slate-400">{log.timestamp}</td>
-                <td className="px-6 py-4 text-sm font-medium text-white">{log.action}</td>
-                <td className="px-6 py-4 font-mono text-sm text-slate-300">{log.user}</td>
-                <td className="px-6 py-4 text-sm text-slate-300">{log.details}</td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${severityStyle(log.severity)}`}>
-                    {log.severity}
-                  </span>
-                </td>
+            {isLoading ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-300">Loading audit logs...</td>
               </tr>
-            ))}
+            ) : filteredLogs.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-300">No audit logs found.</td>
+              </tr>
+            ) : (
+              filteredLogs.map((log) => (
+                <tr key={log.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
+                  <td className="px-6 py-4 font-mono text-sm text-slate-400">{new Date(log.timestamp).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-white">{log.action}</td>
+                  <td className="px-6 py-4 font-mono text-sm text-slate-300">{log.user}</td>
+                  <td className="px-6 py-4 text-sm text-slate-300">{log.details}</td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${severityStyle(log.severity)}`}>
+                      {log.severity}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -2270,6 +2428,7 @@ function Settings() {
 // MAIN ADMIN PANEL COMPONENT
 // =============================================
 export default function AdminPanel() {
+  const { token } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -2291,13 +2450,13 @@ export default function AdminPanel() {
       case 'commissions':
         return <CommissionsManagement />;
       case 'gift-codes':
-        return <GiftCodeManagement />;
+        return <GiftCodeManagement token={token} />;
       case 'rewards':
         return <RewardsManagement />;
       case 'daily-income':
         return <DailyIncomeManagement />;
       case 'security':
-        return <SecurityLogs />;
+        return <SecurityLogs token={token} />;
       case 'settings':
         return <Settings />;
       default:
