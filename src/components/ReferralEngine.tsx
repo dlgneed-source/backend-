@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Wallet, ArrowUpRight, ArrowDownLeft, Share2, Clock, TrendingUp,
@@ -15,6 +15,21 @@ const WithdrawModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
   const [amount, setAmount] = useState('');
   const [step, setStep] = useState<'input' | 'confirm' | 'done'>('input');
 
+  useEffect(() => {
+    if (!open) return;
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setAmount('');
+        setStep('input');
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [open, onClose]);
+
   const handleConfirm = () => {
     setStep('confirm');
     setTimeout(() => setStep('done'), 2000);
@@ -30,7 +45,7 @@ const WithdrawModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
           onClick={reset}
         >
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-            className="glass-strong rounded-2xl p-6 w-full max-w-md border border-border/30 relative"
+            className="glass-strong rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border border-border/30 relative"
             onClick={e => e.stopPropagation()}
           >
             <button onClick={reset} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
@@ -142,9 +157,15 @@ const ledgerData = [
 /* ── Main Component ──────────────────────────────────────── */
 const ReferralEngine: React.FC = () => {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const handleCopyHash = async (hash: string) => {
+    if (!navigator?.clipboard || hash === '—') return;
+    try {
+      await navigator.clipboard.writeText(hash);
+    } catch {}
+  };
 
   return (
-    <div className="flex-1 overflow-y-auto pb-20 scrollbar-hide">
+    <div className="flex-1 overflow-x-hidden overflow-y-auto pb-20 scrollbar-hide">
       <div className="p-4 sm:p-6 max-w-6xl mx-auto flex flex-col gap-5">
 
         {/* Row 1: Wallet Management */}
@@ -259,9 +280,20 @@ const ReferralEngine: React.FC = () => {
                         row.status === 'Distributed' ? 'bg-neon-green/10 text-neon-green' : 'bg-accent/10 text-accent'
                       }`}>{row.status}</span>
                     </td>
-                    <td className="py-3 font-mono text-muted-foreground flex items-center gap-1 whitespace-nowrap">
-                      {row.hash}
-                      {row.hash !== '—' && <Copy className="w-3 h-3 cursor-pointer hover:text-primary transition-colors" />}
+                    <td className="py-3 font-mono text-muted-foreground whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1">
+                        {row.hash}
+                        {row.hash !== '—' && (
+                          <button
+                            type="button"
+                            aria-label={`Copy transaction hash ${row.hash}`}
+                            onClick={() => void handleCopyHash(row.hash)}
+                            className="rounded p-1 text-muted-foreground hover:text-primary transition-colors"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        )}
+                      </span>
                     </td>
                   </tr>
                 ))}

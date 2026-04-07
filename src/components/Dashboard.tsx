@@ -141,7 +141,7 @@ const MobileMenuDrawer = ({ isOpen, onClose, activeTab, setActiveTab }: any) => 
                 </div>
                 <span className="text-lg font-bold text-white">Dashboard</span>
               </div>
-              <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="h-6 w-6" /></button>
+              <button aria-label="Close dashboard menu" onClick={onClose} className="text-slate-400 hover:text-white"><X className="h-6 w-6" /></button>
             </div>
             {/* Wallet Info - Top */}
             <div className="p-4 border-b border-white/10">
@@ -492,7 +492,13 @@ const SkillLevelsCard = () => {
           const Icon = level.icon;
           const isSel = selected === level.level;
           return (
-            <div key={i} onClick={() => setSelected(isSel ? null : level.level)} className={`cursor-pointer rounded-lg border p-3 transition-all ${isSel ? 'border-amber-500/30 bg-amber-500/8' : 'border-white/5 bg-white/[0.03]'}`}>
+            <button
+              key={i}
+              type="button"
+              aria-expanded={isSel}
+              onClick={() => setSelected(isSel ? null : level.level)}
+              className={`w-full text-left rounded-lg border p-3 transition-all ${isSel ? 'border-amber-500/30 bg-amber-500/8' : 'border-white/5 bg-white/[0.03]'}`}
+            >
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `linear-gradient(135deg, ${level.theme.bgGlow}, transparent)`, border: `1px solid ${level.theme.primary}40` }}>
                   <Icon className="h-4 w-4" style={{ color: level.theme.primary }} />
@@ -515,7 +521,7 @@ const SkillLevelsCard = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -1286,6 +1292,17 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const [referralData, setReferralData] = useState<ReferralInsightsData | null>(null);
   const [isReferralLoading, setIsReferralLoading] = useState(false);
   const [referralError, setReferralError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   useEffect(() => {
     if (!token) return;
@@ -1389,7 +1406,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
     : '—';
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-slate-200">
+    <div className="min-h-screen overflow-x-hidden bg-[#0a0a0f] text-slate-200">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none"><div className="absolute -top-1/2 -left-1/2 h-full w-full rounded-full bg-violet-500/3 blur-[100px]" /><div className="absolute -bottom-1/2 -right-1/2 h-full w-full rounded-full bg-cyan-500/3 blur-[100px]" /></div>
       
@@ -1400,7 +1417,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
       <nav className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/90 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-3 sm:px-4">
           <div className="flex h-14 items-center justify-between">
-            <button onClick={() => setMenuOpen(true)} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10">
+            <button aria-label="Open dashboard menu" onClick={() => setMenuOpen(true)} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10">
               <Menu className="h-5 w-5" /><span className="hidden sm:inline">Menu</span>
             </button>
             {onBack && (

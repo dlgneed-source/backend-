@@ -467,10 +467,10 @@ function Sidebar({ activeTab, setActiveTab, collapsed, setCollapsed, mobileOpen,
             </div>
             {(!collapsed || mobileOpen) && <span className="text-lg font-bold text-white lg:block">Admin Panel</span>}
           </div>
-          <button onClick={() => { onMobileClose(); setCollapsed(!collapsed); }} className="text-slate-400 hover:text-white hidden lg:block">
+          <button aria-label={collapsed ? 'Expand admin sidebar' : 'Collapse admin sidebar'} onClick={() => { onMobileClose(); setCollapsed(!collapsed); }} className="text-slate-400 hover:text-white hidden lg:block">
             {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </button>
-          <button onClick={onMobileClose} className="text-slate-400 hover:text-white lg:hidden">
+          <button aria-label="Close admin menu" onClick={onMobileClose} className="text-slate-400 hover:text-white lg:hidden">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -2412,6 +2412,37 @@ export default function AdminPanel() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileMenuOpen]);
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -2444,7 +2475,7 @@ export default function AdminPanel() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-slate-200">
+    <div className="min-h-screen overflow-x-hidden bg-[#0a0a0f] text-slate-200">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-1/2 -left-1/2 h-full w-full rounded-full bg-violet-500/5 blur-3xl" />
@@ -2463,7 +2494,7 @@ export default function AdminPanel() {
 
       {/* Mobile Header */}
       <div className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-[#0a0a0f]/90 backdrop-blur-xl px-4 py-3 lg:hidden">
-        <button onClick={() => setMobileMenuOpen(true)} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
+        <button aria-label="Open admin menu" onClick={() => setMobileMenuOpen(true)} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
           <Menu className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-2">
