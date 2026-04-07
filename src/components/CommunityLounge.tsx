@@ -112,6 +112,11 @@ const CommunityLounge: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Socket.IO & Auth
+  const socket = useSocket();
+  const { user, isAuthenticated } = useAuth();
 
   // Check mobile on mount and resize
   useEffect(() => {
