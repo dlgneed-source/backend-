@@ -732,7 +732,7 @@ const PoolStatsCard = () => {
         { label: 'Leader Pool', value: formatCurrency(metrics.leaderPool), subtext: `${metrics.leaderPlans} plan(s)`, icon: Crown, color: '#fbbf24' },
         { label: 'Reward Pool', value: formatCurrency(metrics.rewardPool), subtext: `${metrics.rewardPlans} plan(s)`, icon: Gem, color: '#22d3ee' },
         { label: 'Sponsor Pool', value: formatCurrency(metrics.sponsorPool), subtext: `${metrics.sponsorPlans} plan(s)`, icon: Award, color: '#34d399' },
-        { label: 'Auto Fill', value: metrics.totalMembers.toLocaleString('en-US'), subtext: 'Total Enrollments', icon: Network, color: '#e879f9' },
+        { label: 'Total Members', value: metrics.totalMembers.toLocaleString('en-US'), subtext: 'Total Enrollments', icon: Network, color: '#e879f9' },
       ]
     : [];
 
