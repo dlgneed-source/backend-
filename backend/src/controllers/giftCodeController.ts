@@ -4,56 +4,13 @@
  */
 
 import { Request, Response } from "express";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { v4 as uuidv4 } from "uuid";
 import { getGiftCodeRedeemability } from "../utils/giftCodeRules";
+import { upsertActiveUserByWallet } from "../utils/upsertUserByWallet";
 
 const prisma = new PrismaClient();
-const REFERRAL_CODE_LENGTH = 12;
-
-function generateReferralCode(): string {
-  return uuidv4().replace(/-/g, "").toUpperCase().slice(0, REFERRAL_CODE_LENGTH);
-}
-
-function isReferralCodeUniqueConstraintError(error: unknown): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
-    return false;
-  }
-
-  const target = error.meta?.target;
-  if (Array.isArray(target)) {
-    return target.includes("referralCode");
-  }
-
-  return target === "referralCode";
-}
-
-async function upsertActiveUserByWallet(walletAddress: string): Promise<{ id: string }> {
-  const normalizedWallet = walletAddress.toLowerCase();
-
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      return await prisma.user.upsert({
-        where: { walletAddress: normalizedWallet },
-        update: {},
-        create: {
-          walletAddress: normalizedWallet,
-          status: "ACTIVE",
-          referralCode: generateReferralCode(),
-        },
-        select: { id: true },
-      });
-    } catch (error) {
-      if (isReferralCodeUniqueConstraintError(error)) {
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  throw new Error("Failed to generate unique referral code for admin wallet");
-}
 
 /**
  * POST /gift-codes/generate
@@ -66,7 +23,7 @@ export async function generateGiftCode(req: AuthenticatedRequest, res: Response)
   try {
     let actorUserId = generatedById;
     if (!actorUserId && req.admin?.walletAddress) {
-      const adminUser = await upsertActiveUserByWallet(req.admin.walletAddress);
+      const adminUser = await upsertActiveUserByWallet(prisma, req.admin.walletAddress);
       actorUserId = adminUser.id;
     }
 
