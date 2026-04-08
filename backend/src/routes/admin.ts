@@ -6,8 +6,6 @@ import {
   getUsers,
   updateUserStatus,
   getWithdrawals,
-  approveWithdrawal,
-  rejectWithdrawal,
   manualFlushout,
   getFlushouts,
   getIncentiveClaims,
@@ -26,8 +24,6 @@ import {
   validate,
   adminLoginSchema,
   updateUserStatusSchema,
-  approveWithdrawalSchema,
-  rejectWithdrawalSchema,
   systemConfigSchema,
   createGiftCodeSchema,
   adminUpdateGiftCodeStatusSchema,
@@ -48,8 +44,6 @@ router.patch("/users/:userId/status", authenticateAdmin, validate(updateUserStat
 
 // Withdrawals
 router.get("/withdrawals", authenticateAdmin, getWithdrawals);
-router.patch("/withdrawals/:withdrawalId/approve", authenticateAdmin, approveWithdrawal);
-router.patch("/withdrawals/:withdrawalId/reject", authenticateAdmin, validate(rejectWithdrawalSchema), rejectWithdrawal);
 
 // Flushout
 router.post("/flushout/:enrollmentId", authenticateAdmin, manualFlushout);

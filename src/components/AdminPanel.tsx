@@ -10,7 +10,7 @@ import {
   Check, Clock, AlertCircle, Info, Filter, Download, MoreHorizontal,
   Settings as SettingsIcon, LogOut, Bell, MessageSquare, FileText, BarChart3, PieChart,
   Activity, Target, Percent, Calendar, Lock, Unlock, Eye, EyeOff,
-  Trash2, Edit, Plus, Minus, ChevronDown, ChevronUp, ExternalLink,
+  Trash2, Edit, Plus, Minus, ChevronDown, ChevronUp,
   Hash, UserPlus, UserCheck, UserX, Repeat, Flame, Star, Trophy,
   Medal, Sparkles, Timer, CreditCard, History, Globe, Server,
   Database, ShieldCheck, Verified, BadgeCheck, CircleDollarSign,
@@ -84,17 +84,6 @@ interface Pool {
     bg: string;
     border: string;
   };
-}
-
-interface WithdrawalRequest {
-  id: number;
-  userId: string;
-  wallet: string;
-  amount: number;
-  status: RequestStatus;
-  requestedAt: string;
-  processedAt?: string;
-  txHash?: string;
 }
 
 interface FlushoutRecord {
@@ -261,18 +250,6 @@ const usersData: User[] = [];
 const poolsData: Pool[] = [];
 
 // =============================================
-// WITHDRAWAL REQUESTS DATA
-// =============================================
-
-const withdrawalRequests: WithdrawalRequest[] = [
-  { id: 1, userId: 'USR001', wallet: '0x7B2...F1A3', amount: 150, status: 'Pending', requestedAt: '2026-03-30 14:30:00' },
-  { id: 2, userId: 'USR002', wallet: '0x5E6...A8D4', amount: 75, status: 'Approved', requestedAt: '2026-03-30 12:15:00', processedAt: '2026-03-30 13:00:00', txHash: '0xabc...def' },
-  { id: 3, userId: 'USR004', wallet: '0x3C1...E4B2', amount: 300, status: 'Processing', requestedAt: '2026-03-30 10:00:00' },
-  { id: 4, userId: 'USR005', wallet: '0x9F8...D2C1', amount: 100, status: 'Rejected', requestedAt: '2026-03-29 18:45:00', processedAt: '2026-03-29 19:30:00' },
-  { id: 5, userId: 'USR001', wallet: '0x7B2...F1A3', amount: 50, status: 'Approved', requestedAt: '2026-03-28 09:00:00', processedAt: '2026-03-28 10:15:00', txHash: '0xdef...abc' },
-];
-
-// =============================================
 // FLUSHOUT RECORDS DATA
 // =============================================
 
@@ -397,7 +374,6 @@ function Sidebar({ activeTab, setActiveTab, collapsed, setCollapsed, mobileOpen,
     { id: 'users', label: 'Users', icon: Users },
     { id: 'plans', label: 'Plans', icon: Layers },
     { id: 'pools', label: 'Pools', icon: Database },
-    { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpRight },
     { id: 'flushouts', label: 'Flushouts', icon: Flame },
     { id: 'commissions', label: 'Commissions', icon: Percent },
     { id: 'gift-codes', label: 'Gift Codes', icon: Gift },
@@ -1353,111 +1329,6 @@ function PoolsManagement() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-// =============================================
-// WITHDRAWALS MANAGEMENT COMPONENT
-// =============================================
-function WithdrawalsManagement() {
-  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'All'>('All');
-
-  const filteredRequests = withdrawalRequests.filter(req => 
-    statusFilter === 'All' || req.status === statusFilter
-  );
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Withdrawal Requests</h1>
-          <p className="text-sm text-slate-400">Manage and process withdrawal requests</p>
-        </div>
-        <div className="flex gap-2 sm:gap-3">
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 sm:px-4 py-2">
-            <p className="text-[10px] sm:text-xs text-amber-400">Pending</p>
-            <p className="font-mono text-lg sm:text-xl font-bold text-amber-300">12</p>
-          </div>
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 sm:px-4 py-2">
-            <p className="text-[10px] sm:text-xs text-emerald-400">Approved</p>
-            <p className="font-mono text-lg sm:text-xl font-bold text-emerald-300">$4,250</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as RequestStatus | 'All')}
-          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none"
-        >
-          <option value="All" className="bg-[#0a0a0f]">All Status</option>
-          <option value="Pending" className="bg-[#0a0a0f]">Pending</option>
-          <option value="Processing" className="bg-[#0a0a0f]">Processing</option>
-          <option value="Approved" className="bg-[#0a0a0f]">Approved</option>
-          <option value="Rejected" className="bg-[#0a0a0f]">Rejected</option>
-        </select>
-      </div>
-
-      {/* Requests Table */}
-      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] min-w-[650px]">
-        <table className="w-full">
-          <thead className="bg-white/[0.03]">
-            <tr className="border-b border-white/10">
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">ID</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">User</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Amount</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Status</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Requested</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRequests.map((req) => (
-              <tr key={req.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
-                <td className="px-6 py-4 font-mono text-sm text-slate-300">#{req.id}</td>
-                <td className="px-6 py-4 font-mono text-sm text-slate-300">{req.wallet}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-white">${req.amount}</td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${statusStyle(req.status)}`}>
-                    {req.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-400">{req.requestedAt}</td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
-                    {req.status === 'Pending' && (
-                      <>
-                        <button className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20">
-                          Approve
-                        </button>
-                        <button className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-500/20">
-                          Reject
-                        </button>
-                      </>
-                    )}
-                    {req.status === 'Processing' && (
-                      <button className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-400 hover:bg-sky-500/20">
-                        Complete
-                      </button>
-                    )}
-                    {req.txHash && (
-                      <button className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-white/10">
-                        <ExternalLink className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      </div>
     </div>
   );
 }
@@ -2484,12 +2355,12 @@ function Settings() {
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
         <h3 className="mb-4 text-lg font-semibold text-white">System Configuration</h3>
         <div className="space-y-4">
-          {[
-            { label: 'Maintenance Mode', desc: 'Temporarily disable new registrations', enabled: false },
-            { label: 'Auto Flushout', desc: 'Enable automatic plan flushouts', enabled: true },
-            { label: 'Commission Distribution', desc: 'Auto-distribute level commissions', enabled: true },
-            { label: 'Withdrawal Approval', desc: 'Require manual approval for withdrawals', enabled: true },
-          ].map((setting, index) => (
+            {[
+              { label: 'Maintenance Mode', desc: 'Temporarily disable new registrations', enabled: false },
+              { label: 'Auto Flushout', desc: 'Enable automatic plan flushouts', enabled: true },
+              { label: 'Commission Distribution', desc: 'Auto-distribute level commissions', enabled: true },
+              { label: 'Auto Withdrawal Signing', desc: 'Use EIP-712 automatic withdrawal authorization', enabled: true },
+            ].map((setting, index) => (
             <div key={index} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-4">
               <div>
                 <p className="text-sm font-medium text-white">{setting.label}</p>
@@ -2666,8 +2537,6 @@ export default function AdminPanel() {
         return <PlansManagement />;
       case 'pools':
         return <PoolsManagement />;
-      case 'withdrawals':
-        return <WithdrawalsManagement />;
       case 'flushouts':
         return <FlushoutsManagement />;
       case 'commissions':

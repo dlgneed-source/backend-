@@ -70,16 +70,6 @@ export const withdrawalSignSchema = z.object({
 // ADMIN SCHEMAS
 // =============================================
 
-export const approveWithdrawalSchema = z.object({
-  withdrawalId: z.string().min(1),
-  txHash: z.string().optional(),
-});
-
-export const rejectWithdrawalSchema = z.object({
-  withdrawalId: z.string().min(1),
-  reason: z.string().min(1, "Rejection reason required"),
-});
-
 export const createGiftCodeSchema = z.object({
   planId: z.number().int().min(1).max(6),
   expiryDays: z.number().int().min(1).max(365).optional().default(30),
