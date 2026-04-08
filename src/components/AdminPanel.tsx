@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 const ADMIN_AUTH_TOKEN_KEY = 'ea_admin_token';
+const ADMIN_PERMISSION_DENIED_MESSAGE = 'Admin permission denied';
 
 // =============================================
 // TYPES & INTERFACES
@@ -422,7 +423,7 @@ function DashboardOverview({ token, onPermissionDenied }: { token: string | null
         recentFlushouts: response.dashboard.recentFlushouts,
       });
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403 && err.message === 'Admin permission denied') {
+      if (err instanceof ApiError && err.status === 403 && err.message === ADMIN_PERMISSION_DENIED_MESSAGE) {
         onPermissionDenied?.();
       }
       setDashboard(null);
