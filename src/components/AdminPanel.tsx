@@ -1997,10 +1997,6 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
       setError('Code must be 4-32 chars and contain only A-Z, 0-9, _ or -.');
       return;
     }
-    if (code && quantity !== 1) {
-      setError('Custom code can only be created with quantity 1.');
-      return;
-    }
     if (newCode.amountMode === 'CUSTOM') {
       if (!/^\d+(\.\d+)?$/.test(customAmountRaw)) {
         setError('Custom amount must be numeric.');
