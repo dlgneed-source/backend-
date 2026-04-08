@@ -1,7 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import { v4 as uuidv4 } from "uuid";
 
 const prisma = new PrismaClient();
+
+export const DEFAULT_ROOM = "announcements";
 
 export interface CommunityRoom {
   id: string;
@@ -189,5 +190,3 @@ function dbMsgToMsg(row: {
     isPinned: row.isPinned,
   };
 }
-
-export { uuidv4 };

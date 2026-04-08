@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
-import { listRecentMessages, listRooms } from "../services/communityStore";
+import { DEFAULT_ROOM, listRecentMessages, listRooms } from "../services/communityStore";
 
 export async function getCommunityBootstrap(req: Request, res: Response): Promise<void> {
   try {
     const rooms = await listRooms();
-    const messages = await listRecentMessages("announcements");
+    const messages = await listRecentMessages(DEFAULT_ROOM);
     res.json({
       success: true,
       rooms,

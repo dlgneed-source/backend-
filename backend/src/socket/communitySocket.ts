@@ -1,5 +1,5 @@
 import { Server, Socket } from "socket.io";
-import { addMessage, deleteMessage, pinMessage, roomExists, saveDm } from "../services/communityStore";
+import { addMessage, DEFAULT_ROOM, deleteMessage, pinMessage, roomExists, saveDm } from "../services/communityStore";
 
 interface ConnectedUser {
   id: string;
@@ -7,7 +7,6 @@ interface ConnectedUser {
   walletAddress?: string;
 }
 
-const DEFAULT_ROOM = "announcements";
 const MAX_MESSAGE_LENGTH = 2000;
 
 function getSocketUser(socket: Socket): ConnectedUser {
