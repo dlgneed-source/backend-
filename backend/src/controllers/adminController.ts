@@ -202,6 +202,48 @@ export async function adminCredentialLogin(req: Request, res: Response): Promise
 }
 
 // =============================================
+// LINK WALLET
+// =============================================
+
+/**
+ * POST /admin/link-wallet
+ * Allows a credential-authenticated admin to link (or update) their wallet address.
+ */
+export async function linkAdminWallet(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { walletAddress } = req.body as { walletAddress: string };
+
+  try {
+    const normalizedWallet = walletAddress.toLowerCase();
+
+    // Check wallet is not already taken by another admin
+    const existing = await prisma.admin.findUnique({ where: { walletAddress: normalizedWallet } });
+    if (existing && existing.id !== req.admin!.id) {
+      res.status(409).json({ success: false, message: "Wallet address already linked to another admin" });
+      return;
+    }
+
+    const updated = await prisma.admin.update({
+      where: { id: req.admin!.id },
+      data: { walletAddress: normalizedWallet },
+      select: { id: true, walletAddress: true, role: true, email: true },
+    });
+
+    res.json({
+      success: true,
+      message: "Wallet linked successfully",
+      admin: {
+        id: updated.id,
+        walletAddress: updated.walletAddress,
+        role: updated.role,
+        loginId: updated.email,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, message: "Failed to link wallet" });
+  }
+}
+
+// =============================================
 // DASHBOARD
 // =============================================
 
@@ -1207,7 +1249,12 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    // Find or create admin's user record so gift codes can always be generated
+    // Find or create admin's user record so gift codes can always be generated.
+    // Requires the admin to have a linked wallet address.
+    if (!req.admin!.walletAddress) {
+      res.status(400).json({ success: false, message: "Please link a wallet address to your admin account before creating gift codes" });
+      return;
+    }
     const adminUser = await upsertActiveUserByWallet(prisma, req.admin!.walletAddress);
 
     if (requestedCode && quantity > 1) {

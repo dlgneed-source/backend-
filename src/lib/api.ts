@@ -288,7 +288,7 @@ export const adminApi = {
       token: string;
       admin: {
         id: string;
-        walletAddress: string;
+        walletAddress: string | null;
         role: string;
         loginId?: string | null;
       };
@@ -296,6 +296,22 @@ export const adminApi = {
     }>('/api/admin/login/credentials', {
       method: 'POST',
       body: { loginId, password },
+    }),
+
+  linkWallet: (token: string, walletAddress: string) =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      admin: {
+        id: string;
+        walletAddress: string | null;
+        role: string;
+        loginId?: string | null;
+      };
+    }>('/api/admin/link-wallet', {
+      method: 'POST',
+      token,
+      body: { walletAddress },
     }),
 
   getDashboard: (token: string) =>
