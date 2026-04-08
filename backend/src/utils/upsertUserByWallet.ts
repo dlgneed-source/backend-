@@ -47,5 +47,7 @@ export async function upsertActiveUserByWallet(
     }
   }
 
-  throw new Error("Failed to generate unique referral code for wallet");
+  throw new Error(
+    `Failed to generate unique referral code after ${MAX_REFERRAL_CODE_ATTEMPTS} attempts for wallet: ${normalizedWallet}`,
+  );
 }
