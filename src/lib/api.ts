@@ -433,7 +433,7 @@ export const adminApi = {
     }>(`/api/admin/gift-codes${queryString ? `?${queryString}` : ''}`, { token });
   },
 
-  createGiftCode: (token: string, payload: { planId: number; expiryDays: number; quantity?: number; code?: string }) =>
+  createGiftCode: (token: string, payload: { planId: number; customAmount?: number; expiryDays?: number; quantity?: number; code?: string }) =>
     apiRequest<{
       success: boolean;
       giftCodes: Array<{

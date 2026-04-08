@@ -2048,7 +2048,14 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [newCode, setNewCode] = useState({ code: '', planId: '1', days: '30', quantity: '1' });
+  const [newCode, setNewCode] = useState({
+    code: '',
+    planId: '1',
+    days: '',
+    quantity: '1',
+    amountMode: 'PLAN' as 'PLAN' | 'CUSTOM',
+    customAmount: '',
+  });
 
   const loadGiftCodes = useCallback(async () => {
     if (!token) {
@@ -2080,16 +2087,23 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
       return;
     }
 
-    const days = Number(newCode.days);
+    const daysRaw = newCode.days.trim();
+    const days = daysRaw.length > 0 ? Number(daysRaw) : undefined;
     const quantity = Number(newCode.quantity);
     const planId = Number(newCode.planId);
     const code = newCode.code.trim().toUpperCase();
+    const customAmountRaw = newCode.customAmount.trim();
+    const customAmount = newCode.amountMode === 'CUSTOM' ? Number(customAmountRaw) : undefined;
 
     if (!Number.isInteger(planId) || planId < 1 || planId > 6) {
       setError('Plan must be between 1 and 6.');
       return;
     }
-    if (!Number.isInteger(days) || days < 1 || days > 365) {
+    if (daysRaw && !/^\d+$/.test(daysRaw)) {
+      setError('Valid for days must contain numbers only.');
+      return;
+    }
+    if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > 365)) {
       setError('Valid for days must be between 1 and 365.');
       return;
     }
@@ -2105,17 +2119,39 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
       setError('Custom code can only be created with quantity 1.');
       return;
     }
+    if (newCode.amountMode === 'CUSTOM') {
+      if (!/^\d+(\.\d+)?$/.test(customAmountRaw)) {
+        setError('Custom amount must be numeric.');
+        return;
+      }
+      if (!Number.isFinite(customAmount) || (customAmount ?? 0) <= 0) {
+        setError('Custom amount must be greater than 0.');
+        return;
+      }
+      if ((customAmount ?? 0) > 1_000_000) {
+        setError('Custom amount is too large.');
+        return;
+      }
+    }
 
     setIsCreating(true);
     setError(null);
     try {
       await adminApi.createGiftCode(token, {
         planId,
-        expiryDays: days,
+        ...(days !== undefined ? { expiryDays: days } : {}),
         quantity,
+        ...(newCode.amountMode === 'CUSTOM' ? { customAmount } : {}),
         ...(code ? { code } : {}),
       });
-      setNewCode({ code: '', planId: '1', days: '30', quantity: '1' });
+      setNewCode({
+        code: '',
+        planId: '1',
+        days: '',
+        quantity: '1',
+        amountMode: 'PLAN',
+        customAmount: '',
+      });
       setShowCreate(false);
       await loadGiftCodes();
     } catch (err) {
@@ -2289,8 +2325,55 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
                   </div>
                 </div>
                 <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Amount Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewCode({ ...newCode, amountMode: 'PLAN', customAmount: '' })}
+                      className={`rounded-xl border px-3 py-2 text-xs font-semibold ${newCode.amountMode === 'PLAN' ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200' : 'border-white/10 bg-white/5 text-slate-300'}`}
+                    >
+                      Plan Amount
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewCode({ ...newCode, amountMode: 'CUSTOM' })}
+                      className={`rounded-xl border px-3 py-2 text-xs font-semibold ${newCode.amountMode === 'CUSTOM' ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200' : 'border-white/10 bg-white/5 text-slate-300'}`}
+                    >
+                      Custom Amount
+                    </button>
+                  </div>
+                </div>
+                {newCode.amountMode === 'CUSTOM' && (
+                  <div>
+                    <label htmlFor="gift-code-custom-amount" className="text-xs text-slate-400 mb-1 block">Custom Amount (USD)</label>
+                    <input
+                      id="gift-code-custom-amount"
+                      value={newCode.customAmount}
+                      onChange={(e) => setNewCode({ ...newCode, customAmount: e.target.value })}
+                      placeholder="e.g. 1"
+                      inputMode="decimal"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none"
+                    />
+                  </div>
+                )}
+                <div>
                   <label htmlFor="gift-code-days" className="text-xs text-slate-400 mb-1 block">Valid For (Days)</label>
-                  <input id="gift-code-days" type="number" value={newCode.days} onChange={e => setNewCode({ ...newCode, days: e.target.value })} placeholder="30" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                  <input
+                    id="gift-code-days"
+                    type="text"
+                    inputMode="numeric"
+                    value={newCode.days}
+                    onChange={e => {
+                      const next = e.target.value;
+                      if (/^\d*$/.test(next)) {
+                        setNewCode({ ...newCode, days: next });
+                      } else {
+                        setError('Valid for days must contain numbers only.');
+                      }
+                    }}
+                    placeholder="e.g. 30"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none"
+                  />
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button onClick={() => setShowCreate(false)} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white">Cancel</button>

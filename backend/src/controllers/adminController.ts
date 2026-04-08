@@ -850,7 +850,7 @@ export async function getAdminGiftCodes(req: AuthenticatedRequest, res: Response
         code: giftCode.code,
         planId: giftCode.planId,
         planName: giftCode.plan.name,
-        amount: giftCode.plan.joiningFee,
+        amount: giftCode.customAmount ?? giftCode.plan.joiningFee,
         status: giftCode.status,
         expiresAt: giftCode.expiresAt,
         createdAt: giftCode.createdAt,
@@ -872,7 +872,13 @@ export async function getAdminGiftCodes(req: AuthenticatedRequest, res: Response
  * Admin creates gift codes
  */
 export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { planId, expiryDays = 30, quantity = 1, code: requestedCode } = req.body;
+  const {
+    planId,
+    customAmount,
+    expiryDays = 30,
+    quantity = 1,
+    code: requestedCode,
+  } = req.body as { planId: number; customAmount?: number; expiryDays?: number; quantity?: number; code?: string };
 
   try {
     const plan = await prisma.plan.findUnique({ where: { id: planId } });
@@ -888,7 +894,7 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
 
     // Find admin's user record (admin wallet may also have a user record)
     const adminUser = await prisma.user.findFirst({
-      where: { walletAddress: req.admin!.walletAddress },
+      where: { walletAddress: { equals: req.admin!.walletAddress, mode: "insensitive" } },
     });
 
     if (!adminUser) {
@@ -919,7 +925,7 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
       }
 
       const giftCode = await prisma.giftCode.create({
-        data: { code, planId, generatedById: adminUser.id, expiresAt, status: "ACTIVE" },
+        data: { code, planId, customAmount: customAmount ?? null, generatedById: adminUser.id, expiresAt, status: "ACTIVE" },
         include: { plan: { select: { id: true, name: true, joiningFee: true } } },
       });
 
@@ -928,7 +934,7 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
         code: giftCode.code,
         planId: giftCode.planId,
         planName: giftCode.plan.name,
-        amount: giftCode.plan.joiningFee,
+        amount: giftCode.customAmount ?? giftCode.plan.joiningFee,
         status: giftCode.status,
         expiresAt: giftCode.expiresAt,
         createdAt: giftCode.createdAt,
@@ -945,8 +951,13 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
       data: {
         adminId: req.admin!.id,
         action: "GIFT_CODE_CREATED",
-        description: `Created ${createdCodes.length} gift code(s) for Plan ${planId}`,
-        metadata: { planId, quantity: createdCodes.length, codes: createdCodes.map((item) => item.code) },
+        description: `Created ${createdCodes.length} gift code(s) for Plan ${planId}${typeof customAmount === "number" ? ` at custom amount $${customAmount}` : ""}`,
+        metadata: {
+          planId,
+          customAmount: typeof customAmount === "number" ? customAmount : null,
+          quantity: createdCodes.length,
+          codes: createdCodes.map((item) => item.code),
+        },
       },
     });
 
@@ -1001,7 +1012,7 @@ export async function updateAdminGiftCodeStatus(req: AuthenticatedRequest, res: 
           code: giftCode.code,
           planId: giftCode.planId,
           planName: giftCode.plan.name,
-          amount: giftCode.plan.joiningFee,
+          amount: giftCode.customAmount ?? giftCode.plan.joiningFee,
           status: giftCode.status,
           expiresAt: giftCode.expiresAt,
           createdAt: giftCode.createdAt,
@@ -1042,7 +1053,7 @@ export async function updateAdminGiftCodeStatus(req: AuthenticatedRequest, res: 
         code: updated.code,
         planId: updated.planId,
         planName: updated.plan.name,
-        amount: updated.plan.joiningFee,
+        amount: updated.customAmount ?? updated.plan.joiningFee,
         status: updated.status,
         expiresAt: updated.expiresAt,
         createdAt: updated.createdAt,

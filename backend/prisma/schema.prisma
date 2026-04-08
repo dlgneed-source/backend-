@@ -309,6 +309,7 @@ model GiftCode {
   id           String         @id @default(cuid())
   code         String         @unique
   planId       Int
+  customAmount Float?
   plan         Plan           @relation(fields: [planId], references: [id])
   generatedById String
   generatedBy  User           @relation("GiftCodeGenerator", fields: [generatedById], references: [id])

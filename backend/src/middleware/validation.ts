@@ -72,6 +72,7 @@ export const withdrawalSignSchema = z.object({
 
 export const createGiftCodeSchema = z.object({
   planId: z.number().int().min(1).max(6),
+  customAmount: z.number().positive("Custom amount must be positive").max(1_000_000, "Custom amount is too large").optional(),
   expiryDays: z.number().int().min(1).max(365).optional().default(30),
   quantity: z.number().int().min(1).max(50).optional().default(1),
   code: z
