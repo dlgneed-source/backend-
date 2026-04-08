@@ -486,6 +486,7 @@ function Sidebar({ activeTab, setActiveTab, collapsed, setCollapsed, mobileOpen,
 // DASHBOARD OVERVIEW COMPONENT
 // =============================================
 function DashboardOverview({ token }: { token: string | null }) {
+  const EXPORT_PAGE_SIZE = 500;
   const [isLoading, setIsLoading] = useState(false);
   const [isExportingWithdrawals, setIsExportingWithdrawals] = useState(false);
   const [isExportingFlushouts, setIsExportingFlushouts] = useState(false);
@@ -547,7 +548,8 @@ function DashboardOverview({ token }: { token: string | null }) {
     const headers = Object.keys(rows[0]);
     const escape = (value: string | number | null | undefined) => {
       const raw = value === null || value === undefined ? '' : String(value);
-      const escaped = raw.replace(/"/g, '""');
+      const injectionSafe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+      const escaped = injectionSafe.replace(/"/g, '""');
       return `"${escaped}"`;
     };
     return [headers.join(','), ...rows.map((row) => headers.map((header) => escape(row[header])).join(','))].join('\n');
@@ -603,12 +605,11 @@ function DashboardOverview({ token }: { token: string | null }) {
     setIsExportingWithdrawals(true);
     setError(null);
     try {
-      const pageSize = 500;
-      const firstPage = await adminApi.getWithdrawals(token, { page: 1, limit: pageSize });
+      const firstPage = await adminApi.getWithdrawals(token, { page: 1, limit: EXPORT_PAGE_SIZE });
       const allRows = [...firstPage.withdrawals];
 
       for (let page = 2; page <= firstPage.pagination.pages; page += 1) {
-        const nextPage = await adminApi.getWithdrawals(token, { page, limit: pageSize });
+        const nextPage = await adminApi.getWithdrawals(token, { page, limit: EXPORT_PAGE_SIZE });
         allRows.push(...nextPage.withdrawals);
       }
 
@@ -641,12 +642,11 @@ function DashboardOverview({ token }: { token: string | null }) {
     setIsExportingFlushouts(true);
     setError(null);
     try {
-      const pageSize = 500;
-      const firstPage = await adminApi.getFlushouts(token, { page: 1, limit: pageSize });
+      const firstPage = await adminApi.getFlushouts(token, { page: 1, limit: EXPORT_PAGE_SIZE });
       const allRows = [...firstPage.flushouts];
 
       for (let page = 2; page <= firstPage.pagination.pages; page += 1) {
-        const nextPage = await adminApi.getFlushouts(token, { page, limit: pageSize });
+        const nextPage = await adminApi.getFlushouts(token, { page, limit: EXPORT_PAGE_SIZE });
         allRows.push(...nextPage.flushouts);
       }
 

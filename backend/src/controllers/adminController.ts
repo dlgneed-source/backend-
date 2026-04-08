@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from "uuid";
 import { isValidWalletAddress } from "../middleware/security";
 
 const prisma = new PrismaClient();
+const MAX_FLUSHOUTS_PAGE_SIZE = 5000;
 
 function extractEnrollmentIdFromManualFlushoutLog(log: { metadata: unknown; description: string }): string | undefined {
   if (log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)) {
@@ -390,7 +391,7 @@ export async function getWithdrawals(req: AuthenticatedRequest, res: Response): 
  */
 export async function getFlushouts(req: AuthenticatedRequest, res: Response): Promise<void> {
   const page = parseInt(req.query.page as string) || 1;
-  const limit = Math.min(parseInt(req.query.limit as string) || 20, 5000);
+  const limit = Math.min(parseInt(req.query.limit as string) || 20, MAX_FLUSHOUTS_PAGE_SIZE);
   const skip = (page - 1) * limit;
 
   try {
