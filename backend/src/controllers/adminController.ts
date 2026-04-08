@@ -1206,15 +1206,17 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    // Find admin's user record (admin wallet may also have a user record)
-    const adminUser = await prisma.user.findFirst({
-      where: { walletAddress: { equals: req.admin!.walletAddress, mode: "insensitive" } },
+    // Find or create admin's user record so gift codes can always be generated
+    const adminWallet = req.admin!.walletAddress.toLowerCase();
+    const adminUser = await prisma.user.upsert({
+      where: { walletAddress: adminWallet },
+      update: {},
+      create: {
+        walletAddress: adminWallet,
+        status: "ACTIVE",
+        referralCode: uuidv4().replace(/-/g, "").toUpperCase().slice(0, 12),
+      },
     });
-
-    if (!adminUser) {
-      res.status(400).json({ success: false, message: "Admin user profile not found" });
-      return;
-    }
 
     if (requestedCode && quantity > 1) {
       res.status(400).json({ success: false, message: "Custom code supports quantity 1 only" });

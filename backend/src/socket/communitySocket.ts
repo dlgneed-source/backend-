@@ -1,6 +1,5 @@
 import { Server, Socket } from "socket.io";
-import { randomUUID } from "crypto";
-import { addMessage, deleteMessage, pinMessage, roomExists } from "../services/communityStore";
+import { addMessage, DEFAULT_ROOM, deleteMessage, pinMessage, roomExists, saveDm } from "../services/communityStore";
 
 interface ConnectedUser {
   id: string;
@@ -8,7 +7,6 @@ interface ConnectedUser {
   walletAddress?: string;
 }
 
-const DEFAULT_ROOM = "announcements";
 const MAX_MESSAGE_LENGTH = 2000;
 
 function getSocketUser(socket: Socket): ConnectedUser {
@@ -35,9 +33,13 @@ export function initCommunitySocket(io: Server): void {
     socket.join(DEFAULT_ROOM);
     socket.join(`user:${connectedUser.id}`);
 
-    socket.on("join_room", ({ roomId }: { roomId: string }) => {
-      if (!roomId || !roomExists(roomId)) return;
-      socket.join(roomId);
+    socket.on("join_room", async ({ roomId }: { roomId: string }) => {
+      try {
+        if (!roomId || !(await roomExists(roomId))) return;
+        socket.join(roomId);
+      } catch (err) {
+        console.error("[communitySocket] join_room error:", err);
+      }
     });
 
     socket.on("leave_room", ({ roomId }: { roomId: string }) => {
@@ -45,71 +47,96 @@ export function initCommunitySocket(io: Server): void {
       socket.leave(roomId);
     });
 
-    socket.on("send_message", ({ roomId, text, replyToId }: { roomId: string; text: string; replyToId?: string }) => {
-      const normalizedText = String(text || "").trim();
-      if (!roomId || !roomExists(roomId) || !normalizedText) return;
+    socket.on("send_message", async ({ roomId, text, replyToId }: { roomId: string; text: string; replyToId?: string }) => {
+      try {
+        const normalizedText = String(text || "").trim();
+        if (!roomId || !normalizedText) return;
+        if (!(await roomExists(roomId))) return;
 
-      const message = addMessage({
-        roomId,
-        text: normalizedText.slice(0, MAX_MESSAGE_LENGTH),
-        userId: connectedUser.id,
-        userName: connectedUser.name,
-        walletAddress: connectedUser.walletAddress,
-        replyToId,
-      });
-
-      io.to(roomId).emit("message_created", message);
-    });
-
-    socket.on("send_dm", ({ receiverId, text }: { receiverId: string; text: string }) => {
-      const normalizedText = String(text || "").trim();
-      if (!receiverId || !normalizedText) return;
-
-      const dmPayload = {
-        id: randomUUID(),
-        senderId: connectedUser.id,
-        receiverId,
-        text: normalizedText.slice(0, MAX_MESSAGE_LENGTH),
-        createdAt: new Date().toISOString(),
-        sender: {
-          id: connectedUser.id,
-          name: connectedUser.name,
+        const message = await addMessage({
+          roomId,
+          text: normalizedText.slice(0, MAX_MESSAGE_LENGTH),
+          userId: connectedUser.id,
+          userName: connectedUser.name,
           walletAddress: connectedUser.walletAddress,
-        },
-      };
+          replyToId,
+        });
 
-      io.to(`user:${receiverId}`).emit("dm_created", dmPayload);
-      socket.emit("dm_created", dmPayload);
+        io.to(roomId).emit("message_created", message);
+      } catch (err) {
+        console.error("[communitySocket] send_message error:", err);
+        socket.emit("error", { message: "Failed to send message" });
+      }
     });
 
-    socket.on("typing_start", ({ roomId }: { roomId: string }) => {
-      if (!roomId || !roomExists(roomId)) return;
-      socket.to(roomId).emit("typing_start", {
-        roomId,
-        userId: connectedUser.id,
-        userName: connectedUser.name,
-      });
+    socket.on("send_dm", async ({ receiverId, text }: { receiverId: string; text: string }) => {
+      try {
+        const normalizedText = String(text || "").trim();
+        if (!receiverId || !normalizedText) return;
+
+        const dmPayload = await saveDm({
+          senderId: connectedUser.id,
+          senderName: connectedUser.name,
+          senderWallet: connectedUser.walletAddress,
+          receiverId,
+          text: normalizedText.slice(0, MAX_MESSAGE_LENGTH),
+        });
+
+        io.to(`user:${receiverId}`).emit("dm_created", dmPayload);
+        socket.emit("dm_created", dmPayload);
+      } catch (err) {
+        console.error("[communitySocket] send_dm error:", err);
+        socket.emit("error", { message: "Failed to send direct message" });
+      }
     });
 
-    socket.on("typing_stop", ({ roomId }: { roomId: string }) => {
-      if (!roomId || !roomExists(roomId)) return;
-      socket.to(roomId).emit("typing_stop", {
-        roomId,
-        userId: connectedUser.id,
-      });
+    socket.on("typing_start", async ({ roomId }: { roomId: string }) => {
+      try {
+        if (!roomId || !(await roomExists(roomId))) return;
+        socket.to(roomId).emit("typing_start", {
+          roomId,
+          userId: connectedUser.id,
+          userName: connectedUser.name,
+        });
+      } catch (err) {
+        console.error("[communitySocket] typing_start error:", err);
+      }
     });
 
-    socket.on("delete_message", ({ messageId }: { messageId: string }) => {
-      if (!messageId) return;
-      if (!deleteMessage(messageId)) return;
-      io.emit("message_deleted", { messageId });
+    socket.on("typing_stop", async ({ roomId }: { roomId: string }) => {
+      try {
+        if (!roomId || !(await roomExists(roomId))) return;
+        socket.to(roomId).emit("typing_stop", {
+          roomId,
+          userId: connectedUser.id,
+        });
+      } catch (err) {
+        console.error("[communitySocket] typing_stop error:", err);
+      }
     });
 
-    socket.on("pin_message", ({ messageId, isPinned }: { messageId: string; isPinned: boolean }) => {
-      if (!messageId) return;
-      const updated = pinMessage(messageId, !!isPinned);
-      if (!updated) return;
-      io.emit("message_pinned", { messageId, isPinned: !!updated.isPinned });
+    socket.on("delete_message", async ({ messageId }: { messageId: string }) => {
+      try {
+        if (!messageId) return;
+        const deleted = await deleteMessage(messageId);
+        if (!deleted) return;
+        io.emit("message_deleted", { messageId });
+      } catch (err) {
+        console.error("[communitySocket] delete_message error:", err);
+        socket.emit("error", { message: "Failed to delete message" });
+      }
+    });
+
+    socket.on("pin_message", async ({ messageId, isPinned }: { messageId: string; isPinned: boolean }) => {
+      try {
+        if (!messageId) return;
+        const updated = await pinMessage(messageId, !!isPinned);
+        if (!updated) return;
+        io.emit("message_pinned", { messageId, isPinned: !!updated.isPinned });
+      } catch (err) {
+        console.error("[communitySocket] pin_message error:", err);
+        socket.emit("error", { message: "Failed to pin message" });
+      }
     });
   });
 }

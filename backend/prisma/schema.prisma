@@ -453,3 +453,57 @@ model TreasuryLedger {
   @@index([treasuryId])
   @@index([createdAt])
 }
+
+// =============================================
+// COMMUNITY CHAT MODELS
+// =============================================
+
+model CommunityRoom {
+  id          String             @id
+  name        String             @unique
+  description String?
+  isVip       Boolean            @default(false)
+  icon        String?
+  memberCount Int                @default(0)
+  isPinned    Boolean            @default(false)
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  messages    CommunityMessage[]
+
+  @@index([isVip])
+}
+
+model CommunityMessage {
+  id          String        @id @default(cuid())
+  roomId      String
+  room        CommunityRoom @relation(fields: [roomId], references: [id])
+  userId      String
+  userName    String
+  walletAddress String?
+  text        String
+  replyToId   String?
+  isPinned    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([roomId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([isPinned])
+}
+
+model DirectMessage {
+  id           String   @id @default(cuid())
+  senderId     String
+  senderName   String
+  senderWallet String?
+  receiverId   String
+  text         String
+  createdAt    DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+}
