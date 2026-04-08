@@ -84,7 +84,7 @@ interface Pool {
 }
 
 interface FlushoutRecord {
-  id: number;
+  id: string;
   userId: string;
   wallet: string;
   planId: number;
@@ -228,18 +228,6 @@ const usersData: User[] = [];
 // =============================================
 // POOLS DATA
 // =============================================
-
-// =============================================
-// FLUSHOUT RECORDS DATA
-// =============================================
-
-const flushoutRecords: FlushoutRecord[] = [
-  { id: 1, userId: 'USR001', wallet: '0x7B2...F1A3', planId: 1, planName: 'Foundation', amount: 12, flushedAt: '2026-03-30 10:00:00', type: 'Auto' },
-  { id: 2, userId: 'USR002', wallet: '0x5E6...A8D4', planId: 1, planName: 'Foundation', amount: 12, flushedAt: '2026-03-29 15:30:00', type: 'Auto' },
-  { id: 3, userId: 'USR004', wallet: '0x3C1...E4B2', planId: 2, planName: 'Pro Builder', amount: 30, flushedAt: '2026-03-28 12:00:00', type: 'Manual' },
-  { id: 4, userId: 'USR005', wallet: '0x9F8...D2C1', planId: 3, planName: 'Cyber Elite', amount: 80, flushedAt: '2026-03-27 09:00:00', type: 'Auto' },
-  { id: 5, userId: 'USR001', wallet: '0x7B2...F1A3', planId: 2, planName: 'Pro Builder', amount: 30, flushedAt: '2026-03-26 18:00:00', type: 'Auto' },
-];
 
 // =============================================
 // COMMISSION RECORDS DATA
@@ -503,7 +491,7 @@ function DashboardOverview({ token }: { token: string | null }) {
     const headers = Object.keys(rows[0]);
     const escape = (value: string | number | null | undefined) => {
       const raw = value === null || value === undefined ? '' : String(value);
-      const injectionSafe = /^[=+\-@]/.test(raw) ? `\t${raw}` : raw;
+      const injectionSafe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
       const escaped = injectionSafe.replace(/"/g, '""');
       return `"${escaped}"`;
     };
@@ -1527,6 +1515,132 @@ function PoolsManagement() {
 // FLUSHOUTS MANAGEMENT COMPONENT
 // =============================================
 function FlushoutsManagement() {
+  const { token } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [records, setRecords] = useState<FlushoutRecord[]>([]);
+  const [manualEnrollmentId, setManualEnrollmentId] = useState('');
+
+  const EXPORT_PAGE_SIZE = 500;
+
+  const toCsv = (rows: Array<Record<string, string | number | null | undefined>>) => {
+    if (rows.length === 0) return '';
+    const headers = Object.keys(rows[0]);
+    const escape = (value: string | number | null | undefined) => {
+      const raw = value === null || value === undefined ? '' : String(value);
+      const injectionSafe = /^[=+\-@]/.test(raw) ? `\t${raw}` : raw;
+      const escaped = injectionSafe.replace(/"/g, '""');
+      return `"${escaped}"`;
+    };
+    return [
+      headers.join(','),
+      ...rows.map((row) => headers.map((header) => escape(row[header])).join(',')),
+    ].join('\n');
+  };
+
+  const downloadCsv = (filename: string, content: string) => {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const loadFlushouts = useCallback(async () => {
+    if (!token) {
+      setRecords([]);
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getFlushouts(token, { page: 1, limit: 100 });
+      setRecords(response.flushouts);
+    } catch (err) {
+      setRecords([]);
+      setError(err instanceof Error ? err.message : 'Failed to load flushouts');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadFlushouts();
+  }, [loadFlushouts]);
+
+  const handleExportAll = async () => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsExporting(true);
+    setError(null);
+    try {
+      const firstPage = await adminApi.getFlushouts(token, { page: 1, limit: EXPORT_PAGE_SIZE });
+      const allRows = [...firstPage.flushouts];
+
+      for (let page = 2; page <= firstPage.pagination.pages; page += 1) {
+        const nextPage = await adminApi.getFlushouts(token, { page, limit: EXPORT_PAGE_SIZE });
+        allRows.push(...nextPage.flushouts);
+      }
+
+      const csv = toCsv(
+        allRows.map((item) => ({
+          id: item.id,
+          userId: item.userId,
+          wallet: item.wallet,
+          userName: item.userName ?? '',
+          planId: item.planId,
+          planName: item.planName,
+          amount: item.amount,
+          type: item.type,
+          flushedAt: item.flushedAt,
+        })),
+      );
+      downloadCsv(`admin-flushouts-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export flushouts');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleManualFlushout = async () => {
+    const enrollmentId = manualEnrollmentId.trim();
+    if (!enrollmentId) {
+      setError('Enrollment ID is required for manual flushout.');
+      return;
+    }
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsSubmittingManual(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await adminApi.manualFlushout(token, enrollmentId);
+      setSuccess(response.message || 'Manual flushout processed.');
+      setManualEnrollmentId('');
+      await loadFlushouts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process manual flushout');
+    } finally {
+      setIsSubmittingManual(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1535,11 +1649,53 @@ function FlushoutsManagement() {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Flushout Management</h1>
           <p className="text-sm text-slate-400">Track and manage plan flushouts</p>
         </div>
-        <button className="flex items-center justify-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-300 hover:bg-amber-500/20 w-full sm:w-auto">
-          <Flame className="h-4 w-4" />
-          Manual Flushout
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            onClick={() => void handleExportAll()}
+            disabled={isExporting || isLoading}
+            className="flex items-center justify-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            {isExporting ? 'Exporting...' : 'Export All'}
+          </button>
+          <button
+            onClick={() => void loadFlushouts()}
+            disabled={isLoading || isSubmittingManual}
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+        <p className="text-sm font-semibold text-amber-100">Manual Flushout</p>
+        <p className="mt-1 text-xs text-amber-200/80">Enter enrollment ID and trigger backend manual flushout.</p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input
+            value={manualEnrollmentId}
+            onChange={(event) => setManualEnrollmentId(event.target.value)}
+            placeholder="Enrollment ID"
+            className="w-full rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none focus:border-amber-400/40"
+          />
+          <button
+            onClick={() => void handleManualFlushout()}
+            disabled={isSubmittingManual || isLoading}
+            className="flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-amber-500/30 disabled:opacity-60"
+          >
+            <Flame className="h-4 w-4" />
+            {isSubmittingManual ? 'Processing...' : 'Run Manual Flushout'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</div>
+      )}
+      {success && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">{success}</div>
+      )}
 
       {/* Flushout Schedule */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
@@ -1565,6 +1721,11 @@ function FlushoutsManagement() {
           <div className="border-b border-white/10 px-4 sm:px-6 py-4">
             <h3 className="text-lg font-semibold text-white">Recent Flushouts</h3>
           </div>
+          {isLoading ? (
+            <div className="p-4 text-sm text-slate-300">Loading flushout records...</div>
+          ) : records.length === 0 ? (
+            <div className="p-4 text-sm text-slate-300">No flushout records found.</div>
+          ) : (
           <table className="w-full">
             <thead className="bg-white/[0.03]">
               <tr className="border-b border-white/10">
@@ -1577,12 +1738,12 @@ function FlushoutsManagement() {
               </tr>
             </thead>
             <tbody>
-              {flushoutRecords.map((record) => (
+              {records.map((record) => (
                 <tr key={record.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
-                  <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">#{record.id}</td>
+                  <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">{(record.id || '').slice(0, 10)}</td>
                   <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">{record.wallet}</td>
                   <td className="px-4 sm:px-6 py-4 text-sm text-slate-300">{record.planName}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm font-semibold text-emerald-400">+${record.amount}</td>
+                  <td className="px-4 sm:px-6 py-4 text-sm font-semibold text-emerald-400">+{formatUsd(record.amount)}</td>
                   <td className="px-4 sm:px-6 py-4">
                     <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${
                       record.type === 'Auto' 
@@ -1592,11 +1753,12 @@ function FlushoutsManagement() {
                       {record.type}
                     </span>
                   </td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-slate-400">{record.flushedAt}</td>
+                  <td className="px-4 sm:px-6 py-4 text-sm text-slate-400">{new Date(record.flushedAt).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          )}
         </div>
       </div>
     </div>

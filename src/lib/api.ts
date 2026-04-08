@@ -389,6 +389,17 @@ export const adminApi = {
     }>(`/api/admin/flushouts${queryString ? `?${queryString}` : ''}`, { token });
   },
 
+  manualFlushout: (token: string, enrollmentId: string) =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      result?: {
+        status: 'success' | 'failed';
+        memberProfit?: number;
+        message?: string;
+      };
+    }>(`/api/admin/flushout/${encodeURIComponent(enrollmentId)}`, { method: 'POST', token }),
+
   getGiftCodes: (token: string, params?: { page?: number; limit?: number; status?: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED'; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
