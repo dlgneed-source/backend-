@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { ApiError, adminApi, teamApi } from '@/lib/api';
+import { ApiError, adminApi, systemApi, teamApi } from '@/lib/api';
 import { getDirectReferralIncome, toSafeNonNegativeNumber } from '@/lib/referral';
+import { buildCsv, downloadCsv } from '@/utils/exportCsv';
 import {
   AlertOctagon, Ban, Briefcase, ChevronRight, Copy, Gift, RefreshCw,
   Search, Shield, TrendingUp, Wallet, Zap, Users, LayoutDashboard,
@@ -106,120 +107,35 @@ interface KIMILevel {
 const formatUsd = (value: number | null | undefined): string =>
   `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// =============================================
-// PLANS DATA (6 PLANS)
-// =============================================
+const mapEconomicsPlanToAdminPlan = (
+  plan: Awaited<ReturnType<typeof systemApi.getPlanEconomics>>['economics']['plans'][number],
+): Plan => ({
+  id: plan.planId,
+  name: plan.name,
+  joiningFee: plan.fees.joiningFee,
+  teamSize: plan.fees.teamSize,
+  uplineCommission: plan.distributions.directUpline,
+  systemFee: plan.distributions.systemFee,
+  levelCommission: plan.distributions.levelCommission,
+  slotFee: plan.fees.slotFee,
+  totalCollection: plan.fees.totalCollection,
+  memberProfit: plan.distributions.memberProfit,
+  leaderPool: plan.distributions.pools.leader,
+  rewardPool: plan.distributions.pools.reward,
+  sponsorPool: plan.distributions.pools.sponsor,
+  roi: plan.fees.joiningFee > 0 ? Number(((plan.distributions.memberProfit / plan.fees.joiningFee) * 100).toFixed(2)) : 0,
+  flushoutDays: plan.flushout.days,
+  theme: PLAN_THEMES[plan.planId] || PLAN_THEMES[1],
+});
 
-const plansData: Plan[] = [
-  {
-    id: 1,
-    name: 'Foundation',
-    joiningFee: 5,
-    teamSize: 5,
-    uplineCommission: 1,
-    systemFee: 0.50,
-    levelCommission: 0.50,
-    slotFee: 3,
-    totalCollection: 15,
-    memberProfit: 12,
-    leaderPool: 1,
-    rewardPool: 0,
-    sponsorPool: 0,
-    roi: 240,
-    flushoutDays: 3,
-    theme: { primary: '#fbbf24', secondary: '#f59e0b', glow: 'rgba(251, 191, 36, 0.5)', bgGlow: 'rgba(251, 191, 36, 0.15)', text: '#fef3c7' },
-  },
-  {
-    id: 2,
-    name: 'Pro Builder',
-    joiningFee: 10,
-    teamSize: 6,
-    uplineCommission: 2,
-    systemFee: 1,
-    levelCommission: 1,
-    slotFee: 6,
-    totalCollection: 38,
-    memberProfit: 30,
-    leaderPool: 2,
-    rewardPool: 2,
-    sponsorPool: 0,
-    roi: 300,
-    flushoutDays: 8,
-    theme: { primary: '#22d3ee', secondary: '#0ea5e9', glow: 'rgba(34, 211, 238, 0.5)', bgGlow: 'rgba(34, 211, 238, 0.15)', text: '#cffafe' },
-  },
-  {
-    id: 3,
-    name: 'Cyber Elite',
-    joiningFee: 20,
-    teamSize: 7,
-    uplineCommission: 4,
-    systemFee: 1,
-    levelCommission: 2,
-    slotFee: 13,
-    totalCollection: 94,
-    memberProfit: 80,
-    leaderPool: 4,
-    rewardPool: 3,
-    sponsorPool: 0,
-    roi: 400,
-    flushoutDays: 16,
-    theme: { primary: '#34d399', secondary: '#10b981', glow: 'rgba(52, 211, 153, 0.5)', bgGlow: 'rgba(52, 211, 153, 0.15)', text: '#d1fae5' },
-  },
-  {
-    id: 4,
-    name: 'AI Mastery',
-    joiningFee: 40,
-    teamSize: 8,
-    uplineCommission: 7,
-    systemFee: 1,
-    levelCommission: 4,
-    slotFee: 28,
-    totalCollection: 226,
-    memberProfit: 200,
-    leaderPool: 8,
-    rewardPool: 4,
-    sponsorPool: 2,
-    roi: 500,
-    flushoutDays: 25,
-    theme: { primary: '#e879f9', secondary: '#a855f7', glow: 'rgba(232, 121, 249, 0.5)', bgGlow: 'rgba(232, 121, 249, 0.15)', text: '#fae8ff' },
-  },
-  {
-    id: 5,
-    name: 'Quantum Leader',
-    joiningFee: 80,
-    teamSize: 8,
-    uplineCommission: 14,
-    systemFee: 2,
-    levelCommission: 8,
-    slotFee: 56,
-    totalCollection: 452,
-    memberProfit: 400,
-    leaderPool: 16,
-    rewardPool: 10,
-    sponsorPool: 2,
-    roi: 500,
-    flushoutDays: 40,
-    theme: { primary: '#f472b6', secondary: '#ec4899', glow: 'rgba(244, 114, 182, 0.5)', bgGlow: 'rgba(244, 114, 182, 0.15)', text: '#fce7f3' },
-  },
-  {
-    id: 6,
-    name: 'Supreme Visionary',
-    joiningFee: 160,
-    teamSize: 8,
-    uplineCommission: 32,
-    systemFee: 2,
-    levelCommission: 16,
-    slotFee: 110,
-    totalCollection: 890,
-    memberProfit: 800,
-    leaderPool: 24,
-    rewardPool: 12,
-    sponsorPool: 4,
-    roi: 500,
-    flushoutDays: 60,
-    theme: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
-  },
-];
+const PLAN_THEMES: Record<number, Plan['theme']> = {
+  1: { primary: '#fbbf24', secondary: '#f59e0b', glow: 'rgba(251, 191, 36, 0.5)', bgGlow: 'rgba(251, 191, 36, 0.15)', text: '#fef3c7' },
+  2: { primary: '#22d3ee', secondary: '#0ea5e9', glow: 'rgba(34, 211, 238, 0.5)', bgGlow: 'rgba(34, 211, 238, 0.15)', text: '#cffafe' },
+  3: { primary: '#34d399', secondary: '#10b981', glow: 'rgba(52, 211, 153, 0.5)', bgGlow: 'rgba(52, 211, 153, 0.15)', text: '#d1fae5' },
+  4: { primary: '#e879f9', secondary: '#a855f7', glow: 'rgba(232, 121, 249, 0.5)', bgGlow: 'rgba(232, 121, 249, 0.15)', text: '#fae8ff' },
+  5: { primary: '#f472b6', secondary: '#ec4899', glow: 'rgba(244, 114, 182, 0.5)', bgGlow: 'rgba(244, 114, 182, 0.15)', text: '#fce7f3' },
+  6: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
+};
 
 // =============================================
 // USERS DATA
@@ -488,30 +404,6 @@ function DashboardOverview({ token }: { token: string | null }) {
     return 'Pending';
   };
 
-  const toCsv = (rows: Array<Record<string, string | number | null | undefined>>) => {
-    if (rows.length === 0) return '';
-    const headers = Object.keys(rows[0]);
-    const escape = (value: string | number | null | undefined) => {
-      const raw = value === null || value === undefined ? '' : String(value);
-      const injectionSafe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-      const escaped = injectionSafe.replace(/"/g, '""');
-      return `"${escaped}"`;
-    };
-    return [headers.join(','), ...rows.map((row) => headers.map((header) => escape(row[header])).join(','))].join('\n');
-  };
-
-  const downloadCsv = (filename: string, content: string) => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  };
-
   const loadDashboard = useCallback(async () => {
     if (!token) {
       setDashboard(null);
@@ -558,7 +450,7 @@ function DashboardOverview({ token }: { token: string | null }) {
         allRows.push(...nextPage.withdrawals);
       }
 
-      const csv = toCsv(
+      const csv = buildCsv(
         allRows.map((item) => ({
           id: item.id,
           wallet: item.user.walletAddress,
@@ -595,7 +487,7 @@ function DashboardOverview({ token }: { token: string | null }) {
         allRows.push(...nextPage.flushouts);
       }
 
-      const csv = toCsv(
+      const csv = buildCsv(
         allRows.map((item) => ({
           id: item.id,
           wallet: item.wallet,
@@ -982,7 +874,7 @@ function UsersManagement() {
 // =============================================
 // PLANS MANAGEMENT COMPONENT
 // =============================================
-function PlansManagement({ token }: { token: string | null }) {
+function PlansManagement({ token, plans }: { token: string | null; plans: Plan[] }) {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1068,7 +960,7 @@ function PlansManagement({ token }: { token: string | null }) {
 
       {/* Plans Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {plansData.map((plan) => {
+        {plans.map((plan) => {
           const metrics = planMetricsMap.get(plan.id);
           const activeUsers = metrics?.activeUsers ?? 0;
           const maturedUsers = metrics?.maturedUsers ?? 0;
@@ -1335,12 +1227,18 @@ function PoolsManagement({ token }: { token: string | null }) {
       setError('Permission denied. Admin login required.');
       return;
     }
+    const confirmed = window.confirm(
+      scope === 'REWARD'
+        ? 'Confirm reward pool withdrawal? This action updates balances immediately.'
+        : 'Confirm all-pool withdrawal? This action updates balances immediately.',
+    );
+    if (!confirmed) return;
 
     setIsWithdrawing(scope);
     setWithdrawMessage(null);
     setError(null);
     try {
-      const response = await adminApi.withdrawPoolFunds(token, { scope });
+      const response = await adminApi.withdrawPoolFunds(token, { scope, confirmation: 'CONFIRM_POOL_WITHDRAW' });
       setWithdrawMessage(response.message);
       await loadPoolMetrics();
     } catch (err) {
@@ -1514,7 +1412,7 @@ function PoolsManagement({ token }: { token: string | null }) {
 // =============================================
 // FLUSHOUTS MANAGEMENT COMPONENT
 // =============================================
-function FlushoutsManagement({ token }: { token: string | null }) {
+function FlushoutsManagement({ token, plans }: { token: string | null; plans: Plan[] }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
@@ -1524,33 +1422,6 @@ function FlushoutsManagement({ token }: { token: string | null }) {
   const [manualEnrollmentId, setManualEnrollmentId] = useState('');
 
   const EXPORT_PAGE_SIZE = 500;
-
-  const toCsv = (rows: Array<Record<string, string | number | null | undefined>>) => {
-    if (rows.length === 0) return '';
-    const headers = Object.keys(rows[0]);
-    const escape = (value: string | number | null | undefined) => {
-      const raw = value === null || value === undefined ? '' : String(value);
-      const injectionSafe = /^[=+\-@]/.test(raw) ? `\t${raw}` : raw;
-      const escaped = injectionSafe.replace(/"/g, '""');
-      return `"${escaped}"`;
-    };
-    return [
-      headers.join(','),
-      ...rows.map((row) => headers.map((header) => escape(row[header])).join(',')),
-    ].join('\n');
-  };
-
-  const downloadCsv = (filename: string, content: string) => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  };
 
   const loadFlushouts = useCallback(async () => {
     if (!token) {
@@ -1593,7 +1464,7 @@ function FlushoutsManagement({ token }: { token: string | null }) {
         allRows.push(...nextPage.flushouts);
       }
 
-      const csv = toCsv(
+      const csv = buildCsv(
         allRows.map((item) => ({
           id: item.id,
           userId: item.userId,
@@ -1624,12 +1495,14 @@ function FlushoutsManagement({ token }: { token: string | null }) {
       setError('Permission denied. Admin login required.');
       return;
     }
+    const confirmed = window.confirm(`Confirm manual flushout for enrollment ${enrollmentId}?`);
+    if (!confirmed) return;
 
     setIsSubmittingManual(true);
     setError(null);
     setSuccess(null);
     try {
-      const response = await adminApi.manualFlushout(token, enrollmentId);
+      const response = await adminApi.manualFlushout(token, enrollmentId, { confirmation: 'CONFIRM_MANUAL_FLUSHOUT' });
       setSuccess(response.message || 'Manual flushout processed.');
       setManualEnrollmentId('');
       await loadFlushouts();
@@ -1700,7 +1573,7 @@ function FlushoutsManagement({ token }: { token: string | null }) {
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
         <h3 className="mb-4 text-lg font-semibold text-white">Flushout Schedule</h3>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          {plansData.map((plan) => (
+          {plans.map((plan) => (
             <div 
               key={plan.id} 
               className="rounded-xl border p-4 text-center"
@@ -2709,6 +2582,10 @@ function DailyIncomeManagement() {
 // =============================================
 export function SecurityLogs({ token }: { token: string | null }) {
   const [severityFilter, setSeverityFilter] = useState<'All' | 'Info' | 'Warning' | 'Critical'>('All');
+  const [actionFilter, setActionFilter] = useState('');
+  const [adminIdFilter, setAdminIdFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [logs, setLogs] = useState<Array<{
     id: string;
     timestamp: string;
@@ -2730,7 +2607,13 @@ export function SecurityLogs({ token }: { token: string | null }) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await adminApi.getAuditLogs(token, { limit: 100 });
+      const response = await adminApi.getAuditLogs(token, {
+        limit: 100,
+        action: actionFilter.trim() || undefined,
+        adminId: adminIdFilter.trim() || undefined,
+        from: fromDate ? new Date(`${fromDate}T00:00:00.000Z`).toISOString() : undefined,
+        to: toDate ? new Date(`${toDate}T23:59:59.999Z`).toISOString() : undefined,
+      });
       const mappedLogs = response.logs.map((log) => {
         const action = log.action.toUpperCase();
         const severity: 'Info' | 'Warning' | 'Critical' = action.includes('BLOCK') || action.includes('REJECT') || action.includes('DENIED')
@@ -2755,7 +2638,7 @@ export function SecurityLogs({ token }: { token: string | null }) {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [actionFilter, adminIdFilter, fromDate, toDate, token]);
 
   useEffect(() => {
     void loadAuditLogs();
@@ -2773,7 +2656,24 @@ export function SecurityLogs({ token }: { token: string | null }) {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Security Logs</h1>
           <p className="text-sm text-slate-400">Monitor system activity and security events</p>
         </div>
-        <button className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 w-full sm:w-auto">
+        <button
+          onClick={() =>
+            downloadCsv(
+              `admin-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`,
+              buildCsv(
+                filteredLogs.map((log) => ({
+                  timestamp: log.timestamp,
+                  action: log.action,
+                  user: log.user,
+                  details: log.details,
+                  severity: log.severity,
+                })),
+                ['timestamp', 'action', 'user', 'details', 'severity'],
+              ),
+            )
+          }
+          className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 w-full sm:w-auto"
+        >
           <Download className="h-4 w-4" />
           Export Logs
         </button>
@@ -2809,6 +2709,37 @@ export function SecurityLogs({ token }: { token: string | null }) {
           <option value="Warning" className="bg-[#0a0a0f]">Warning</option>
           <option value="Critical" className="bg-[#0a0a0f]">Critical</option>
         </select>
+        <input
+          value={actionFilter}
+          onChange={(e) => setActionFilter(e.target.value)}
+          placeholder="Action (e.g. POOL_DISTRIBUTED)"
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none"
+        />
+        <input
+          value={adminIdFilter}
+          onChange={(e) => setAdminIdFilter(e.target.value)}
+          placeholder="Admin ID"
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none"
+        />
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none"
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none"
+        />
+        <button
+          onClick={() => void loadAuditLogs()}
+          disabled={isLoading}
+          className="rounded-xl border border-cyan-400/30 bg-cyan-500/15 px-4 py-3 text-sm font-semibold text-cyan-200 disabled:opacity-60"
+        >
+          Apply Filters
+        </button>
       </div>
 
       {/* Logs Table */}
@@ -2957,6 +2888,7 @@ export function Settings({ token }: { token: string | null }) {
     try {
       const response = await adminApi.triggerKillSwitch(token, {
         reason: killReason.trim() || undefined,
+        confirmation: 'CONFIRM_KILL_SWITCH',
       });
       setKillResult(
         `Transfer initiated to ${response.transfer.destinationWallet} for ${formatUsd(response.transfer.amount)}.`,
@@ -3174,6 +3106,7 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [plansData, setPlansData] = useState<Plan[]>([]);
   const previousOverflow = useRef<string | null>(null);
   const effectiveToken = adminToken || walletToken;
 
@@ -3206,12 +3139,25 @@ export default function AdminPanel() {
     setAdminToken(null);
   }, []);
 
+  const loadPlanEconomics = useCallback(async () => {
+    try {
+      const response = await systemApi.getPlanEconomics();
+      setPlansData(response.economics.plans.map(mapEconomicsPlanToAdminPlan));
+    } catch {
+      setPlansData([]);
+    }
+  }, []);
+
   const restoreBodyOverflow = useCallback(() => {
     if (previousOverflow.current !== null) {
       document.body.style.overflow = previousOverflow.current;
       previousOverflow.current = null;
     }
   }, []);
+
+  useEffect(() => {
+    void loadPlanEconomics();
+  }, [loadPlanEconomics]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -3258,11 +3204,11 @@ export default function AdminPanel() {
       case 'users':
         return <UsersManagement />;
       case 'plans':
-        return <PlansManagement token={effectiveToken} />;
+        return <PlansManagement token={effectiveToken} plans={plansData} />;
       case 'pools':
         return <PoolsManagement token={effectiveToken} />;
       case 'flushouts':
-        return <FlushoutsManagement token={effectiveToken} />;
+        return <FlushoutsManagement token={effectiveToken} plans={plansData} />;
       case 'commissions':
         return <CommissionsManagement />;
       case 'gift-codes':

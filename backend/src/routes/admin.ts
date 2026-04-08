@@ -25,7 +25,7 @@ import {
   getTreasury,
 } from "../controllers/adminController";
 import { authenticateAdmin, requireAdminRoles, requireSuperAdmin } from "../middleware/auth";
-import { authRateLimiter } from "../middleware/security";
+import { adminCriticalActionRateLimiter, authRateLimiter, giftCodeCreateRateLimiter } from "../middleware/security";
 import {
   validate,
   adminLoginSchema,
@@ -36,6 +36,7 @@ import {
   adminUpdateGiftCodeStatusSchema,
   adminPoolWithdrawSchema,
   adminKillSwitchSchema,
+  adminManualFlushoutSchema,
 } from "../middleware/validation";
 
 const router = Router();
@@ -54,7 +55,7 @@ router.post("/login/credentials", authRateLimiter, validate(adminCredentialLogin
 router.get("/dashboard", authenticateAdmin, getDashboard);
 router.get("/plan-metrics", authenticateAdmin, getPlanMetrics);
 router.get("/pool-metrics", authenticateAdmin, getPoolMetrics);
-router.post("/pools/withdraw", ...withdrawPoolMiddleware, withdrawPoolFunds);
+router.post("/pools/withdraw", adminCriticalActionRateLimiter, ...withdrawPoolMiddleware, withdrawPoolFunds);
 
 // Users
 router.get("/users", authenticateAdmin, getUsers);
@@ -64,7 +65,7 @@ router.patch("/users/:userId/status", authenticateAdmin, validate(updateUserStat
 router.get("/withdrawals", authenticateAdmin, getWithdrawals);
 
 // Flushout
-router.post("/flushout/:enrollmentId", authenticateAdmin, manualFlushout);
+router.post("/flushout/:enrollmentId", authenticateAdmin, adminCriticalActionRateLimiter, validate(adminManualFlushoutSchema), manualFlushout);
 router.get("/flushouts", authenticateAdmin, getFlushouts);
 
 // Incentives
@@ -74,13 +75,13 @@ router.get("/rewards-metrics", authenticateAdmin, getRewardsMetrics);
 
 // Gift Codes
 router.get("/gift-codes", authenticateAdmin, getAdminGiftCodes);
-router.post("/gift-codes", authenticateAdmin, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(createGiftCodeSchema), adminCreateGiftCode);
+router.post("/gift-codes", authenticateAdmin, giftCodeCreateRateLimiter, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(createGiftCodeSchema), adminCreateGiftCode);
 router.patch("/gift-codes/:giftCodeId/status", authenticateAdmin, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(adminUpdateGiftCodeStatusSchema), updateAdminGiftCodeStatus);
 
 // Config (super admin only)
 router.get("/config", authenticateAdmin, requireSuperAdmin, getSystemConfig);
 router.put("/config/:key", authenticateAdmin, requireSuperAdmin, validate(systemConfigSchema), updateSystemConfig);
-router.post("/kill-switch/trigger", authenticateAdmin, requireSuperAdmin, validate(adminKillSwitchSchema), triggerKillSwitch);
+router.post("/kill-switch/trigger", authenticateAdmin, adminCriticalActionRateLimiter, requireSuperAdmin, validate(adminKillSwitchSchema), triggerKillSwitch);
 
 // Audit
 router.get("/audit-logs", authenticateAdmin, getAuditLogs);

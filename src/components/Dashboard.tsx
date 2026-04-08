@@ -1,9 +1,10 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { teamApi, usersApi } from '@/lib/api';
+import { systemApi, teamApi, usersApi } from '@/lib/api';
 import { getDirectReferralIncome, toSafeNonEmptyString, toSafeNonNegativeNumber } from '@/lib/referral';
 import { DashboardPoolMetrics, fetchDashboardPoolMetrics } from '@/lib/poolStats';
+import { exportCsv } from '@/utils/exportCsv';
 import {
   buildReferralRootNode,
   hasNestedDownline,
@@ -56,35 +57,35 @@ export interface PlanData {
   };
 }
 
-// =============================================
-// PLANS DATA (6 PLANS)
-// =============================================
-export const plansData: PlanData[] = [
-  {
-    level: 1, name: 'Foundation', joiningFee: 5, teamSize: 5, uplineCommission: 1, systemFee: 0.50, levelCommission: 0.50, slotFee: 3, totalCollection: 15, memberProfit: 12, leaderPool: 1, rewardPool: 0, sponsorPool: 0, roi: 240, flushoutDays: 3,
-    theme: { primary: '#fbbf24', secondary: '#f59e0b', glow: 'rgba(251, 191, 36, 0.5)', bgGlow: 'rgba(251, 191, 36, 0.15)', text: '#fef3c7' },
-  },
-  {
-    level: 2, name: 'Pro Builder', joiningFee: 10, teamSize: 6, uplineCommission: 2, systemFee: 1, levelCommission: 1, slotFee: 6, totalCollection: 36, memberProfit: 30, leaderPool: 2, rewardPool: 2, sponsorPool: 0, roi: 300, flushoutDays: 8,
-    theme: { primary: '#22d3ee', secondary: '#0ea5e9', glow: 'rgba(34, 211, 238, 0.5)', bgGlow: 'rgba(34, 211, 238, 0.15)', text: '#cffafe' },
-  },
-  {
-    level: 3, name: 'Cyber Elite', joiningFee: 20, teamSize: 7, uplineCommission: 4, systemFee: 1, levelCommission: 2, slotFee: 13, totalCollection: 91, memberProfit: 80, leaderPool: 4, rewardPool: 3, sponsorPool: 0, roi: 400, flushoutDays: 16,
-    theme: { primary: '#34d399', secondary: '#10b981', glow: 'rgba(52, 211, 153, 0.5)', bgGlow: 'rgba(52, 211, 153, 0.15)', text: '#d1fae5' },
-  },
-  {
-    level: 4, name: 'AI Mastery', joiningFee: 40, teamSize: 8, uplineCommission: 7, systemFee: 1, levelCommission: 4, slotFee: 28, totalCollection: 224, memberProfit: 200, leaderPool: 8, rewardPool: 4, sponsorPool: 2, roi: 500, flushoutDays: 25,
-    theme: { primary: '#e879f9', secondary: '#a855f7', glow: 'rgba(232, 121, 249, 0.5)', bgGlow: 'rgba(232, 121, 249, 0.15)', text: '#fae8ff' },
-  },
-  {
-    level: 5, name: 'Quantum Leader', joiningFee: 80, teamSize: 8, uplineCommission: 14, systemFee: 2, levelCommission: 8, slotFee: 56, totalCollection: 448, memberProfit: 400, leaderPool: 16, rewardPool: 10, sponsorPool: 2, roi: 500, flushoutDays: 40,
-    theme: { primary: '#f472b6', secondary: '#ec4899', glow: 'rgba(244, 114, 182, 0.5)', bgGlow: 'rgba(244, 114, 182, 0.15)', text: '#fce7f3' },
-  },
-  {
-    level: 6, name: 'Supreme Visionary', joiningFee: 160, teamSize: 8, uplineCommission: 32, systemFee: 2, levelCommission: 16, slotFee: 110, totalCollection: 880, memberProfit: 800, leaderPool: 24, rewardPool: 12, sponsorPool: 4, roi: 500, flushoutDays: 60,
-    theme: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
-  },
-];
+const mapEconomicsPlanToDashboardPlan = (
+  plan: Awaited<ReturnType<typeof systemApi.getPlanEconomics>>['economics']['plans'][number],
+): PlanData => ({
+  level: plan.planId,
+  name: plan.name,
+  joiningFee: plan.fees.joiningFee,
+  teamSize: plan.fees.teamSize,
+  uplineCommission: plan.distributions.directUpline,
+  systemFee: plan.distributions.systemFee,
+  levelCommission: plan.distributions.levelCommission,
+  slotFee: plan.fees.slotFee,
+  totalCollection: plan.fees.totalCollection,
+  memberProfit: plan.distributions.memberProfit,
+  leaderPool: plan.distributions.pools.leader,
+  rewardPool: plan.distributions.pools.reward,
+  sponsorPool: plan.distributions.pools.sponsor,
+  roi: plan.fees.joiningFee > 0 ? Number(((plan.distributions.memberProfit / plan.fees.joiningFee) * 100).toFixed(2)) : 0,
+  flushoutDays: plan.flushout.days,
+  theme: PLAN_THEMES[plan.planId] || PLAN_THEMES[1],
+});
+
+const PLAN_THEMES: Record<number, PlanData['theme']> = {
+  1: { primary: '#fbbf24', secondary: '#f59e0b', glow: 'rgba(251, 191, 36, 0.5)', bgGlow: 'rgba(251, 191, 36, 0.15)', text: '#fef3c7' },
+  2: { primary: '#22d3ee', secondary: '#0ea5e9', glow: 'rgba(34, 211, 238, 0.5)', bgGlow: 'rgba(34, 211, 238, 0.15)', text: '#cffafe' },
+  3: { primary: '#34d399', secondary: '#10b981', glow: 'rgba(52, 211, 153, 0.5)', bgGlow: 'rgba(52, 211, 153, 0.15)', text: '#d1fae5' },
+  4: { primary: '#e879f9', secondary: '#a855f7', glow: 'rgba(232, 121, 249, 0.5)', bgGlow: 'rgba(232, 121, 249, 0.15)', text: '#fae8ff' },
+  5: { primary: '#f472b6', secondary: '#ec4899', glow: 'rgba(244, 114, 182, 0.5)', bgGlow: 'rgba(244, 114, 182, 0.15)', text: '#fce7f3' },
+  6: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
+};
 
 export const skillLevels = [
   { level: 1, name: 'Foundation Explorer', title: 'Beginner', skills: ['HTML5 & CSS3', 'JavaScript Basics', 'Python Intro', 'Linux CLI', 'Git'], icon: BookOpen, theme: { primary: '#fbbf24', bgGlow: 'rgba(251, 191, 36, 0.15)' } },
@@ -1234,7 +1235,7 @@ const ReferPageContent = ({
 // =============================================
 // DETAILS PAGE CONTENT
 // =============================================
-const DetailsPageContent = ({ transactions }: { transactions: TransactionItem[] }) => (
+const DetailsPageContent = ({ transactions, plans }: { transactions: TransactionItem[]; plans: PlanData[] }) => (
   <div className="max-w-lg mx-auto">
     <div className="relative">
       <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-orange-500/15 blur-lg" />
@@ -1249,10 +1250,10 @@ const DetailsPageContent = ({ transactions }: { transactions: TransactionItem[] 
         <div className="mb-5">
           <h4 className="mb-3 text-sm font-semibold text-white">Active Plans</h4>
           <div className="space-y-2">
-            {[{ name: 'Foundation', invested: 5, profit: 12, color: '#fbbf24' }, { name: 'Pro Builder', invested: 10, profit: 30, color: '#22d3ee' }, { name: 'Cyber Elite', invested: 20, profit: 80, color: '#34d399' }].map((p, i) => (
+            {plans.slice(0, 3).map((p, i) => (
               <div key={i} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <div className="flex items-center gap-3"><div className="h-3 w-3 rounded-full" style={{ background: p.color }} /><span className="text-sm text-slate-200">{p.name}</span></div>
-                <div className="text-right"><span className="text-xs text-slate-400">${p.invested} → </span><span className="text-sm font-medium text-emerald-400">${p.profit}</span></div>
+                <div className="flex items-center gap-3"><div className="h-3 w-3 rounded-full" style={{ background: p.theme.primary }} /><span className="text-sm text-slate-200">{p.name}</span></div>
+                <div className="text-right"><span className="text-xs text-slate-400">${p.joiningFee} → </span><span className="text-sm font-medium text-emerald-400">${p.memberProfit}</span></div>
               </div>
             ))}
           </div>
@@ -1262,14 +1263,11 @@ const DetailsPageContent = ({ transactions }: { transactions: TransactionItem[] 
             <h4 className="text-sm font-semibold text-white">Recent Activity</h4>
             <button 
               onClick={() => {
-                const csv = 'Type,Amount,Time\n' + transactions.map(tx => `${tx.type},${tx.amount},${tx.time}`).join('\n');
-                const blob = new Blob([csv], { type: 'text/csv' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'transactions.csv';
-                a.click();
-                URL.revokeObjectURL(url);
+                exportCsv(
+                  'transactions.csv',
+                  transactions.map((tx) => ({ type: tx.type, amount: tx.amount, time: tx.time })),
+                  ['type', 'amount', 'time'],
+                );
               }}
               className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-3 py-1.5 text-[10px] font-bold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all"
             >
@@ -1306,6 +1304,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   const [subView, setSubView] = useState<'none' | 'details' | 'withdrawal' | 'refer'>('none');
   const [showSkills, setShowSkills] = useState(false);
   const [liveTransactions, setLiveTransactions] = useState<TransactionItem[]>([]);
+  const [economicsPlans, setEconomicsPlans] = useState<PlanData[]>([]);
   const [referralData, setReferralData] = useState<ReferralInsightsData | null>(null);
   const [isReferralLoading, setIsReferralLoading] = useState(false);
   const [referralError, setReferralError] = useState<string | null>(null);
@@ -1404,10 +1403,22 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
   }, [token]);
 
   useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        const response = await systemApi.getPlanEconomics();
+        setEconomicsPlans(response.economics.plans.map(mapEconomicsPlanToDashboardPlan));
+      } catch {
+        setEconomicsPlans([]);
+      }
+    };
+    void loadPlans();
+  }, []);
+
+  useEffect(() => {
     void loadReferralData();
   }, [loadReferralData]);
 
-  const activePlans: PlanData[] = plansData;
+  const activePlans: PlanData[] = economicsPlans;
   const activeTransactions = liveTransactions;
   const balance = Number(user?.balance || 0);
   const formatStatValue = useCallback(
@@ -1488,7 +1499,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
 
             {subView === 'details' && (
               <div className="overflow-x-auto -mx-3 px-3">
-                <DetailsPageContent transactions={activeTransactions} />
+                <DetailsPageContent transactions={activeTransactions} plans={activePlans} />
               </div>
             )}
             {subView === 'withdrawal' && <WithdrawalPageContent balance={balance} />}

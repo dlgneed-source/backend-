@@ -104,10 +104,22 @@ export const systemConfigSchema = z.object({
 export const adminPoolWithdrawSchema = z.object({
   scope: z.enum(["REWARD", "ALL"]),
   amount: z.number().positive("Amount must be positive").optional(),
+  confirmation: z.literal("CONFIRM_POOL_WITHDRAW", {
+    errorMap: () => ({ message: "Pool withdraw confirmation is required" }),
+  }),
 });
 
 export const adminKillSwitchSchema = z.object({
   reason: z.string().trim().max(500).optional(),
+  confirmation: z.literal("CONFIRM_KILL_SWITCH", {
+    errorMap: () => ({ message: "Kill switch confirmation is required" }),
+  }),
+});
+
+export const adminManualFlushoutSchema = z.object({
+  confirmation: z.literal("CONFIRM_MANUAL_FLUSHOUT", {
+    errorMap: () => ({ message: "Manual flushout confirmation is required" }),
+  }),
 });
 
 // =============================================

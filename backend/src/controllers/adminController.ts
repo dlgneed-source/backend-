@@ -12,6 +12,7 @@ import { verifyWalletSignature, generateSignInMessage } from "../utils/eip712";
 import { processFlushout } from "../utils/flushoutLogic";
 import { v4 as uuidv4 } from "uuid";
 import { isValidWalletAddress } from "../middleware/security";
+import { buildAuditLogWhere } from "../utils/auditLogFilters";
 
 const prisma = new PrismaClient();
 const MAX_FLUSHOUTS_PAGE_SIZE = 5000;
@@ -439,7 +440,11 @@ export async function getPoolMetrics(req: AuthenticatedRequest, res: Response): 
  * POST /admin/pools/withdraw
  */
 export async function withdrawPoolFunds(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { scope, amount } = req.body as { scope: "REWARD" | "ALL"; amount?: number };
+  const { scope, amount, confirmation } = req.body as { scope: "REWARD" | "ALL"; amount?: number; confirmation: string };
+  if (confirmation !== "CONFIRM_POOL_WITHDRAW") {
+    res.status(400).json({ success: false, message: "Pool withdraw confirmation missing" });
+    return;
+  }
   const poolTypeFilter: PoolType | null = scope === "REWARD" ? "REWARD" : null;
   const scopeLabel = scope === "REWARD" ? "reward pools" : "all pools";
   const ledgerDescription = scope === "REWARD" ? "Admin reward pool withdrawal" : "Admin all-pool withdrawal";
@@ -738,6 +743,12 @@ export async function getFlushouts(req: AuthenticatedRequest, res: Response): Pr
  */
 export async function manualFlushout(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { enrollmentId } = req.params;
+  const { confirmation } = req.body as { confirmation: string };
+
+  if (confirmation !== "CONFIRM_MANUAL_FLUSHOUT") {
+    res.status(400).json({ success: false, message: "Manual flushout confirmation missing" });
+    return;
+  }
 
   try {
     const result = await processFlushout(enrollmentId);
@@ -953,7 +964,12 @@ export async function getRewardsMetrics(req: AuthenticatedRequest, res: Response
  * Initiates emergency treasury transfer flow to configured admin wallet.
  */
 export async function triggerKillSwitch(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { reason } = req.body as { reason?: string };
+  const { reason, confirmation } = req.body as { reason?: string; confirmation: string };
+
+  if (confirmation !== "CONFIRM_KILL_SWITCH") {
+    res.status(400).json({ success: false, message: "Kill switch confirmation missing" });
+    return;
+  }
 
   try {
     const walletConfig = await prisma.systemConfig.findUnique({
@@ -1331,16 +1347,14 @@ export async function updateAdminGiftCodeStatus(req: AuthenticatedRequest, res: 
       },
     });
 
-    if (status === "DISABLED") {
-      await prisma.auditLog.create({
-        data: {
-          adminId: req.admin!.id,
-          action: "GIFT_CODE_DISABLED",
-          description: `Gift code ${updated.code} disabled`,
-          metadata: { giftCodeId: updated.id, fromStatus: giftCode.status, toStatus: status },
-        },
-      });
-    }
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.id,
+        action: "GIFT_CODE_DISABLED",
+        description: `Gift code ${updated.code} status changed from ${giftCode.status} to ${status}`,
+        metadata: { giftCodeId: updated.id, fromStatus: giftCode.status, toStatus: status },
+      },
+    });
 
     res.json({
       success: true,
@@ -1421,10 +1435,29 @@ export async function getAuditLogs(req: AuthenticatedRequest, res: Response): Pr
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 50;
   const skip = (page - 1) * limit;
+  const action = (req.query.action as string | undefined)?.trim();
+  const adminId = (req.query.adminId as string | undefined)?.trim();
+  const from = (req.query.from as string | undefined)?.trim();
+  const to = (req.query.to as string | undefined)?.trim();
 
   try {
+    let where: ReturnType<typeof buildAuditLogWhere>;
+    try {
+      where = buildAuditLogWhere({ action, adminId, from, to });
+    } catch (error) {
+      const messageByCode: Record<string, string> = {
+        INVALID_ACTION_FILTER: "Invalid action filter",
+        INVALID_FROM_DATE: "Invalid from date",
+        INVALID_TO_DATE: "Invalid to date",
+      };
+      const code = error instanceof Error ? error.message : "";
+      res.status(400).json({ success: false, message: messageByCode[code] || "Invalid audit log filters" });
+      return;
+    }
+
     const [logs, total] = await Promise.all([
       prisma.auditLog.findMany({
+        where,
         include: {
           admin: { select: { walletAddress: true, name: true } },
           user: { select: { walletAddress: true, name: true } },
@@ -1433,7 +1466,7 @@ export async function getAuditLogs(req: AuthenticatedRequest, res: Response): Pr
         skip,
         take: limit,
       }),
-      prisma.auditLog.count(),
+      prisma.auditLog.count({ where }),
     ]);
 
     res.json({ success: true, logs, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
