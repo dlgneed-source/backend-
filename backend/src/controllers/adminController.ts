@@ -14,6 +14,52 @@ import { isValidWalletAddress } from "../middleware/security";
 
 const prisma = new PrismaClient();
 
+async function getManualFlushoutEnrollmentIds(enrollmentIds: string[]): Promise<Set<string>> {
+  if (enrollmentIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const logs = await prisma.auditLog.findMany({
+    where: {
+      action: "ENROLLMENT_FLUSHED",
+      description: { contains: "Manual flushout", mode: "insensitive" },
+    },
+    select: {
+      metadata: true,
+      description: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 10000,
+  });
+
+  const idSet = new Set<string>(enrollmentIds);
+  const manualIds = new Set<string>();
+
+  logs.forEach((log) => {
+    let enrollmentId: string | undefined;
+
+    if (log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)) {
+      const value = (log.metadata as Record<string, unknown>).enrollmentId;
+      if (typeof value === "string") {
+        enrollmentId = value;
+      }
+    }
+
+    if (!enrollmentId) {
+      const matched = log.description.match(/#([a-zA-Z0-9]+)/);
+      if (matched?.[1]) {
+        enrollmentId = matched[1];
+      }
+    }
+
+    if (enrollmentId && idSet.has(enrollmentId)) {
+      manualIds.add(enrollmentId);
+    }
+  });
+
+  return manualIds;
+}
+
 // =============================================
 // ADMIN AUTH
 // =============================================
@@ -174,6 +220,8 @@ export async function getDashboard(req: AuthenticatedRequest, res: Response): Pr
       };
     });
 
+    const manualFlushoutIds = await getManualFlushoutEnrollmentIds(recentFlushouts.map((record) => record.id));
+
     res.json({
       success: true,
       dashboard: {
@@ -209,7 +257,7 @@ export async function getDashboard(req: AuthenticatedRequest, res: Response): Pr
           planName: record.plan.name,
           amount: record.plan.memberProfit,
           flushedAt: record.flushoutAt ?? record.updatedAt,
-          type: "Auto",
+          type: manualFlushoutIds.has(record.id) ? "Manual" : "Auto",
         })),
       },
     });
@@ -341,7 +389,7 @@ export async function getFlushouts(req: AuthenticatedRequest, res: Response): Pr
 
   try {
     const where = {
-      OR: [{ status: "FLUSHED" as const }, { flushoutAt: { not: null as Date | null } }],
+      OR: [{ status: "FLUSHED" as const }, { flushoutAt: { not: null } }],
     };
 
     const [flushouts, total] = await Promise.all([
@@ -358,6 +406,8 @@ export async function getFlushouts(req: AuthenticatedRequest, res: Response): Pr
       prisma.enrollment.count({ where }),
     ]);
 
+    const manualFlushoutIds = await getManualFlushoutEnrollmentIds(flushouts.map((record) => record.id));
+
     res.json({
       success: true,
       flushouts: flushouts.map((record) => ({
@@ -369,7 +419,7 @@ export async function getFlushouts(req: AuthenticatedRequest, res: Response): Pr
         planName: record.plan.name,
         amount: record.plan.memberProfit,
         flushedAt: record.flushoutAt ?? record.updatedAt,
-        type: "Auto",
+        type: manualFlushoutIds.has(record.id) ? "Manual" : "Auto",
       })),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
