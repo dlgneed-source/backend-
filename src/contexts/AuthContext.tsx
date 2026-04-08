@@ -62,6 +62,11 @@ function buildMetaMaskMobileAppLink(): string {
   return `${METAMASK_MOBILE_APP_LINK_BASE}${encodeURIComponent(dappUrl)}`;
 }
 
+function redirectToMetaMaskMobileApp(): void {
+  if (import.meta.env.MODE === 'test') return;
+  window.location.assign(buildMetaMaskMobileAppLink());
+}
+
 function normalizeAddress(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const address = value.trim().toLowerCase();
@@ -148,10 +153,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const provider = getProvider();
     if (!provider) {
       if (isMobileDevice()) {
-        const message = 'MetaMask extension not found. Redirecting to MetaMask app...';
-        setWalletError(message);
+        const message = 'MetaMask not found. Redirecting to MetaMask app...';
+        setWalletError(null);
         toast.info(message);
-        window.location.assign(buildMetaMaskMobileAppLink());
+        redirectToMetaMaskMobileApp();
         return false;
       }
 
