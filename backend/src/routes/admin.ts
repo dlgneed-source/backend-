@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getAdminNonce,
   adminLogin,
+  adminCredentialLogin,
   getDashboard,
   getPlanMetrics,
   getPoolMetrics,
@@ -28,6 +29,7 @@ import { authRateLimiter } from "../middleware/security";
 import {
   validate,
   adminLoginSchema,
+  adminCredentialLoginSchema,
   updateUserStatusSchema,
   systemConfigSchema,
   createGiftCodeSchema,
@@ -46,6 +48,7 @@ const withdrawPoolMiddleware = [
 // Auth
 router.get("/nonce/:walletAddress", authRateLimiter, getAdminNonce);
 router.post("/login", authRateLimiter, validate(adminLoginSchema), adminLogin);
+router.post("/login/credentials", authRateLimiter, validate(adminCredentialLoginSchema), adminCredentialLogin);
 
 // Dashboard
 router.get("/dashboard", authenticateAdmin, getDashboard);

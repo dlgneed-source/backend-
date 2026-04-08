@@ -5,6 +5,7 @@
 
 import { Request, Response } from "express";
 import { PoolType, PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { generateAdminToken } from "../middleware/auth";
 import { verifyWalletSignature, generateSignInMessage } from "../utils/eip712";
@@ -146,6 +147,53 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
     res.json({ success: true, token, admin: { id: admin.id, walletAddress: admin.walletAddress, role: admin.role } });
   } catch (err) {
     res.status(500).json({ success: false, message: "Admin login failed" });
+  }
+}
+
+/**
+ * POST /admin/login/credentials
+ */
+export async function adminCredentialLogin(req: Request, res: Response): Promise<void> {
+  const { loginId, password } = req.body as { loginId: string; password: string };
+
+  try {
+    const normalizedLoginId = loginId.trim().toLowerCase();
+
+    const admin = await prisma.admin.findFirst({
+      where: { email: normalizedLoginId },
+    });
+
+    if (!admin || !admin.isActive || !admin.passwordHash) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, admin.passwordHash);
+    if (!isPasswordValid) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+
+    await prisma.admin.update({
+      where: { id: admin.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const token = generateAdminToken(admin.id, admin.walletAddress, admin.role);
+
+    res.json({
+      success: true,
+      token,
+      admin: {
+        id: admin.id,
+        walletAddress: admin.walletAddress,
+        role: admin.role,
+        loginId: admin.email,
+      },
+      authMethod: "credentials",
+    });
+  } catch {
+    res.status(500).json({ success: false, message: "Admin credential login failed" });
   }
 }
 

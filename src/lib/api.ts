@@ -224,6 +224,22 @@ export const communityApi = {
 };
 
 export const adminApi = {
+  loginWithCredentials: (loginId: string, password: string) =>
+    apiRequest<{
+      success: boolean;
+      token: string;
+      admin: {
+        id: string;
+        walletAddress: string;
+        role: string;
+        loginId?: string | null;
+      };
+      authMethod: 'credentials';
+    }>('/api/admin/login/credentials', {
+      method: 'POST',
+      body: { loginId, password },
+    }),
+
   getDashboard: (token: string) =>
     apiRequest<{
       success: boolean;

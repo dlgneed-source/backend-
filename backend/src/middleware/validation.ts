@@ -43,6 +43,11 @@ export const adminLoginSchema = z.object({
   signature: z.string().min(1, "Signature required"),
 });
 
+export const adminCredentialLoginSchema = z.object({
+  loginId: z.string().trim().min(1, "Login ID required").max(100, "Login ID too long"),
+  password: z.string().min(1, "Password required").max(200, "Password too long"),
+});
+
 // =============================================
 // ENROLLMENT SCHEMAS
 // =============================================

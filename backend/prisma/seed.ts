@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -250,12 +251,21 @@ async function main() {
   // SEED SUPER ADMIN
   // =============================================
   const adminWallet = process.env.ADMIN_WALLET || "0x0000000000000000000000000000000000000001";
+  const adminLoginId = (process.env.ADMIN_LOGIN_ID || "Dramirkhan").trim().toLowerCase();
+  const adminLoginPassword = process.env.ADMIN_LOGIN_PASSWORD || "Dramir1234";
+  const passwordHash = await bcrypt.hash(adminLoginPassword, 12);
   await prisma.admin.upsert({
     where: { walletAddress: adminWallet },
-    update: {},
+    update: {
+      email: adminLoginId,
+      passwordHash,
+      isActive: true,
+    },
     create: {
       walletAddress: adminWallet,
       name: "Super Admin",
+      email: adminLoginId,
+      passwordHash,
       role: "SUPER_ADMIN",
       isActive: true,
     },
