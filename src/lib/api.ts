@@ -317,6 +317,7 @@ export const adminApi = {
       };
     }>('/api/admin/pool-metrics', { token }),
 
+  // If amount is omitted, backend withdraws the full available balance for the selected scope.
   withdrawPoolFunds: (token: string, payload: { scope: 'REWARD' | 'ALL'; amount?: number }) =>
     apiRequest<{
       success: boolean;

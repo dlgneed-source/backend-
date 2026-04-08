@@ -14,6 +14,7 @@ import { isValidWalletAddress } from "../middleware/security";
 
 const prisma = new PrismaClient();
 const MAX_FLUSHOUTS_PAGE_SIZE = 5000;
+const CURRENCY_PRECISION = 6;
 
 function extractEnrollmentIdFromManualFlushoutLog(log: { metadata: unknown; description: string }): string | undefined {
   if (log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)) {
@@ -389,11 +390,13 @@ export async function getPoolMetrics(req: AuthenticatedRequest, res: Response): 
  */
 export async function withdrawPoolFunds(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { scope, amount } = req.body as { scope: "REWARD" | "ALL"; amount?: number };
-  const targetType: PoolType | null = scope === "REWARD" ? "REWARD" : null;
+  const poolTypeFilter: PoolType | null = scope === "REWARD" ? "REWARD" : null;
+  const scopeLabel = scope === "REWARD" ? "reward pools" : "all pools";
+  const ledgerDescription = scope === "REWARD" ? "Admin reward pool withdrawal" : "Admin all-pool withdrawal";
 
   try {
-    const candidatePools = await prisma.pool.findMany({
-      where: targetType ? { type: targetType } : undefined,
+    const rawPools = await prisma.pool.findMany({
+      where: poolTypeFilter ? { type: poolTypeFilter } : undefined,
       orderBy: [{ balance: "desc" }, { id: "asc" }],
       select: {
         id: true,
@@ -401,8 +404,12 @@ export async function withdrawPoolFunds(req: AuthenticatedRequest, res: Response
         balance: true,
       },
     });
+    const candidatePools = rawPools.map((pool) => ({
+      ...pool,
+      numericBalance: Number(pool.balance) || 0,
+    }));
 
-    const totalAvailable = candidatePools.reduce((sum, pool) => sum + (Number(pool.balance) || 0), 0);
+    const totalAvailable = candidatePools.reduce((sum, pool) => sum + pool.numericBalance, 0);
     if (candidatePools.length === 0 || totalAvailable <= 0) {
       res.status(400).json({ success: false, message: "No pool balance available for withdrawal" });
       return;
@@ -425,7 +432,7 @@ export async function withdrawPoolFunds(req: AuthenticatedRequest, res: Response
       for (const pool of candidatePools) {
         if (remaining <= 0) break;
 
-        const poolBalance = Number(pool.balance) || 0;
+        const poolBalance = pool.numericBalance;
         if (poolBalance <= 0) continue;
 
         const deductAmount = Math.min(poolBalance, remaining);
@@ -442,18 +449,18 @@ export async function withdrawPoolFunds(req: AuthenticatedRequest, res: Response
         updatedPools.push({
           poolId: pool.id,
           type: pool.type,
-          withdrawnAmount: Number(deductAmount.toFixed(6)),
-          balanceAfter: Number(newBalance.toFixed(6)),
+          withdrawnAmount: Number(deductAmount.toFixed(CURRENCY_PRECISION)),
+          balanceAfter: Number(newBalance.toFixed(CURRENCY_PRECISION)),
         });
 
-        remaining = Number((remaining - deductAmount).toFixed(6));
+        remaining -= deductAmount;
       }
 
       let treasury = await tx.treasury.findFirst();
       if (!treasury) {
         treasury = await tx.treasury.create({ data: {} });
       }
-      const nextTreasuryBalance = Number((treasury.balance - withdrawalAmount).toFixed(6));
+      const nextTreasuryBalance = Number((Number(treasury.balance) - withdrawalAmount).toFixed(CURRENCY_PRECISION));
 
       const updatedTreasury = await tx.treasury.update({
         where: { id: treasury.id },
@@ -469,7 +476,7 @@ export async function withdrawPoolFunds(req: AuthenticatedRequest, res: Response
           credit: 0,
           debit: withdrawalAmount,
           balance: nextTreasuryBalance,
-          description: scope === "REWARD" ? "Admin reward pool withdrawal" : "Admin all-pool withdrawal",
+          description: ledgerDescription,
           metadata: {
             scope,
             affectedPools: updatedPools.map((pool) => ({ poolId: pool.poolId, amount: pool.withdrawnAmount })),
@@ -481,12 +488,10 @@ export async function withdrawPoolFunds(req: AuthenticatedRequest, res: Response
         data: {
           adminId: req.admin!.id,
           action: "POOL_DISTRIBUTED",
-          description: scope === "REWARD"
-            ? `Admin withdrew ${withdrawalAmount.toFixed(6)} from reward pools`
-            : `Admin withdrew ${withdrawalAmount.toFixed(6)} from all pools`,
+          description: `Admin withdrew ${withdrawalAmount.toFixed(CURRENCY_PRECISION)} from ${scopeLabel}`,
           metadata: {
             scope,
-            withdrawalAmount: Number(withdrawalAmount.toFixed(6)),
+            withdrawalAmount: Number(withdrawalAmount.toFixed(CURRENCY_PRECISION)),
             affectedPools: updatedPools,
           },
         },
@@ -500,8 +505,8 @@ export async function withdrawPoolFunds(req: AuthenticatedRequest, res: Response
       message: scope === "REWARD" ? "Reward pool withdrawal completed" : "All pool withdrawal completed",
       withdrawal: {
         scope,
-        requestedAmount: Number(withdrawalAmount.toFixed(6)),
-        withdrawnAmount: Number(withdrawalAmount.toFixed(6)),
+        requestedAmount: Number(withdrawalAmount.toFixed(CURRENCY_PRECISION)),
+        withdrawnAmount: Number(withdrawalAmount.toFixed(CURRENCY_PRECISION)),
         affectedPools: breakdown,
       },
     });

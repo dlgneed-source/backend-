@@ -34,6 +34,11 @@ import {
 } from "../middleware/validation";
 
 const router = Router();
+const withdrawPoolMiddleware = [
+  authenticateAdmin,
+  requireAdminRoles(["SUPER_ADMIN", "ADMIN"]),
+  validate(adminPoolWithdrawSchema),
+] as const;
 
 // Auth
 router.get("/nonce/:walletAddress", authRateLimiter, getAdminNonce);
@@ -43,7 +48,7 @@ router.post("/login", authRateLimiter, validate(adminLoginSchema), adminLogin);
 router.get("/dashboard", authenticateAdmin, getDashboard);
 router.get("/plan-metrics", authenticateAdmin, getPlanMetrics);
 router.get("/pool-metrics", authenticateAdmin, getPoolMetrics);
-router.post("/pools/withdraw", authenticateAdmin, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(adminPoolWithdrawSchema), withdrawPoolFunds);
+router.post("/pools/withdraw", ...withdrawPoolMiddleware, withdrawPoolFunds);
 
 // Users
 router.get("/users", authenticateAdmin, getUsers);

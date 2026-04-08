@@ -71,7 +71,7 @@ interface User {
 
 interface Pool {
   id: string;
-  name: string;
+  displayName: string;
   planId: number;
   balance: number;
   totalDistributed: number;
@@ -100,6 +100,9 @@ interface KIMILevel {
   usersCount: number;
   totalEarnings: number;
 }
+
+const formatUsd = (value: number | null | undefined): string =>
+  `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // =============================================
 // PLANS DATA (6 PLANS)
@@ -484,9 +487,7 @@ function DashboardOverview({ token }: { token: string | null }) {
     }>;
   } | null>(null);
 
-  const formatMoney = useCallback((value: number) => (
-    `$${Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}`
-  ), []);
+  const formatMoney = formatUsd;
 
   const normalizeStatus = (status: string): RequestStatus => {
     const normalized = status.toUpperCase();
@@ -1007,9 +1008,6 @@ function PlansManagement() {
     adoptionRate: number;
   }>>([]);
 
-  const formatMoney = (value: number) =>
-    `$${Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}`;
-
   const loadPlanMetrics = useCallback(async () => {
     if (!token) {
       setPlanMetrics([]);
@@ -1148,7 +1146,7 @@ function PlansManagement() {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-400">Total Revenue</span>
-                  <span className="font-medium" style={{ color: plan.theme.primary }}>{formatMoney(totalRevenue)}</span>
+                  <span className="font-medium" style={{ color: plan.theme.primary }}>{formatUsd(totalRevenue)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-400">Plan Adoption</span>
@@ -1270,9 +1268,6 @@ function PoolsManagement() {
     systemFund: 0,
   });
 
-  const formatMoney = (value: number | null | undefined): string =>
-    `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
   const loadPoolMetrics = useCallback(async () => {
     if (!token) {
       setPools([]);
@@ -1283,32 +1278,56 @@ function PoolsManagement() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await adminApi.getPoolMetrics(token);
-      const nextPools: Pool[] = response.pools.map((pool) => {
-        const baseTheme = pool.type === 'SYSTEM'
-          ? { primary: '#22d3ee', bg: 'bg-cyan-500/10', border: 'rgba(34,211,238,0.35)' }
-          : pool.type === 'LEADER'
-            ? { primary: '#f59e0b', bg: 'bg-amber-500/10', border: 'rgba(245,158,11,0.35)' }
-            : pool.type === 'REWARD'
-              ? { primary: '#a855f7', bg: 'bg-purple-500/10', border: 'rgba(168,85,247,0.35)' }
-              : { primary: '#34d399', bg: 'bg-emerald-500/10', border: 'rgba(52,211,153,0.35)' };
+      const getPoolPresentation = (type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR') => {
+        switch (type) {
+          case 'SYSTEM':
+            return {
+              theme: { primary: '#22d3ee', bg: 'bg-cyan-500/10', border: 'rgba(34,211,238,0.35)' },
+              label: 'System Fund',
+            };
+          case 'LEADER':
+            return {
+              theme: { primary: '#f59e0b', bg: 'bg-amber-500/10', border: 'rgba(245,158,11,0.35)' },
+              label: 'Leader Pool',
+            };
+          case 'REWARD':
+            return {
+              theme: { primary: '#a855f7', bg: 'bg-purple-500/10', border: 'rgba(168,85,247,0.35)' },
+              label: 'Reward Pool',
+            };
+          default:
+            return {
+              theme: { primary: '#34d399', bg: 'bg-emerald-500/10', border: 'rgba(52,211,153,0.35)' },
+              label: 'Sponsor Pool',
+            };
+        }
+      };
 
-        const typeLabel = pool.type === 'SYSTEM'
-          ? 'System Fund'
-          : pool.type === 'LEADER'
-            ? 'Leader Pool'
-            : pool.type === 'REWARD'
-              ? 'Reward Pool'
-              : 'Sponsor Pool';
+      const response = await adminApi.getPoolMetrics(token);
+      const mapPoolType = (type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR'): Pool['type'] => {
+        switch (type) {
+          case 'SYSTEM':
+            return 'System';
+          case 'LEADER':
+            return 'Leader';
+          case 'REWARD':
+            return 'Reward';
+          default:
+            return 'Sponsor';
+        }
+      };
+
+      const nextPools: Pool[] = response.pools.map((pool) => {
+        const presentation = getPoolPresentation(pool.type);
 
         return {
           id: pool.id,
           planId: pool.planId,
-          name: `${pool.planName} • ${typeLabel}`,
+          displayName: `${pool.planName} • ${presentation.label}`,
           balance: pool.balance,
           totalDistributed: pool.totalDistributed,
-          type: pool.type === 'SYSTEM' ? 'System' : pool.type === 'LEADER' ? 'Leader' : pool.type === 'REWARD' ? 'Reward' : 'Sponsor',
-          theme: baseTheme,
+          type: mapPoolType(pool.type),
+          theme: presentation.theme,
         };
       });
 
@@ -1367,8 +1386,8 @@ function PoolsManagement() {
           <Database className="h-5 w-5" style={{ color: pool.theme.primary }} />
         </div>
         <div>
-          <p className="text-xs text-slate-400">{pool.name}</p>
-          <p className="font-mono text-xl font-semibold text-white">{formatMoney(pool.balance)}</p>
+          <p className="text-xs text-slate-400">{pool.displayName}</p>
+          <p className="font-mono text-xl font-semibold text-white">{formatUsd(pool.balance)}</p>
         </div>
       </div>
       <div className="space-y-1 text-xs">
@@ -1378,7 +1397,7 @@ function PoolsManagement() {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-slate-500">Total Distributed</span>
-          <span className="font-medium text-emerald-400">{formatMoney(pool.totalDistributed)}</span>
+          <span className="font-medium text-emerald-400">{formatUsd(pool.totalDistributed)}</span>
         </div>
       </div>
     </motion.div>
@@ -1393,27 +1412,27 @@ function PoolsManagement() {
           <p className="text-sm text-slate-400">Manage all treasury pools and distributions</p>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 px-3 sm:px-4 py-2">
-          <p className="text-[10px] sm:text-xs text-slate-500">System Fund (All Fund)</p>
-          <p className="font-mono text-lg sm:text-xl font-bold text-emerald-400">{formatMoney(totals.systemFund)}</p>
+          <p className="text-[10px] sm:text-xs text-slate-500">All Fund (System Fund)</p>
+          <p className="font-mono text-lg sm:text-xl font-bold text-emerald-400">{formatUsd(totals.systemFund)}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
           <p className="text-[10px] text-slate-500">All Fund</p>
-          <p className="text-lg font-bold text-white">{formatMoney(totals.allFund)}</p>
+          <p className="text-lg font-bold text-white">{formatUsd(totals.allFund)}</p>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
           <p className="text-[10px] text-slate-500">Leader Pool</p>
-          <p className="text-lg font-bold text-amber-300">{formatMoney(totals.leaderPool)}</p>
+          <p className="text-lg font-bold text-amber-300">{formatUsd(totals.leaderPool)}</p>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
           <p className="text-[10px] text-slate-500">Reward Pool</p>
-          <p className="text-lg font-bold text-purple-300">{formatMoney(totals.rewardPool)}</p>
+          <p className="text-lg font-bold text-purple-300">{formatUsd(totals.rewardPool)}</p>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
           <p className="text-[10px] text-slate-500">Sponsor Pool</p>
-          <p className="text-lg font-bold text-emerald-300">{formatMoney(totals.sponsorPool)}</p>
+          <p className="text-lg font-bold text-emerald-300">{formatUsd(totals.sponsorPool)}</p>
         </div>
       </div>
 
