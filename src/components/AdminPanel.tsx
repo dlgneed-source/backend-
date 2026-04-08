@@ -226,8 +226,6 @@ const usersData: User[] = [];
 // POOLS DATA
 // =============================================
 
-const poolsData: Pool[] = [];
-
 // =============================================
 // FLUSHOUT RECORDS DATA
 // =============================================
@@ -1257,46 +1255,131 @@ function PlansManagement() {
 // POOLS MANAGEMENT COMPONENT
 // =============================================
 function PoolsManagement() {
-  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+  const { token } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState<'REWARD' | 'ALL' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [withdrawMessage, setWithdrawMessage] = useState<string | null>(null);
+  const [pools, setPools] = useState<Pool[]>([]);
+  const [totals, setTotals] = useState({
+    systemPool: 0,
+    leaderPool: 0,
+    rewardPool: 0,
+    sponsorPool: 0,
+    allFund: 0,
+    systemFund: 0,
+  });
 
-  const systemPools = poolsData.filter(p => p.type === 'System');
-  const leaderPools = poolsData.filter(p => p.type === 'Leader');
-  const rewardPools = poolsData.filter(p => p.type === 'Reward');
-  const sponsorPools = poolsData.filter(p => p.type === 'Sponsor');
+  const formatMoney = (value: number | null | undefined): string =>
+    `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const loadPoolMetrics = useCallback(async () => {
+    if (!token) {
+      setPools([]);
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getPoolMetrics(token);
+      const nextPools: Pool[] = response.pools.map((pool) => {
+        const baseTheme = pool.type === 'SYSTEM'
+          ? { primary: '#22d3ee', bg: 'bg-cyan-500/10', border: 'rgba(34,211,238,0.35)' }
+          : pool.type === 'LEADER'
+            ? { primary: '#f59e0b', bg: 'bg-amber-500/10', border: 'rgba(245,158,11,0.35)' }
+            : pool.type === 'REWARD'
+              ? { primary: '#a855f7', bg: 'bg-purple-500/10', border: 'rgba(168,85,247,0.35)' }
+              : { primary: '#34d399', bg: 'bg-emerald-500/10', border: 'rgba(52,211,153,0.35)' };
+
+        const typeLabel = pool.type === 'SYSTEM'
+          ? 'System Fund'
+          : pool.type === 'LEADER'
+            ? 'Leader Pool'
+            : pool.type === 'REWARD'
+              ? 'Reward Pool'
+              : 'Sponsor Pool';
+
+        return {
+          id: pool.id,
+          planId: pool.planId,
+          name: `${pool.planName} • ${typeLabel}`,
+          balance: pool.balance,
+          totalDistributed: pool.totalDistributed,
+          type: pool.type === 'SYSTEM' ? 'System' : pool.type === 'LEADER' ? 'Leader' : pool.type === 'REWARD' ? 'Reward' : 'Sponsor',
+          theme: baseTheme,
+        };
+      });
+
+      setPools(nextPools);
+      setTotals(response.totals);
+    } catch (err) {
+      setPools([]);
+      setTotals({ systemPool: 0, leaderPool: 0, rewardPool: 0, sponsorPool: 0, allFund: 0, systemFund: 0 });
+      setError(err instanceof Error ? err.message : 'Failed to load pool metrics');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  const handleWithdraw = useCallback(async (scope: 'REWARD' | 'ALL') => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsWithdrawing(scope);
+    setWithdrawMessage(null);
+    setError(null);
+    try {
+      const response = await adminApi.withdrawPoolFunds(token, { scope });
+      setWithdrawMessage(response.message);
+      await loadPoolMetrics();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process withdrawal');
+    } finally {
+      setIsWithdrawing(null);
+    }
+  }, [loadPoolMetrics, token]);
+
+  useEffect(() => {
+    void loadPoolMetrics();
+  }, [loadPoolMetrics]);
+
+  const systemPools = useMemo(() => pools.filter((pool) => pool.type === 'System'), [pools]);
+  const leaderPools = useMemo(() => pools.filter((pool) => pool.type === 'Leader'), [pools]);
+  const rewardPools = useMemo(() => pools.filter((pool) => pool.type === 'Reward'), [pools]);
+  const sponsorPools = useMemo(() => pools.filter((pool) => pool.type === 'Sponsor'), [pools]);
 
   const PoolCard = ({ pool }: { pool: Pool }) => (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group rounded-xl border p-4 transition-all hover:-translate-y-1"
-      style={{ 
-        borderColor: pool.theme.border, 
-        background: `linear-gradient(135deg, ${pool.theme.bg}40, transparent)` 
+      className="group rounded-xl border p-4"
+      style={{
+        borderColor: pool.theme.border,
+        background: `linear-gradient(135deg, ${pool.theme.border}20, transparent)`,
       }}
     >
       <div className="mb-3 flex items-center gap-3">
         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${pool.theme.bg}`}>
-          <Database className={`h-5 w-5`} style={{ color: pool.theme.primary }} />
+          <Database className="h-5 w-5" style={{ color: pool.theme.primary }} />
         </div>
         <div>
           <p className="text-xs text-slate-400">{pool.name}</p>
-          <p className="font-mono text-xl font-semibold text-white">${pool.balance.toLocaleString()}</p>
+          <p className="font-mono text-xl font-semibold text-white">{formatMoney(pool.balance)}</p>
         </div>
       </div>
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-500">Total Distributed</span>
-        <span className="font-medium text-emerald-400">${pool.totalDistributed.toLocaleString()}</span>
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button 
-          onClick={() => setSelectedPool(pool)}
-          className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 text-xs font-medium text-slate-300 hover:bg-white/10"
-        >
-          Withdraw
-        </button>
-        <button className="flex-1 rounded-lg border border-cyan-500/20 bg-cyan-500/10 py-2 text-xs font-medium text-cyan-300 hover:bg-cyan-500/15">
-          Details
-        </button>
+      <div className="space-y-1 text-xs">
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500">Plan ID</span>
+          <span className="font-medium text-slate-200">{pool.planId}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500">Total Distributed</span>
+          <span className="font-medium text-emerald-400">{formatMoney(pool.totalDistributed)}</span>
+        </div>
       </div>
     </motion.div>
   );
@@ -1310,10 +1393,81 @@ function PoolsManagement() {
           <p className="text-sm text-slate-400">Manage all treasury pools and distributions</p>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 px-3 sm:px-4 py-2">
-          <p className="text-[10px] sm:text-xs text-slate-500">Total Pool Balance</p>
-          <p className="font-mono text-lg sm:text-xl font-bold text-emerald-400">$425,890</p>
+          <p className="text-[10px] sm:text-xs text-slate-500">System Fund (All Fund)</p>
+          <p className="font-mono text-lg sm:text-xl font-bold text-emerald-400">{formatMoney(totals.systemFund)}</p>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="text-[10px] text-slate-500">All Fund</p>
+          <p className="text-lg font-bold text-white">{formatMoney(totals.allFund)}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="text-[10px] text-slate-500">Leader Pool</p>
+          <p className="text-lg font-bold text-amber-300">{formatMoney(totals.leaderPool)}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="text-[10px] text-slate-500">Reward Pool</p>
+          <p className="text-lg font-bold text-purple-300">{formatMoney(totals.rewardPool)}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="text-[10px] text-slate-500">Sponsor Pool</p>
+          <p className="text-lg font-bold text-emerald-300">{formatMoney(totals.sponsorPool)}</p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-sm font-semibold text-white">Admin Pool Withdraw Actions</p>
+        <p className="text-xs text-slate-400">Run secure backend withdrawals for Reward Pool only or complete All Fund.</p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <button
+            onClick={() => void handleWithdraw('REWARD')}
+            disabled={isLoading || isWithdrawing !== null || totals.rewardPool <= 0}
+            className="rounded-xl border border-purple-400/30 bg-purple-500/10 px-4 py-2 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-50"
+          >
+            {isWithdrawing === 'REWARD' ? 'Withdrawing...' : 'Withdraw Reward Pool'}
+          </button>
+          <button
+            onClick={() => void handleWithdraw('ALL')}
+            disabled={isLoading || isWithdrawing !== null || totals.allFund <= 0}
+            className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50"
+          >
+            {isWithdrawing === 'ALL' ? 'Withdrawing...' : 'Withdraw All Pool Balance'}
+          </button>
+          <button
+            onClick={() => void loadPoolMetrics()}
+            disabled={isLoading || isWithdrawing !== null}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10 disabled:opacity-50"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {withdrawMessage && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+          {withdrawMessage}
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200">
+          {error}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+          Loading pool metrics...
+        </div>
+      )}
+
+      {!isLoading && !error && pools.length === 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+          No pool records found.
+        </div>
+      )}
 
       {/* System Pools */}
       <div>
@@ -1346,59 +1500,6 @@ function PoolsManagement() {
           {sponsorPools.map(pool => <PoolCard key={pool.id} pool={pool} />)}
         </div>
       </div>
-
-      {/* Withdraw Modal */}
-      <AnimatePresence>
-        {selectedPool && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-            onClick={() => setSelectedPool(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0f] p-6"
-            >
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">Withdraw from Pool</h3>
-                <button onClick={() => setSelectedPool(null)} className="text-slate-400 hover:text-white">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="mb-4 rounded-xl border border-white/5 bg-white/[0.03] p-4">
-                <p className="text-xs text-slate-500">Pool</p>
-                <p className="text-sm font-medium text-white">{selectedPool.name}</p>
-                <p className="mt-2 text-xs text-slate-500">Available Balance</p>
-                <p className="text-2xl font-bold text-emerald-400">${selectedPool.balance.toLocaleString()}</p>
-              </div>
-              <div className="mb-4">
-                <label className="mb-2 block text-xs text-slate-500">Amount to Withdraw</label>
-                <input
-                  type="number"
-                  placeholder="Enter amount..."
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/30"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setSelectedPool(null)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-slate-300 hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-                <button className="flex-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 py-3 text-sm font-medium text-white">
-                  Withdraw
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

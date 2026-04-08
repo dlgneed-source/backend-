@@ -95,6 +95,11 @@ export const systemConfigSchema = z.object({
   description: z.string().optional(),
 });
 
+export const adminPoolWithdrawSchema = z.object({
+  scope: z.enum(["REWARD", "ALL"]),
+  amount: z.number().positive("Amount must be positive").optional(),
+});
+
 // =============================================
 // GIFT CODE SCHEMAS
 // =============================================

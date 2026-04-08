@@ -4,7 +4,7 @@
  */
 
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PoolType, PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { generateAdminToken } from "../middleware/auth";
 import { verifyWalletSignature, generateSignInMessage } from "../utils/eip712";
@@ -335,6 +335,179 @@ export async function getPlanMetrics(req: AuthenticatedRequest, res: Response): 
   } catch (err) {
     console.error("[admin] Failed to fetch plan metrics:", err);
     res.status(500).json({ success: false, message: "Failed to fetch plan metrics" });
+  }
+}
+
+/**
+ * GET /admin/pool-metrics
+ */
+export async function getPoolMetrics(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const pools = await prisma.pool.findMany({
+      include: {
+        plan: {
+          select: { id: true, name: true },
+        },
+      },
+      orderBy: [{ type: "asc" }, { planId: "asc" }],
+    });
+
+    const totals = pools.reduce((acc, pool) => {
+      const safeBalance = Number(pool.balance) || 0;
+      if (pool.type === "SYSTEM") acc.systemPool += safeBalance;
+      if (pool.type === "LEADER") acc.leaderPool += safeBalance;
+      if (pool.type === "REWARD") acc.rewardPool += safeBalance;
+      if (pool.type === "SPONSOR") acc.sponsorPool += safeBalance;
+      acc.allFund += safeBalance;
+      return acc;
+    }, { systemPool: 0, leaderPool: 0, rewardPool: 0, sponsorPool: 0, allFund: 0 });
+
+    res.json({
+      success: true,
+      pools: pools.map((pool) => ({
+        id: pool.id,
+        planId: pool.planId,
+        planName: pool.plan.name,
+        type: pool.type,
+        balance: Number(pool.balance) || 0,
+        totalReceived: Number(pool.totalReceived) || 0,
+        totalDistributed: Number(pool.totalDistributed) || 0,
+      })),
+      totals: {
+        ...totals,
+        systemFund: totals.allFund,
+      },
+    });
+  } catch (err) {
+    console.error("[admin] Failed to fetch pool metrics:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch pool metrics" });
+  }
+}
+
+/**
+ * POST /admin/pools/withdraw
+ */
+export async function withdrawPoolFunds(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { scope, amount } = req.body as { scope: "REWARD" | "ALL"; amount?: number };
+  const targetType: PoolType | null = scope === "REWARD" ? "REWARD" : null;
+
+  try {
+    const candidatePools = await prisma.pool.findMany({
+      where: targetType ? { type: targetType } : undefined,
+      orderBy: [{ balance: "desc" }, { id: "asc" }],
+      select: {
+        id: true,
+        type: true,
+        balance: true,
+      },
+    });
+
+    const totalAvailable = candidatePools.reduce((sum, pool) => sum + (Number(pool.balance) || 0), 0);
+    if (candidatePools.length === 0 || totalAvailable <= 0) {
+      res.status(400).json({ success: false, message: "No pool balance available for withdrawal" });
+      return;
+    }
+
+    const withdrawalAmount = amount ?? totalAvailable;
+    if (!Number.isFinite(withdrawalAmount) || withdrawalAmount <= 0) {
+      res.status(400).json({ success: false, message: "Invalid withdrawal amount" });
+      return;
+    }
+    if (withdrawalAmount > totalAvailable) {
+      res.status(400).json({ success: false, message: "Withdrawal amount exceeds available pool balance" });
+      return;
+    }
+
+    const breakdown = await prisma.$transaction(async (tx) => {
+      let remaining = withdrawalAmount;
+      const updatedPools: Array<{ poolId: string; type: PoolType; withdrawnAmount: number; balanceAfter: number }> = [];
+
+      for (const pool of candidatePools) {
+        if (remaining <= 0) break;
+
+        const poolBalance = Number(pool.balance) || 0;
+        if (poolBalance <= 0) continue;
+
+        const deductAmount = Math.min(poolBalance, remaining);
+        const newBalance = poolBalance - deductAmount;
+
+        await tx.pool.update({
+          where: { id: pool.id },
+          data: {
+            balance: newBalance,
+            totalDistributed: { increment: deductAmount },
+          },
+        });
+
+        updatedPools.push({
+          poolId: pool.id,
+          type: pool.type,
+          withdrawnAmount: Number(deductAmount.toFixed(6)),
+          balanceAfter: Number(newBalance.toFixed(6)),
+        });
+
+        remaining = Number((remaining - deductAmount).toFixed(6));
+      }
+
+      let treasury = await tx.treasury.findFirst();
+      if (!treasury) {
+        treasury = await tx.treasury.create({ data: {} });
+      }
+      const nextTreasuryBalance = Number((treasury.balance - withdrawalAmount).toFixed(6));
+
+      const updatedTreasury = await tx.treasury.update({
+        where: { id: treasury.id },
+        data: {
+          totalWithdrawn: { increment: withdrawalAmount },
+          balance: nextTreasuryBalance,
+        },
+      });
+
+      await tx.treasuryLedger.create({
+        data: {
+          treasuryId: updatedTreasury.id,
+          credit: 0,
+          debit: withdrawalAmount,
+          balance: nextTreasuryBalance,
+          description: scope === "REWARD" ? "Admin reward pool withdrawal" : "Admin all-pool withdrawal",
+          metadata: {
+            scope,
+            affectedPools: updatedPools.map((pool) => ({ poolId: pool.poolId, amount: pool.withdrawnAmount })),
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          adminId: req.admin!.id,
+          action: "POOL_DISTRIBUTED",
+          description: scope === "REWARD"
+            ? `Admin withdrew ${withdrawalAmount.toFixed(6)} from reward pools`
+            : `Admin withdrew ${withdrawalAmount.toFixed(6)} from all pools`,
+          metadata: {
+            scope,
+            withdrawalAmount: Number(withdrawalAmount.toFixed(6)),
+            affectedPools: updatedPools,
+          },
+        },
+      });
+
+      return updatedPools;
+    });
+
+    res.json({
+      success: true,
+      message: scope === "REWARD" ? "Reward pool withdrawal completed" : "All pool withdrawal completed",
+      withdrawal: {
+        scope,
+        requestedAmount: Number(withdrawalAmount.toFixed(6)),
+        withdrawnAmount: Number(withdrawalAmount.toFixed(6)),
+        affectedPools: breakdown,
+      },
+    });
+  } catch (err) {
+    console.error("[admin] Failed to withdraw pool funds:", err);
+    res.status(500).json({ success: false, message: "Failed to withdraw pool funds" });
   }
 }
 

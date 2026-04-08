@@ -4,6 +4,8 @@ import {
   adminLogin,
   getDashboard,
   getPlanMetrics,
+  getPoolMetrics,
+  withdrawPoolFunds,
   getUsers,
   updateUserStatus,
   getWithdrawals,
@@ -28,6 +30,7 @@ import {
   systemConfigSchema,
   createGiftCodeSchema,
   adminUpdateGiftCodeStatusSchema,
+  adminPoolWithdrawSchema,
 } from "../middleware/validation";
 
 const router = Router();
@@ -39,6 +42,8 @@ router.post("/login", authRateLimiter, validate(adminLoginSchema), adminLogin);
 // Dashboard
 router.get("/dashboard", authenticateAdmin, getDashboard);
 router.get("/plan-metrics", authenticateAdmin, getPlanMetrics);
+router.get("/pool-metrics", authenticateAdmin, getPoolMetrics);
+router.post("/pools/withdraw", authenticateAdmin, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(adminPoolWithdrawSchema), withdrawPoolFunds);
 
 // Users
 router.get("/users", authenticateAdmin, getUsers);

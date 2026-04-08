@@ -295,6 +295,45 @@ export const adminApi = {
       };
     }>('/api/admin/plan-metrics', { token }),
 
+  getPoolMetrics: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      pools: Array<{
+        id: string;
+        planId: number;
+        planName: string;
+        type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR';
+        balance: number;
+        totalReceived: number;
+        totalDistributed: number;
+      }>;
+      totals: {
+        systemPool: number;
+        leaderPool: number;
+        rewardPool: number;
+        sponsorPool: number;
+        allFund: number;
+        systemFund: number;
+      };
+    }>('/api/admin/pool-metrics', { token }),
+
+  withdrawPoolFunds: (token: string, payload: { scope: 'REWARD' | 'ALL'; amount?: number }) =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      withdrawal: {
+        scope: 'REWARD' | 'ALL';
+        requestedAmount: number;
+        withdrawnAmount: number;
+        affectedPools: Array<{
+          poolId: string;
+          type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR';
+          withdrawnAmount: number;
+          balanceAfter: number;
+        }>;
+      };
+    }>('/api/admin/pools/withdraw', { method: 'POST', token, body: payload }),
+
   getWithdrawals: (token: string, params?: { page?: number; limit?: number; status?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
