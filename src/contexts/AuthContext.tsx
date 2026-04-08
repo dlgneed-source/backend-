@@ -155,8 +155,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const provider = getProvider();
     if (!provider) {
       if (isMobileDevice()) {
-        const message = 'MetaMask not found. Redirecting to MetaMask app...';
-        setWalletError(message);
+        const message = 'Mobile wallet flow detected. Opening MetaMask app...';
+        setWalletError(null);
         toast.info(message);
         redirectToMetaMaskMobileApp();
         return false;
