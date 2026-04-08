@@ -1187,6 +1187,7 @@ export async function getAdminGiftCodes(req: AuthenticatedRequest, res: Response
 export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Response): Promise<void> {
   const {
     planId,
+    // Optional override to issue promotional codes with amount different from plan joiningFee.
     customAmount,
     expiryDays,
     quantity = 1,

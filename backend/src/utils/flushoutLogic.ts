@@ -9,7 +9,7 @@
  * - rewardPool → added to REWARD pool (if > 0)
  * - sponsorPool → added to SPONSOR pool (if > 0)
  *
- * Enrollment-time payouts (system fee, direct upline, level chain) are handled
+ * Enrollment-time payouts (system fee, direct upline, multi-level commission chain) are handled
  * during enrollment creation and should not be duplicated during flushout.
  */
 
