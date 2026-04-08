@@ -41,7 +41,6 @@ async function getManualFlushoutEnrollmentIds(enrollmentIds: string[]): Promise<
   const logs = await prisma.auditLog.findMany({
     where: {
       action: "ENROLLMENT_FLUSHED",
-      description: { contains: "Manual flushout", mode: "insensitive" },
       OR: uniqueEnrollmentIds.map((id) => ({
         description: { contains: `#${id}` },
       })),
@@ -58,8 +57,14 @@ async function getManualFlushoutEnrollmentIds(enrollmentIds: string[]): Promise<
 
   logs.forEach((log) => {
     const enrollmentId = extractEnrollmentIdFromManualFlushoutLog(log);
+    const metadata = log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)
+      ? (log.metadata as Record<string, unknown>)
+      : null;
+    const explicitManualFlag = metadata?.flushoutType === "MANUAL";
+    const fallbackManualFlag = /manual flushout/i.test(log.description);
+    const isManual = explicitManualFlag || fallbackManualFlag;
 
-    if (enrollmentId && idSet.has(enrollmentId)) {
+    if (enrollmentId && idSet.has(enrollmentId) && isManual) {
       manualIds.add(enrollmentId);
     }
   });
@@ -223,7 +228,7 @@ export async function getDashboard(req: AuthenticatedRequest, res: Response): Pr
         maturedUsers: counts.matured,
         flushedUsers: counts.flushed,
         totalEnrollments: counts.totalEnrollments,
-        totalRevenue: Number((counts.totalEnrollments * plan.joiningFee).toFixed(6)),
+        totalRevenue: counts.totalEnrollments * plan.joiningFee,
       };
     });
 
@@ -539,7 +544,7 @@ export async function manualFlushout(req: AuthenticatedRequest, res: Response): 
         adminId: req.admin!.id,
         action: "ENROLLMENT_FLUSHED",
         description: `Manual flushout for enrollment #${enrollmentId}`,
-        metadata: { enrollmentId, memberProfit: result.memberProfit },
+        metadata: { enrollmentId, memberProfit: result.memberProfit, flushoutType: "MANUAL" },
       },
     });
 

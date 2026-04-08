@@ -548,7 +548,7 @@ function DashboardOverview({ token }: { token: string | null }) {
     const headers = Object.keys(rows[0]);
     const escape = (value: string | number | null | undefined) => {
       const raw = value === null || value === undefined ? '' : String(value);
-      const injectionSafe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+      const injectionSafe = /^[=+\-@]/.test(raw) ? `\t${raw}` : raw;
       const escaped = injectionSafe.replace(/"/g, '""');
       return `"${escaped}"`;
     };
