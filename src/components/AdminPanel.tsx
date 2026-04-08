@@ -3106,6 +3106,7 @@ export function Settings({ token }: { token: string | null }) {
 // =============================================
 export default function AdminPanel() {
   const { token: walletToken, walletAddress } = useAuth();
+  const previousWalletTokenRef = useRef<string | null>(walletToken);
   const [adminToken, setAdminToken] = useState<string | null>(() => sessionStorage.getItem(ADMIN_AUTH_TOKEN_KEY));
   const [walletAdminAccessDenied, setWalletAdminAccessDenied] = useState(false);
   const [adminLinkedWallet, setAdminLinkedWallet] = useState<string | null>(null);
@@ -3182,10 +3183,12 @@ export default function AdminPanel() {
   }, [adminToken, walletToken]);
 
   useEffect(() => {
-    if (!adminToken) {
+    const walletTokenChanged = previousWalletTokenRef.current !== walletToken;
+    if (!adminToken && walletTokenChanged && walletAdminAccessDenied) {
       setWalletAdminAccessDenied(false);
     }
-  }, [adminToken, walletToken]);
+    previousWalletTokenRef.current = walletToken;
+  }, [adminToken, walletAdminAccessDenied, walletToken]);
 
   const loadPlanEconomics = useCallback(async () => {
     try {
