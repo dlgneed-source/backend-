@@ -40,10 +40,10 @@ export async function upsertActiveUserByWallet(
         select: { id: true },
       });
     } catch (error) {
-      if (isReferralCodeUniqueConstraintError(error) && attempt < MAX_REFERRAL_CODE_ATTEMPTS) {
-        continue;
-      }
       if (isReferralCodeUniqueConstraintError(error)) {
+        if (attempt < MAX_REFERRAL_CODE_ATTEMPTS) {
+          continue;
+        }
         break;
       }
       throw error;
