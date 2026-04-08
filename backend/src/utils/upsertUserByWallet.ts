@@ -27,7 +27,7 @@ export async function upsertActiveUserByWallet(
 ): Promise<{ id: string }> {
   const normalizedWallet = walletAddress.toLowerCase();
 
-  for (let attempt = 0; attempt < MAX_REFERRAL_CODE_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= MAX_REFERRAL_CODE_ATTEMPTS; attempt++) {
     try {
       return await prisma.user.upsert({
         where: { walletAddress: normalizedWallet },
@@ -40,8 +40,11 @@ export async function upsertActiveUserByWallet(
         select: { id: true },
       });
     } catch (error) {
-      if (isReferralCodeUniqueConstraintError(error)) {
+      if (isReferralCodeUniqueConstraintError(error) && attempt < MAX_REFERRAL_CODE_ATTEMPTS) {
         continue;
+      }
+      if (isReferralCodeUniqueConstraintError(error)) {
+        break;
       }
       throw error;
     }
