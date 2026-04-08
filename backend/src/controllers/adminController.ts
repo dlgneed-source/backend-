@@ -840,6 +840,9 @@ export async function getRewardsMetrics(req: AuthenticatedRequest, res: Response
     const configMap = new Map(configs.map((item) => [item.key, item.value]));
     const nextDistributionRaw = configMap.get("REWARDS_NEXT_DISTRIBUTION_AT");
     const nextDistributionDate = nextDistributionRaw ? new Date(nextDistributionRaw) : null;
+    if (nextDistributionRaw && nextDistributionDate && Number.isNaN(nextDistributionDate.getTime())) {
+      console.warn(`[admin.rewards] Invalid REWARDS_NEXT_DISTRIBUTION_AT config: "${nextDistributionRaw}"`);
+    }
     const nextDistributionAt = nextDistributionDate && !Number.isNaN(nextDistributionDate.getTime())
       ? nextDistributionDate.toISOString()
       : null;
