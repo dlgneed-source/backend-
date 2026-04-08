@@ -251,8 +251,11 @@ async function main() {
   // SEED SUPER ADMIN
   // =============================================
   const adminWallet = process.env.ADMIN_WALLET || "0x0000000000000000000000000000000000000001";
-  const adminLoginId = (process.env.ADMIN_LOGIN_ID || "Dramirkhan").trim().toLowerCase();
-  const adminLoginPassword = process.env.ADMIN_LOGIN_PASSWORD || "Dramir1234";
+  const adminLoginId = (process.env.ADMIN_LOGIN_ID || "").trim().toLowerCase();
+  const adminLoginPassword = process.env.ADMIN_LOGIN_PASSWORD || "";
+  if (!adminLoginId || !adminLoginPassword) {
+    throw new Error("ADMIN_LOGIN_ID and ADMIN_LOGIN_PASSWORD must be set for admin credential seeding");
+  }
   const passwordHash = await bcrypt.hash(adminLoginPassword, 12);
   await prisma.admin.upsert({
     where: { walletAddress: adminWallet },

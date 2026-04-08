@@ -3167,7 +3167,7 @@ export function Settings({ token }: { token: string | null }) {
 export default function AdminPanel() {
   const { token: walletToken } = useAuth();
   const [adminToken, setAdminToken] = useState<string | null>(() => sessionStorage.getItem(ADMIN_AUTH_TOKEN_KEY));
-  const [adminLoginId, setAdminLoginId] = useState('Dramirkhan');
+  const [adminLoginId, setAdminLoginId] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false);
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null);

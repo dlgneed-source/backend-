@@ -16,6 +16,7 @@ import { isValidWalletAddress } from "../middleware/security";
 const prisma = new PrismaClient();
 const MAX_FLUSHOUTS_PAGE_SIZE = 5000;
 const CURRENCY_PRECISION = 6;
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync("invalid-credential-probe", 12);
 
 function extractEnrollmentIdFromManualFlushoutLog(log: { metadata: unknown; description: string }): string | undefined {
   if (log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)) {
@@ -160,16 +161,17 @@ export async function adminCredentialLogin(req: Request, res: Response): Promise
     const normalizedLoginId = loginId.trim().toLowerCase();
 
     const admin = await prisma.admin.findFirst({
-      where: { email: normalizedLoginId },
+      where: {
+        email: {
+          equals: normalizedLoginId,
+          mode: "insensitive",
+        },
+      },
     });
 
-    if (!admin || !admin.isActive || !admin.passwordHash) {
-      res.status(401).json({ success: false, message: "Invalid credentials" });
-      return;
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, admin.passwordHash);
-    if (!isPasswordValid) {
+    const passwordHashToCheck = admin?.passwordHash || DUMMY_PASSWORD_HASH;
+    const isPasswordValid = await bcrypt.compare(password, passwordHashToCheck);
+    if (!admin || !admin.isActive || !admin.passwordHash || !isPasswordValid) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
       return;
     }
