@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 vi.mock('sonner', () => ({
   toast: {
@@ -13,6 +14,7 @@ vi.mock('sonner', () => ({
 
 const ADDRESS_1 = '0x1111111111111111111111111111111111111111';
 const ADDRESS_2 = '0x2222222222222222222222222222222222222222';
+const DEFAULT_USER_AGENT = window.navigator.userAgent;
 
 type Listener = (...args: unknown[]) => void;
 type ProviderEvents = Record<string, Listener[]>;
@@ -73,11 +75,34 @@ describe('AuthContext wallet flow', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     sessionStorage.clear();
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: DEFAULT_USER_AGENT,
+    });
     Object.defineProperty(window, 'ethereum', {
       configurable: true,
       writable: true,
       value: undefined,
     });
+  });
+
+  it('redirects mobile users to MetaMask app when provider is missing', async () => {
+    const assignSpy = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+    });
+    global.fetch = vi.fn() as typeof fetch;
+
+    render(<AuthProvider><TestHarness /></AuthProvider>);
+    fireEvent.click(screen.getByText('connect'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('wallet-error')).toHaveTextContent('Redirecting to MetaMask app');
+    });
+    expect(assignSpy).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\/metamask\.app\.link\/dapp\//));
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(toast.info).toHaveBeenCalled();
   });
 
   it('wallet connect success', async () => {

@@ -44,10 +44,22 @@ interface AuthContextType {
 const AUTH_TOKEN_KEY = 'ea_auth_token';
 const DEFAULT_BSC_CHAIN_ID = '0x38';
 const EXPECTED_CHAIN_ID = normalizeChainId(import.meta.env.VITE_CHAIN_ID || DEFAULT_BSC_CHAIN_ID);
+const METAMASK_MOBILE_APP_LINK_BASE = 'https://metamask.app.link/dapp/';
 const AuthContext = createContext<AuthContextType | null>(null);
 
 function getProvider(): EthereumProvider | null {
   return (window as EthereumWindow).ethereum || null;
+}
+
+function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const userAgent = navigator.userAgent || '';
+  return /android|iphone|ipad|ipod|iemobile|opera mini|mobile/i.test(userAgent);
+}
+
+function buildMetaMaskMobileAppLink(): string {
+  const dappUrl = `${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}`;
+  return `${METAMASK_MOBILE_APP_LINK_BASE}${encodeURIComponent(dappUrl)}`;
 }
 
 function normalizeAddress(value: unknown): string | null {
@@ -135,6 +147,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (): Promise<boolean> => {
     const provider = getProvider();
     if (!provider) {
+      if (isMobileDevice()) {
+        const message = 'MetaMask extension not found. Redirecting to MetaMask app...';
+        setWalletError(message);
+        toast.info(message);
+        window.location.assign(buildMetaMaskMobileAppLink());
+        return false;
+      }
+
       const message = 'MetaMask not detected. Please install MetaMask to continue.';
       setWalletError(message);
       toast.error(message);
