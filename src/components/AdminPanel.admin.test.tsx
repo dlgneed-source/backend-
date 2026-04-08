@@ -280,6 +280,81 @@ describe('AdminPanel gift code and audit integrations', () => {
     await screen.findByText('SEASONAL1');
   });
 
+  it('allows custom code with quantity greater than 1', async () => {
+    const fetchMock = queueFetchResponses([
+      {
+        ok: true,
+        status: 200,
+        body: {
+          success: true,
+          giftCodes: [],
+          pagination: { page: 1, limit: 100, total: 0, pages: 0 },
+        },
+      },
+      {
+        ok: true,
+        status: 201,
+        body: {
+          success: true,
+          giftCodes: [
+            {
+              id: 'gc-series-1',
+              code: 'SEASONAL1-01',
+              planId: 1,
+              planName: 'Plan 1',
+              amount: 1,
+              status: 'ACTIVE',
+              expiresAt: '2030-01-02T00:00:00.000Z',
+              createdAt: '2030-01-01T00:00:00.000Z',
+              usedCount: 0,
+              maxUses: 1,
+            },
+          ],
+        },
+      },
+      {
+        ok: true,
+        status: 200,
+        body: {
+          success: true,
+          giftCodes: [
+            {
+              id: 'gc-series-1',
+              code: 'SEASONAL1-01',
+              planId: 1,
+              planName: 'Plan 1',
+              amount: 1,
+              status: 'ACTIVE',
+              expiresAt: '2030-01-02T00:00:00.000Z',
+              createdAt: '2030-01-01T00:00:00.000Z',
+              usedCount: 0,
+              maxUses: 1,
+            },
+          ],
+          pagination: { page: 1, limit: 100, total: 1, pages: 1 },
+        },
+      },
+    ]);
+
+    render(<GiftCodeManagement token="admin-token" />);
+    await screen.findByText('No gift codes found.');
+
+    fireEvent.click(screen.getByText('Create Code'));
+    fireEvent.change(screen.getByPlaceholderText('e.g. WELCOME50'), { target: { value: 'SEASONAL1' } });
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '15' } });
+    fireEvent.change(screen.getByPlaceholderText('e.g. 30'), { target: { value: '30' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Create Code' })[1]);
+
+    await waitFor(() => {
+      const postCall = fetchMock.mock.calls.find((call) => String(call[0]).includes('/api/admin/gift-codes') && call[1]?.method === 'POST');
+      expect(postCall).toBeTruthy();
+      const rawBody = postCall?.[1]?.body;
+      expect(typeof rawBody).toBe('string');
+      const payload = JSON.parse(String(rawBody));
+      expect(payload).toMatchObject({ code: 'SEASONAL1', quantity: 15, expiryDays: 30 });
+    });
+  });
+
   it('renders empty list state for gift codes', async () => {
     queueFetchResponses([
       {

@@ -1257,18 +1257,20 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
     }
     const adminUser = await upsertActiveUserByWallet(prisma, req.admin!.walletAddress);
 
-    if (requestedCode && quantity > 1) {
-      res.status(400).json({ success: false, message: "Custom code supports quantity 1 only" });
-      return;
-    }
-
     const now = new Date();
     const expiresAt = new Date(now);
     expiresAt.setDate(expiresAt.getDate() + (expiryDays ?? 30));
 
     const createdCodes = [];
-    for (let i = 0; i < Math.min(quantity, 50); i++) {
-      const code = (requestedCode ? requestedCode.trim().toUpperCase() : `EA${planId}-${uuidv4().replace(/-/g, "").toUpperCase().slice(0, 8)}`);
+    const normalizedRequestedCode = requestedCode?.trim().toUpperCase();
+    const totalToCreate = Math.min(quantity, 50);
+    const seriesWidth = String(totalToCreate).length;
+    for (let i = 0; i < totalToCreate; i++) {
+      const code = normalizedRequestedCode
+        ? totalToCreate > 1
+          ? `${normalizedRequestedCode.slice(0, Math.max(1, 32 - (seriesWidth + 1)))}-${String(i + 1).padStart(seriesWidth, "0")}`
+          : normalizedRequestedCode
+        : `EA${planId}-${uuidv4().replace(/-/g, "").toUpperCase().slice(0, 8)}`;
 
       const existing = await prisma.giftCode.findUnique({ where: { code } });
       if (existing) {
@@ -1296,10 +1298,6 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
         usedCount: 0,
         maxUses: 1,
       });
-
-      if (requestedCode) {
-        break;
-      }
     }
 
     await prisma.auditLog.create({
