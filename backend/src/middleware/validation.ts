@@ -43,6 +43,11 @@ export const adminLoginSchema = z.object({
   signature: z.string().min(1, "Signature required"),
 });
 
+export const adminCredentialLoginSchema = z.object({
+  loginId: z.string().trim().min(1, "Login ID required").max(100, "Login ID too long"),
+  password: z.string().min(1, "Password required").max(200, "Password too long"),
+});
+
 // =============================================
 // ENROLLMENT SCHEMAS
 // =============================================
@@ -70,18 +75,9 @@ export const withdrawalSignSchema = z.object({
 // ADMIN SCHEMAS
 // =============================================
 
-export const approveWithdrawalSchema = z.object({
-  withdrawalId: z.string().min(1),
-  txHash: z.string().optional(),
-});
-
-export const rejectWithdrawalSchema = z.object({
-  withdrawalId: z.string().min(1),
-  reason: z.string().min(1, "Rejection reason required"),
-});
-
 export const createGiftCodeSchema = z.object({
   planId: z.number().int().min(1).max(6),
+  customAmount: z.number().positive("Custom amount must be positive").max(1_000_000, "Custom amount is too large").optional(),
   expiryDays: z.number().int().min(1).max(365).optional().default(30),
   quantity: z.number().int().min(1).max(50).optional().default(1),
   code: z
@@ -103,6 +99,27 @@ export const systemConfigSchema = z.object({
   key: z.string().min(1),
   value: z.string().min(1),
   description: z.string().optional(),
+});
+
+export const adminPoolWithdrawSchema = z.object({
+  scope: z.enum(["REWARD", "ALL"]),
+  amount: z.number().positive("Amount must be positive").optional(),
+  confirmation: z.literal("CONFIRM_POOL_WITHDRAW", {
+    errorMap: () => ({ message: "Pool withdraw confirmation is required" }),
+  }),
+});
+
+export const adminKillSwitchSchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+  confirmation: z.literal("CONFIRM_KILL_SWITCH", {
+    errorMap: () => ({ message: "Kill switch confirmation is required" }),
+  }),
+});
+
+export const adminManualFlushoutSchema = z.object({
+  confirmation: z.literal("CONFIRM_MANUAL_FLUSHOUT", {
+    errorMap: () => ({ message: "Manual flushout confirmation is required" }),
+  }),
 });
 
 // =============================================

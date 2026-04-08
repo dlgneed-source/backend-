@@ -7,10 +7,11 @@ import {
 } from "../controllers/giftCodeController";
 import { authenticateAdmin, authenticateUser, requireAdminRoles } from "../middleware/auth";
 import { validate, createGiftCodeSchema, redeemGiftCodeSchema } from "../middleware/validation";
+import { giftCodeCreateRateLimiter } from "../middleware/security";
 
 const router = Router();
 
-router.post("/generate", authenticateAdmin, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(createGiftCodeSchema), generateGiftCode);
+router.post("/generate", authenticateAdmin, giftCodeCreateRateLimiter, requireAdminRoles(["SUPER_ADMIN", "ADMIN"]), validate(createGiftCodeSchema), generateGiftCode);
 router.post("/redeem", authenticateUser, validate(redeemGiftCodeSchema), redeemGiftCode);
 router.get("/my", authenticateUser, getMyGiftCodes);
 router.get("/:code/validate", validateGiftCode);

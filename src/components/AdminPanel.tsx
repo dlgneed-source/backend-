@@ -1,16 +1,17 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { ApiError, adminApi, teamApi } from '@/lib/api';
+import { ApiError, adminApi, systemApi, teamApi } from '@/lib/api';
 import { getDirectReferralIncome, toSafeNonNegativeNumber } from '@/lib/referral';
+import { buildCsv, downloadCsv } from '@/utils/exportCsv';
 import {
-  AlertOctagon, Ban, Briefcase, ChevronRight, Copy, Gift, Radio, RefreshCw,
-  Search, Send, Shield, TrendingUp, Wallet, Zap, Users, LayoutDashboard,
+  AlertOctagon, Ban, Briefcase, ChevronRight, Copy, Gift, RefreshCw,
+  Search, Shield, TrendingUp, Wallet, Zap, Users, LayoutDashboard,
   Layers, Award, Crown, Gem, Network, ArrowUpRight, ArrowDownLeft, X,
   Check, Clock, AlertCircle, Info, Filter, Download, MoreHorizontal,
   Settings as SettingsIcon, LogOut, Bell, MessageSquare, FileText, BarChart3, PieChart,
   Activity, Target, Percent, Calendar, Lock, Unlock, Eye, EyeOff,
-  Trash2, Edit, Plus, Minus, ChevronDown, ChevronUp, ExternalLink,
+  Trash2, Edit, Plus, Minus, ChevronDown, ChevronUp,
   Hash, UserPlus, UserCheck, UserX, Repeat, Flame, Star, Trophy,
   Medal, Sparkles, Timer, CreditCard, History, Globe, Server,
   Database, ShieldCheck, Verified, BadgeCheck, CircleDollarSign,
@@ -18,6 +19,8 @@ import {
   AlertTriangle, HelpCircle, BookOpen, Code2, Cpu, Brain, Terminal,
   Monitor, Smartphone, Tablet, Laptop, MousePointer, Keyboard, ChevronLeft
 } from 'lucide-react';
+
+const ADMIN_AUTH_TOKEN_KEY = 'ea_admin_token';
 
 // =============================================
 // TYPES & INTERFACES
@@ -43,9 +46,6 @@ interface Plan {
   sponsorPool: number;
   roi: number;
   flushoutDays: number;
-  activeUsers: number;
-  maturedUsers: number;
-  totalRevenue: number;
   theme: {
     primary: string;
     secondary: string;
@@ -74,7 +74,7 @@ interface User {
 
 interface Pool {
   id: string;
-  name: string;
+  displayName: string;
   planId: number;
   balance: number;
   totalDistributed: number;
@@ -86,19 +86,8 @@ interface Pool {
   };
 }
 
-interface WithdrawalRequest {
-  id: number;
-  userId: string;
-  wallet: string;
-  amount: number;
-  status: RequestStatus;
-  requestedAt: string;
-  processedAt?: string;
-  txHash?: string;
-}
-
 interface FlushoutRecord {
-  id: number;
+  id: string;
   userId: string;
   wallet: string;
   planId: number;
@@ -115,138 +104,38 @@ interface KIMILevel {
   totalEarnings: number;
 }
 
-// =============================================
-// PLANS DATA (6 PLANS)
-// =============================================
+const formatUsd = (value: number | null | undefined): string =>
+  `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const plansData: Plan[] = [
-  {
-    id: 1,
-    name: 'Foundation',
-    joiningFee: 5,
-    teamSize: 5,
-    uplineCommission: 1,
-    systemFee: 0.50,
-    levelCommission: 0.50,
-    slotFee: 3,
-    totalCollection: 15,
-    memberProfit: 12,
-    leaderPool: 1,
-    rewardPool: 0,
-    sponsorPool: 0,
-    roi: 240,
-    flushoutDays: 3,
-    activeUsers: 1245,
-    maturedUsers: 892,
-    totalRevenue: 18675,
-    theme: { primary: '#fbbf24', secondary: '#f59e0b', glow: 'rgba(251, 191, 36, 0.5)', bgGlow: 'rgba(251, 191, 36, 0.15)', text: '#fef3c7' },
-  },
-  {
-    id: 2,
-    name: 'Pro Builder',
-    joiningFee: 10,
-    teamSize: 6,
-    uplineCommission: 2,
-    systemFee: 1,
-    levelCommission: 1,
-    slotFee: 6,
-    totalCollection: 36,
-    memberProfit: 30,
-    leaderPool: 2,
-    rewardPool: 2,
-    sponsorPool: 0,
-    roi: 300,
-    flushoutDays: 8,
-    activeUsers: 892,
-    maturedUsers: 654,
-    totalRevenue: 32112,
-    theme: { primary: '#22d3ee', secondary: '#0ea5e9', glow: 'rgba(34, 211, 238, 0.5)', bgGlow: 'rgba(34, 211, 238, 0.15)', text: '#cffafe' },
-  },
-  {
-    id: 3,
-    name: 'Cyber Elite',
-    joiningFee: 20,
-    teamSize: 7,
-    uplineCommission: 4,
-    systemFee: 1,
-    levelCommission: 2,
-    slotFee: 13,
-    totalCollection: 91,
-    memberProfit: 80,
-    leaderPool: 4,
-    rewardPool: 3,
-    sponsorPool: 0,
-    roi: 400,
-    flushoutDays: 16,
-    activeUsers: 567,
-    maturedUsers: 423,
-    totalRevenue: 51597,
-    theme: { primary: '#34d399', secondary: '#10b981', glow: 'rgba(52, 211, 153, 0.5)', bgGlow: 'rgba(52, 211, 153, 0.15)', text: '#d1fae5' },
-  },
-  {
-    id: 4,
-    name: 'AI Mastery',
-    joiningFee: 40,
-    teamSize: 8,
-    uplineCommission: 7,
-    systemFee: 1,
-    levelCommission: 4,
-    slotFee: 28,
-    totalCollection: 224,
-    memberProfit: 200,
-    leaderPool: 8,
-    rewardPool: 4,
-    sponsorPool: 2,
-    roi: 500,
-    flushoutDays: 25,
-    activeUsers: 345,
-    maturedUsers: 278,
-    totalRevenue: 77280,
-    theme: { primary: '#e879f9', secondary: '#a855f7', glow: 'rgba(232, 121, 249, 0.5)', bgGlow: 'rgba(232, 121, 249, 0.15)', text: '#fae8ff' },
-  },
-  {
-    id: 5,
-    name: 'Quantum Leader',
-    joiningFee: 80,
-    teamSize: 8,
-    uplineCommission: 14,
-    systemFee: 2,
-    levelCommission: 8,
-    slotFee: 56,
-    totalCollection: 448,
-    memberProfit: 400,
-    leaderPool: 16,
-    rewardPool: 10,
-    sponsorPool: 2,
-    roi: 500,
-    flushoutDays: 40,
-    activeUsers: 189,
-    maturedUsers: 156,
-    totalRevenue: 84672,
-    theme: { primary: '#f472b6', secondary: '#ec4899', glow: 'rgba(244, 114, 182, 0.5)', bgGlow: 'rgba(244, 114, 182, 0.15)', text: '#fce7f3' },
-  },
-  {
-    id: 6,
-    name: 'Supreme Visionary',
-    joiningFee: 160,
-    teamSize: 8,
-    uplineCommission: 32,
-    systemFee: 2,
-    levelCommission: 16,
-    slotFee: 110,
-    totalCollection: 880,
-    memberProfit: 800,
-    leaderPool: 24,
-    rewardPool: 12,
-    sponsorPool: 4,
-    roi: 500,
-    flushoutDays: 60,
-    activeUsers: 98,
-    maturedUsers: 87,
-    totalRevenue: 86240,
-    theme: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
-  },
-];
+const mapEconomicsPlanToAdminPlan = (
+  plan: Awaited<ReturnType<typeof systemApi.getPlanEconomics>>['economics']['plans'][number],
+): Plan => ({
+  id: plan.planId,
+  name: plan.name,
+  joiningFee: plan.fees.joiningFee,
+  teamSize: plan.fees.teamSize,
+  uplineCommission: plan.distributions.directUpline,
+  systemFee: plan.distributions.systemFee,
+  levelCommission: plan.distributions.levelCommission,
+  slotFee: plan.fees.slotFee,
+  totalCollection: plan.fees.totalCollection,
+  memberProfit: plan.distributions.memberProfit,
+  leaderPool: plan.distributions.pools.leader,
+  rewardPool: plan.distributions.pools.reward,
+  sponsorPool: plan.distributions.pools.sponsor,
+  roi: plan.fees.joiningFee > 0 ? Number(((plan.distributions.memberProfit / plan.fees.joiningFee) * 100).toFixed(2)) : 0,
+  flushoutDays: plan.flushout.days,
+  theme: PLAN_THEMES[plan.planId] || PLAN_THEMES[1],
+});
+
+const PLAN_THEMES: Record<number, Plan['theme']> = {
+  1: { primary: '#fbbf24', secondary: '#f59e0b', glow: 'rgba(251, 191, 36, 0.5)', bgGlow: 'rgba(251, 191, 36, 0.15)', text: '#fef3c7' },
+  2: { primary: '#22d3ee', secondary: '#0ea5e9', glow: 'rgba(34, 211, 238, 0.5)', bgGlow: 'rgba(34, 211, 238, 0.15)', text: '#cffafe' },
+  3: { primary: '#34d399', secondary: '#10b981', glow: 'rgba(52, 211, 153, 0.5)', bgGlow: 'rgba(52, 211, 153, 0.15)', text: '#d1fae5' },
+  4: { primary: '#e879f9', secondary: '#a855f7', glow: 'rgba(232, 121, 249, 0.5)', bgGlow: 'rgba(232, 121, 249, 0.15)', text: '#fae8ff' },
+  5: { primary: '#f472b6', secondary: '#ec4899', glow: 'rgba(244, 114, 182, 0.5)', bgGlow: 'rgba(244, 114, 182, 0.15)', text: '#fce7f3' },
+  6: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
+};
 
 // =============================================
 // USERS DATA
@@ -257,32 +146,6 @@ const usersData: User[] = [];
 // =============================================
 // POOLS DATA
 // =============================================
-
-const poolsData: Pool[] = [];
-
-// =============================================
-// WITHDRAWAL REQUESTS DATA
-// =============================================
-
-const withdrawalRequests: WithdrawalRequest[] = [
-  { id: 1, userId: 'USR001', wallet: '0x7B2...F1A3', amount: 150, status: 'Pending', requestedAt: '2026-03-30 14:30:00' },
-  { id: 2, userId: 'USR002', wallet: '0x5E6...A8D4', amount: 75, status: 'Approved', requestedAt: '2026-03-30 12:15:00', processedAt: '2026-03-30 13:00:00', txHash: '0xabc...def' },
-  { id: 3, userId: 'USR004', wallet: '0x3C1...E4B2', amount: 300, status: 'Processing', requestedAt: '2026-03-30 10:00:00' },
-  { id: 4, userId: 'USR005', wallet: '0x9F8...D2C1', amount: 100, status: 'Rejected', requestedAt: '2026-03-29 18:45:00', processedAt: '2026-03-29 19:30:00' },
-  { id: 5, userId: 'USR001', wallet: '0x7B2...F1A3', amount: 50, status: 'Approved', requestedAt: '2026-03-28 09:00:00', processedAt: '2026-03-28 10:15:00', txHash: '0xdef...abc' },
-];
-
-// =============================================
-// FLUSHOUT RECORDS DATA
-// =============================================
-
-const flushoutRecords: FlushoutRecord[] = [
-  { id: 1, userId: 'USR001', wallet: '0x7B2...F1A3', planId: 1, planName: 'Foundation', amount: 12, flushedAt: '2026-03-30 10:00:00', type: 'Auto' },
-  { id: 2, userId: 'USR002', wallet: '0x5E6...A8D4', planId: 1, planName: 'Foundation', amount: 12, flushedAt: '2026-03-29 15:30:00', type: 'Auto' },
-  { id: 3, userId: 'USR004', wallet: '0x3C1...E4B2', planId: 2, planName: 'Pro Builder', amount: 30, flushedAt: '2026-03-28 12:00:00', type: 'Manual' },
-  { id: 4, userId: 'USR005', wallet: '0x9F8...D2C1', planId: 3, planName: 'Cyber Elite', amount: 80, flushedAt: '2026-03-27 09:00:00', type: 'Auto' },
-  { id: 5, userId: 'USR001', wallet: '0x7B2...F1A3', planId: 2, planName: 'Pro Builder', amount: 30, flushedAt: '2026-03-26 18:00:00', type: 'Auto' },
-];
 
 // =============================================
 // COMMISSION RECORDS DATA
@@ -397,7 +260,6 @@ function Sidebar({ activeTab, setActiveTab, collapsed, setCollapsed, mobileOpen,
     { id: 'users', label: 'Users', icon: Users },
     { id: 'plans', label: 'Plans', icon: Layers },
     { id: 'pools', label: 'Pools', icon: Database },
-    { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpRight },
     { id: 'flushouts', label: 'Flushouts', icon: Flame },
     { id: 'commissions', label: 'Commissions', icon: Percent },
     { id: 'gift-codes', label: 'Gift Codes', icon: Gift },
@@ -531,8 +393,7 @@ function DashboardOverview({ token }: { token: string | null }) {
     }>;
   } | null>(null);
 
-  const formatMoney = (value: number) =>
-    `$${Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}`;
+  const formatMoney = formatUsd;
 
   const normalizeStatus = (status: string): RequestStatus => {
     const normalized = status.toUpperCase();
@@ -541,30 +402,6 @@ function DashboardOverview({ token }: { token: string | null }) {
     if (normalized === 'APPROVED' || normalized === 'COMPLETED') return 'Approved';
     if (normalized === 'REJECTED') return 'Rejected';
     return 'Pending';
-  };
-
-  const toCsv = (rows: Array<Record<string, string | number | null | undefined>>) => {
-    if (rows.length === 0) return '';
-    const headers = Object.keys(rows[0]);
-    const escape = (value: string | number | null | undefined) => {
-      const raw = value === null || value === undefined ? '' : String(value);
-      const injectionSafe = /^[=+\-@]/.test(raw) ? `\t${raw}` : raw;
-      const escaped = injectionSafe.replace(/"/g, '""');
-      return `"${escaped}"`;
-    };
-    return [headers.join(','), ...rows.map((row) => headers.map((header) => escape(row[header])).join(','))].join('\n');
-  };
-
-  const downloadCsv = (filename: string, content: string) => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
   };
 
   const loadDashboard = useCallback(async () => {
@@ -613,7 +450,7 @@ function DashboardOverview({ token }: { token: string | null }) {
         allRows.push(...nextPage.withdrawals);
       }
 
-      const csv = toCsv(
+      const csv = buildCsv(
         allRows.map((item) => ({
           id: item.id,
           wallet: item.user.walletAddress,
@@ -650,7 +487,7 @@ function DashboardOverview({ token }: { token: string | null }) {
         allRows.push(...nextPage.flushouts);
       }
 
-      const csv = toCsv(
+      const csv = buildCsv(
         allRows.map((item) => ({
           id: item.id,
           wallet: item.wallet,
@@ -1037,90 +874,176 @@ function UsersManagement() {
 // =============================================
 // PLANS MANAGEMENT COMPONENT
 // =============================================
-function PlansManagement() {
+function PlansManagement({ token, plans }: { token: string | null; plans: Plan[] }) {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [planMetrics, setPlanMetrics] = useState<Array<{
+    planId: number;
+    planName: string;
+    activeUsers: number;
+    maturedUsers: number;
+    flushedUsers: number;
+    totalEnrollments: number;
+    totalRevenue: number;
+    adoptionRate: number;
+  }>>([]);
+
+  const loadPlanMetrics = useCallback(async () => {
+    if (!token) {
+      setPlanMetrics([]);
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getPlanMetrics(token);
+      setPlanMetrics(response.planMetrics);
+    } catch (err) {
+      setPlanMetrics([]);
+      setError(err instanceof Error ? err.message : 'Failed to load plan metrics');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadPlanMetrics();
+  }, [loadPlanMetrics]);
+
+  const planMetricsMap = useMemo(() => (
+    new Map(planMetrics.map((metric) => [metric.planId, metric]))
+  ), [planMetrics]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-white">Plans Management</h1>
-        <p className="text-sm text-slate-400">View and manage all investment plans</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Plans Management</h1>
+          <p className="text-sm text-slate-400">View and manage all investment plans</p>
+        </div>
+        <button
+          onClick={() => void loadPlanMetrics()}
+          disabled={isLoading}
+          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs sm:text-sm font-medium text-slate-300 hover:bg-white/10 disabled:opacity-60"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh Metrics
+        </button>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-200">
+          <p>{error}</p>
+          <button
+            onClick={() => void loadPlanMetrics()}
+            className="mt-2 inline-flex items-center gap-1 rounded-lg border border-rose-400/30 px-2 py-1 text-[11px] font-semibold text-rose-100 hover:bg-rose-500/10"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </button>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">Loading plan metrics...</div>
+      )}
+
+      {!isLoading && !error && planMetrics.length === 0 && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
+          No plan enrollment metrics found yet.
+        </div>
+      )}
 
       {/* Plans Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {plansData.map((plan) => (
-          <motion.div
-            key={plan.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="group relative overflow-hidden rounded-2xl border p-5 backdrop-blur-xl"
-            style={{
-              borderColor: `${plan.theme.primary}30`,
-              background: `linear-gradient(135deg, ${plan.theme.bgGlow} 0%, rgba(0,0,0,0.2) 100%)`,
-            }}
-          >
-            <div 
-              className="absolute inset-x-0 top-0 h-1"
-              style={{ background: `linear-gradient(90deg, transparent, ${plan.theme.primary}, transparent)` }}
-            />
-            
-            <div className="mb-4 flex items-start justify-between">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: plan.theme.primary }}>Plan {plan.id}</p>
-                <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-              </div>
-              <div 
-                className="flex h-12 w-12 items-center justify-center rounded-xl"
-                style={{ background: plan.theme.bgGlow, border: `1px solid ${plan.theme.primary}40` }}
-              >
-                <Layers className="h-5 w-5" style={{ color: plan.theme.primary }} />
-              </div>
-            </div>
+        {plans.map((plan) => {
+          const metrics = planMetricsMap.get(plan.id);
+          const activeUsers = metrics?.activeUsers ?? 0;
+          const maturedUsers = metrics?.maturedUsers ?? 0;
+          const totalRevenue = metrics?.totalRevenue ?? 0;
+          const totalEnrollments = metrics?.totalEnrollments ?? 0;
+          const adoptionRate = metrics?.adoptionRate ?? 0;
 
-            <div className="mb-4 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">Enrollment Fee</p>
-                <p className="text-lg font-bold text-white">${plan.joiningFee}</p>
-              </div>
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">ROI</p>
-                <p className="text-lg font-bold" style={{ color: plan.theme.primary }}>{plan.roi}%</p>
-              </div>
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">Team Size</p>
-                <p className="text-lg font-bold text-white">{plan.teamSize}</p>
-              </div>
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">Guaranteed Flushout</p>
-                <p className="text-lg font-bold text-white">{plan.flushoutDays}d</p>
-              </div>
-            </div>
-
-            <div className="mb-4 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">Active Users</span>
-                <span className="font-medium text-white">{plan.activeUsers}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">Matured Users</span>
-                <span className="font-medium text-emerald-400">{plan.maturedUsers}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">Total Revenue</span>
-                <span className="font-medium" style={{ color: plan.theme.primary }}>${plan.totalRevenue.toLocaleString()}</span>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => setSelectedPlan(plan)}
-              className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+          return (
+            <motion.div
+              key={plan.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="group relative overflow-hidden rounded-2xl border p-5 backdrop-blur-xl"
+              style={{
+                borderColor: `${plan.theme.primary}30`,
+                background: `linear-gradient(135deg, ${plan.theme.bgGlow} 0%, rgba(0,0,0,0.2) 100%)`,
+              }}
             >
-              View Details
-            </button>
-          </motion.div>
-        ))}
+              <div
+                className="absolute inset-x-0 top-0 h-1"
+                style={{ background: `linear-gradient(90deg, transparent, ${plan.theme.primary}, transparent)` }}
+              />
+
+              <div className="mb-4 flex items-start justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: plan.theme.primary }}>Plan {plan.id}</p>
+                  <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                </div>
+                <div
+                  className="flex h-12 w-12 items-center justify-center rounded-xl"
+                  style={{ background: plan.theme.bgGlow, border: `1px solid ${plan.theme.primary}40` }}
+                >
+                  <Layers className="h-5 w-5" style={{ color: plan.theme.primary }} />
+                </div>
+              </div>
+
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-slate-500">Enrollment Fee</p>
+                  <p className="text-lg font-bold text-white">${plan.joiningFee}</p>
+                </div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-slate-500">ROI</p>
+                  <p className="text-lg font-bold" style={{ color: plan.theme.primary }}>{plan.roi}%</p>
+                </div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-slate-500">Team Size</p>
+                  <p className="text-lg font-bold text-white">{plan.teamSize}</p>
+                </div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-slate-500">Guaranteed Flushout</p>
+                  <p className="text-lg font-bold text-white">{plan.flushoutDays}d</p>
+                </div>
+              </div>
+
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Active Users</span>
+                  <span className="font-medium text-white">{activeUsers.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Matured Users</span>
+                  <span className="font-medium text-emerald-400">{maturedUsers.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Total Revenue</span>
+                  <span className="font-medium" style={{ color: plan.theme.primary }}>{formatUsd(totalRevenue)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Plan Adoption</span>
+                  <span className="font-medium text-sky-300">{adoptionRate.toFixed(2)}% ({totalEnrollments.toLocaleString()})</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedPlan(plan)}
+                className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+              >
+                View Details
+              </button>
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* Plan Detail Modal */}
@@ -1210,47 +1133,158 @@ function PlansManagement() {
 // =============================================
 // POOLS MANAGEMENT COMPONENT
 // =============================================
-function PoolsManagement() {
-  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+function PoolsManagement({ token }: { token: string | null }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState<'REWARD' | 'ALL' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [withdrawMessage, setWithdrawMessage] = useState<string | null>(null);
+  const [pools, setPools] = useState<Pool[]>([]);
+  const [totals, setTotals] = useState({
+    systemPool: 0,
+    leaderPool: 0,
+    rewardPool: 0,
+    sponsorPool: 0,
+    allFund: 0,
+    systemFund: 0,
+  });
 
-  const systemPools = poolsData.filter(p => p.type === 'System');
-  const leaderPools = poolsData.filter(p => p.type === 'Leader');
-  const rewardPools = poolsData.filter(p => p.type === 'Reward');
-  const sponsorPools = poolsData.filter(p => p.type === 'Sponsor');
+  const loadPoolMetrics = useCallback(async () => {
+    if (!token) {
+      setPools([]);
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const getPoolPresentation = (type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR') => {
+        switch (type) {
+          case 'SYSTEM':
+            return {
+              theme: { primary: '#22d3ee', bg: 'bg-cyan-500/10', border: 'rgba(34,211,238,0.35)' },
+              label: 'System Fund',
+            };
+          case 'LEADER':
+            return {
+              theme: { primary: '#f59e0b', bg: 'bg-amber-500/10', border: 'rgba(245,158,11,0.35)' },
+              label: 'Leader Pool',
+            };
+          case 'REWARD':
+            return {
+              theme: { primary: '#a855f7', bg: 'bg-purple-500/10', border: 'rgba(168,85,247,0.35)' },
+              label: 'Reward Pool',
+            };
+          default:
+            return {
+              theme: { primary: '#34d399', bg: 'bg-emerald-500/10', border: 'rgba(52,211,153,0.35)' },
+              label: 'Sponsor Pool',
+            };
+        }
+      };
+
+      const response = await adminApi.getPoolMetrics(token);
+      const mapPoolType = (type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR'): Pool['type'] => {
+        switch (type) {
+          case 'SYSTEM':
+            return 'System';
+          case 'LEADER':
+            return 'Leader';
+          case 'REWARD':
+            return 'Reward';
+          default:
+            return 'Sponsor';
+        }
+      };
+
+      const nextPools: Pool[] = response.pools.map((pool) => {
+        const presentation = getPoolPresentation(pool.type);
+
+        return {
+          id: pool.id,
+          planId: pool.planId,
+          displayName: `${pool.planName} • ${presentation.label}`,
+          balance: pool.balance,
+          totalDistributed: pool.totalDistributed,
+          type: mapPoolType(pool.type),
+          theme: presentation.theme,
+        };
+      });
+
+      setPools(nextPools);
+      setTotals(response.totals);
+    } catch (err) {
+      setPools([]);
+      setTotals({ systemPool: 0, leaderPool: 0, rewardPool: 0, sponsorPool: 0, allFund: 0, systemFund: 0 });
+      setError(err instanceof Error ? err.message : 'Failed to load pool metrics');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  const handleWithdraw = useCallback(async (scope: 'REWARD' | 'ALL') => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+    const confirmed = window.confirm(
+      scope === 'REWARD'
+        ? 'Confirm reward pool withdrawal? This action updates balances immediately.'
+        : 'Confirm all-pool withdrawal? This action updates balances immediately.',
+    );
+    if (!confirmed) return;
+
+    setIsWithdrawing(scope);
+    setWithdrawMessage(null);
+    setError(null);
+    try {
+      const response = await adminApi.withdrawPoolFunds(token, { scope, confirmation: 'CONFIRM_POOL_WITHDRAW' });
+      setWithdrawMessage(response.message);
+      await loadPoolMetrics();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process withdrawal');
+    } finally {
+      setIsWithdrawing(null);
+    }
+  }, [loadPoolMetrics, token]);
+
+  useEffect(() => {
+    void loadPoolMetrics();
+  }, [loadPoolMetrics]);
+
+  const systemPools = useMemo(() => pools.filter((pool) => pool.type === 'System'), [pools]);
+  const leaderPools = useMemo(() => pools.filter((pool) => pool.type === 'Leader'), [pools]);
+  const rewardPools = useMemo(() => pools.filter((pool) => pool.type === 'Reward'), [pools]);
+  const sponsorPools = useMemo(() => pools.filter((pool) => pool.type === 'Sponsor'), [pools]);
 
   const PoolCard = ({ pool }: { pool: Pool }) => (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group rounded-xl border p-4 transition-all hover:-translate-y-1"
-      style={{ 
-        borderColor: pool.theme.border, 
-        background: `linear-gradient(135deg, ${pool.theme.bg}40, transparent)` 
+      className="group rounded-xl border p-4"
+      style={{
+        borderColor: pool.theme.border,
+        background: `linear-gradient(135deg, ${pool.theme.border}20, transparent)`,
       }}
     >
       <div className="mb-3 flex items-center gap-3">
         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${pool.theme.bg}`}>
-          <Database className={`h-5 w-5`} style={{ color: pool.theme.primary }} />
+          <Database className="h-5 w-5" style={{ color: pool.theme.primary }} />
         </div>
         <div>
-          <p className="text-xs text-slate-400">{pool.name}</p>
-          <p className="font-mono text-xl font-semibold text-white">${pool.balance.toLocaleString()}</p>
+          <p className="text-xs text-slate-400">{pool.displayName}</p>
+          <p className="font-mono text-xl font-semibold text-white">{formatUsd(pool.balance)}</p>
         </div>
       </div>
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-500">Total Distributed</span>
-        <span className="font-medium text-emerald-400">${pool.totalDistributed.toLocaleString()}</span>
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button 
-          onClick={() => setSelectedPool(pool)}
-          className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 text-xs font-medium text-slate-300 hover:bg-white/10"
-        >
-          Withdraw
-        </button>
-        <button className="flex-1 rounded-lg border border-cyan-500/20 bg-cyan-500/10 py-2 text-xs font-medium text-cyan-300 hover:bg-cyan-500/15">
-          Details
-        </button>
+      <div className="space-y-1 text-xs">
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500">Plan ID</span>
+          <span className="font-medium text-slate-200">{pool.planId}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500">Total Distributed</span>
+          <span className="font-medium text-emerald-400">{formatUsd(pool.totalDistributed)}</span>
+        </div>
       </div>
     </motion.div>
   );
@@ -1264,10 +1298,81 @@ function PoolsManagement() {
           <p className="text-sm text-slate-400">Manage all treasury pools and distributions</p>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 px-3 sm:px-4 py-2">
-          <p className="text-[10px] sm:text-xs text-slate-500">Total Pool Balance</p>
-          <p className="font-mono text-lg sm:text-xl font-bold text-emerald-400">$425,890</p>
+          <p className="text-[10px] sm:text-xs text-slate-500">All Fund (System Fund)</p>
+          <p className="font-mono text-lg sm:text-xl font-bold text-emerald-400">{formatUsd(totals.systemFund)}</p>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="text-[10px] text-slate-500">All Fund</p>
+          <p className="text-lg font-bold text-white">{formatUsd(totals.allFund)}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="text-[10px] text-slate-500">Leader Pool</p>
+          <p className="text-lg font-bold text-amber-300">{formatUsd(totals.leaderPool)}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="text-[10px] text-slate-500">Reward Pool</p>
+          <p className="text-lg font-bold text-purple-300">{formatUsd(totals.rewardPool)}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="text-[10px] text-slate-500">Sponsor Pool</p>
+          <p className="text-lg font-bold text-emerald-300">{formatUsd(totals.sponsorPool)}</p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-sm font-semibold text-white">Admin Pool Withdraw Actions</p>
+        <p className="text-xs text-slate-400">Run secure backend withdrawals for Reward Pool only or complete All Fund.</p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <button
+            onClick={() => void handleWithdraw('REWARD')}
+            disabled={isLoading || isWithdrawing !== null || totals.rewardPool <= 0}
+            className="rounded-xl border border-purple-400/30 bg-purple-500/10 px-4 py-2 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-50"
+          >
+            {isWithdrawing === 'REWARD' ? 'Withdrawing...' : 'Withdraw Reward Pool'}
+          </button>
+          <button
+            onClick={() => void handleWithdraw('ALL')}
+            disabled={isLoading || isWithdrawing !== null || totals.allFund <= 0}
+            className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50"
+          >
+            {isWithdrawing === 'ALL' ? 'Withdrawing...' : 'Withdraw All Pool Balance'}
+          </button>
+          <button
+            onClick={() => void loadPoolMetrics()}
+            disabled={isLoading || isWithdrawing !== null}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10 disabled:opacity-50"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {withdrawMessage && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+          {withdrawMessage}
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200">
+          {error}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+          Loading pool metrics...
+        </div>
+      )}
+
+      {!isLoading && !error && pools.length === 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+          No pool records found.
+        </div>
+      )}
 
       {/* System Pools */}
       <div>
@@ -1300,164 +1405,6 @@ function PoolsManagement() {
           {sponsorPools.map(pool => <PoolCard key={pool.id} pool={pool} />)}
         </div>
       </div>
-
-      {/* Withdraw Modal */}
-      <AnimatePresence>
-        {selectedPool && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-            onClick={() => setSelectedPool(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0f] p-6"
-            >
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">Withdraw from Pool</h3>
-                <button onClick={() => setSelectedPool(null)} className="text-slate-400 hover:text-white">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="mb-4 rounded-xl border border-white/5 bg-white/[0.03] p-4">
-                <p className="text-xs text-slate-500">Pool</p>
-                <p className="text-sm font-medium text-white">{selectedPool.name}</p>
-                <p className="mt-2 text-xs text-slate-500">Available Balance</p>
-                <p className="text-2xl font-bold text-emerald-400">${selectedPool.balance.toLocaleString()}</p>
-              </div>
-              <div className="mb-4">
-                <label className="mb-2 block text-xs text-slate-500">Amount to Withdraw</label>
-                <input
-                  type="number"
-                  placeholder="Enter amount..."
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/30"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setSelectedPool(null)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-slate-300 hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-                <button className="flex-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 py-3 text-sm font-medium text-white">
-                  Withdraw
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// =============================================
-// WITHDRAWALS MANAGEMENT COMPONENT
-// =============================================
-function WithdrawalsManagement() {
-  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'All'>('All');
-
-  const filteredRequests = withdrawalRequests.filter(req => 
-    statusFilter === 'All' || req.status === statusFilter
-  );
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Withdrawal Requests</h1>
-          <p className="text-sm text-slate-400">Manage and process withdrawal requests</p>
-        </div>
-        <div className="flex gap-2 sm:gap-3">
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 sm:px-4 py-2">
-            <p className="text-[10px] sm:text-xs text-amber-400">Pending</p>
-            <p className="font-mono text-lg sm:text-xl font-bold text-amber-300">12</p>
-          </div>
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 sm:px-4 py-2">
-            <p className="text-[10px] sm:text-xs text-emerald-400">Approved</p>
-            <p className="font-mono text-lg sm:text-xl font-bold text-emerald-300">$4,250</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as RequestStatus | 'All')}
-          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none"
-        >
-          <option value="All" className="bg-[#0a0a0f]">All Status</option>
-          <option value="Pending" className="bg-[#0a0a0f]">Pending</option>
-          <option value="Processing" className="bg-[#0a0a0f]">Processing</option>
-          <option value="Approved" className="bg-[#0a0a0f]">Approved</option>
-          <option value="Rejected" className="bg-[#0a0a0f]">Rejected</option>
-        </select>
-      </div>
-
-      {/* Requests Table */}
-      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] min-w-[650px]">
-        <table className="w-full">
-          <thead className="bg-white/[0.03]">
-            <tr className="border-b border-white/10">
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">ID</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">User</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Amount</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Status</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Requested</th>
-              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRequests.map((req) => (
-              <tr key={req.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
-                <td className="px-6 py-4 font-mono text-sm text-slate-300">#{req.id}</td>
-                <td className="px-6 py-4 font-mono text-sm text-slate-300">{req.wallet}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-white">${req.amount}</td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${statusStyle(req.status)}`}>
-                    {req.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-400">{req.requestedAt}</td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
-                    {req.status === 'Pending' && (
-                      <>
-                        <button className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20">
-                          Approve
-                        </button>
-                        <button className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-500/20">
-                          Reject
-                        </button>
-                      </>
-                    )}
-                    {req.status === 'Processing' && (
-                      <button className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-400 hover:bg-sky-500/20">
-                        Complete
-                      </button>
-                    )}
-                    {req.txHash && (
-                      <button className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-white/10">
-                        <ExternalLink className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      </div>
     </div>
   );
 }
@@ -1465,7 +1412,107 @@ function WithdrawalsManagement() {
 // =============================================
 // FLUSHOUTS MANAGEMENT COMPONENT
 // =============================================
-function FlushoutsManagement() {
+function FlushoutsManagement({ token, plans }: { token: string | null; plans: Plan[] }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [records, setRecords] = useState<FlushoutRecord[]>([]);
+  const [manualEnrollmentId, setManualEnrollmentId] = useState('');
+
+  const EXPORT_PAGE_SIZE = 500;
+
+  const loadFlushouts = useCallback(async () => {
+    if (!token) {
+      setRecords([]);
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getFlushouts(token, { page: 1, limit: 100 });
+      setRecords(response.flushouts);
+    } catch (err) {
+      setRecords([]);
+      setError(err instanceof Error ? err.message : 'Failed to load flushouts');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadFlushouts();
+  }, [loadFlushouts]);
+
+  const handleExportAll = async () => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsExporting(true);
+    setError(null);
+    try {
+      const firstPage = await adminApi.getFlushouts(token, { page: 1, limit: EXPORT_PAGE_SIZE });
+      const allRows = [...firstPage.flushouts];
+
+      for (let page = 2; page <= firstPage.pagination.pages; page += 1) {
+        const nextPage = await adminApi.getFlushouts(token, { page, limit: EXPORT_PAGE_SIZE });
+        allRows.push(...nextPage.flushouts);
+      }
+
+      const csv = buildCsv(
+        allRows.map((item) => ({
+          id: item.id,
+          userId: item.userId,
+          wallet: item.wallet,
+          userName: item.userName ?? '',
+          planId: item.planId,
+          planName: item.planName,
+          amount: item.amount,
+          type: item.type,
+          flushedAt: item.flushedAt,
+        })),
+      );
+      downloadCsv(`admin-flushouts-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export flushouts');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleManualFlushout = async () => {
+    const enrollmentId = manualEnrollmentId.trim();
+    if (!enrollmentId) {
+      setError('Enrollment ID is required for manual flushout.');
+      return;
+    }
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+    const confirmed = window.confirm(`Confirm manual flushout for enrollment ${enrollmentId}?`);
+    if (!confirmed) return;
+
+    setIsSubmittingManual(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await adminApi.manualFlushout(token, enrollmentId, { confirmation: 'CONFIRM_MANUAL_FLUSHOUT' });
+      setSuccess(response.message || 'Manual flushout processed.');
+      setManualEnrollmentId('');
+      await loadFlushouts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process manual flushout');
+    } finally {
+      setIsSubmittingManual(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1474,17 +1521,59 @@ function FlushoutsManagement() {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Flushout Management</h1>
           <p className="text-sm text-slate-400">Track and manage plan flushouts</p>
         </div>
-        <button className="flex items-center justify-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-300 hover:bg-amber-500/20 w-full sm:w-auto">
-          <Flame className="h-4 w-4" />
-          Manual Flushout
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            onClick={() => void handleExportAll()}
+            disabled={isExporting || isLoading}
+            className="flex items-center justify-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            {isExporting ? 'Exporting...' : 'Export All'}
+          </button>
+          <button
+            onClick={() => void loadFlushouts()}
+            disabled={isLoading || isSubmittingManual}
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+        <p className="text-sm font-semibold text-amber-100">Manual Flushout</p>
+        <p className="mt-1 text-xs text-amber-200/80">Enter enrollment ID and trigger backend manual flushout.</p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input
+            value={manualEnrollmentId}
+            onChange={(event) => setManualEnrollmentId(event.target.value)}
+            placeholder="Enrollment ID"
+            className="w-full rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none focus:border-amber-400/40"
+          />
+          <button
+            onClick={() => void handleManualFlushout()}
+            disabled={isSubmittingManual || isLoading}
+            className="flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-amber-500/30 disabled:opacity-60"
+          >
+            <Flame className="h-4 w-4" />
+            {isSubmittingManual ? 'Processing...' : 'Run Manual Flushout'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</div>
+      )}
+      {success && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">{success}</div>
+      )}
 
       {/* Flushout Schedule */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
         <h3 className="mb-4 text-lg font-semibold text-white">Flushout Schedule</h3>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          {plansData.map((plan) => (
+          {plans.map((plan) => (
             <div 
               key={plan.id} 
               className="rounded-xl border p-4 text-center"
@@ -1504,6 +1593,11 @@ function FlushoutsManagement() {
           <div className="border-b border-white/10 px-4 sm:px-6 py-4">
             <h3 className="text-lg font-semibold text-white">Recent Flushouts</h3>
           </div>
+          {isLoading ? (
+            <div className="p-4 text-sm text-slate-300">Loading flushout records...</div>
+          ) : records.length === 0 ? (
+            <div className="p-4 text-sm text-slate-300">No flushout records found.</div>
+          ) : (
           <table className="w-full">
             <thead className="bg-white/[0.03]">
               <tr className="border-b border-white/10">
@@ -1516,12 +1610,12 @@ function FlushoutsManagement() {
               </tr>
             </thead>
             <tbody>
-              {flushoutRecords.map((record) => (
+              {records.map((record) => (
                 <tr key={record.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
-                  <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">#{record.id}</td>
+                  <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">{(record.id || '').slice(0, 10)}</td>
                   <td className="px-4 sm:px-6 py-4 font-mono text-sm text-slate-300">{record.wallet}</td>
                   <td className="px-4 sm:px-6 py-4 text-sm text-slate-300">{record.planName}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm font-semibold text-emerald-400">+${record.amount}</td>
+                  <td className="px-4 sm:px-6 py-4 text-sm font-semibold text-emerald-400">+{formatUsd(record.amount)}</td>
                   <td className="px-4 sm:px-6 py-4">
                     <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${
                       record.type === 'Auto' 
@@ -1531,11 +1625,12 @@ function FlushoutsManagement() {
                       {record.type}
                     </span>
                   </td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-slate-400">{record.flushedAt}</td>
+                  <td className="px-4 sm:px-6 py-4 text-sm text-slate-400">{new Date(record.flushedAt).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          )}
         </div>
       </div>
     </div>
@@ -1825,7 +1920,15 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [newCode, setNewCode] = useState({ code: '', planId: '1', days: '30', quantity: '1' });
+  const [newCode, setNewCode] = useState({
+    code: '',
+    planId: '1',
+    days: '',
+    quantity: '1',
+    amountMode: 'PLAN' as 'PLAN' | 'CUSTOM',
+    customAmount: '',
+  });
+  const isNumericDaysInput = (value: string): boolean => /^\d*$/.test(value);
 
   const loadGiftCodes = useCallback(async () => {
     if (!token) {
@@ -1857,16 +1960,24 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
       return;
     }
 
-    const days = Number(newCode.days);
+    const daysRaw = newCode.days.trim();
+    const daysInputProvided = daysRaw.length > 0;
+    const days = daysInputProvided ? Number(daysRaw) : undefined;
     const quantity = Number(newCode.quantity);
     const planId = Number(newCode.planId);
     const code = newCode.code.trim().toUpperCase();
+    const customAmountRaw = newCode.customAmount.trim();
+    const customAmount = newCode.amountMode === 'CUSTOM' ? Number(customAmountRaw) : undefined;
 
     if (!Number.isInteger(planId) || planId < 1 || planId > 6) {
       setError('Plan must be between 1 and 6.');
       return;
     }
-    if (!Number.isInteger(days) || days < 1 || days > 365) {
+    if (daysInputProvided && !isNumericDaysInput(daysRaw)) {
+      setError('Valid for days must contain numbers only.');
+      return;
+    }
+    if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > 365)) {
       setError('Valid for days must be between 1 and 365.');
       return;
     }
@@ -1882,17 +1993,39 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
       setError('Custom code can only be created with quantity 1.');
       return;
     }
+    if (newCode.amountMode === 'CUSTOM') {
+      if (!/^\d+(\.\d+)?$/.test(customAmountRaw)) {
+        setError('Custom amount must be numeric.');
+        return;
+      }
+      if (!Number.isFinite(customAmount) || (customAmount ?? 0) <= 0) {
+        setError('Custom amount must be greater than 0.');
+        return;
+      }
+      if ((customAmount ?? 0) > 1_000_000) {
+        setError('Custom amount is too large.');
+        return;
+      }
+    }
 
     setIsCreating(true);
     setError(null);
     try {
       await adminApi.createGiftCode(token, {
         planId,
-        expiryDays: days,
+        ...(days !== undefined ? { expiryDays: days } : {}),
         quantity,
+        ...(newCode.amountMode === 'CUSTOM' ? { customAmount } : {}),
         ...(code ? { code } : {}),
       });
-      setNewCode({ code: '', planId: '1', days: '30', quantity: '1' });
+      setNewCode({
+        code: '',
+        planId: '1',
+        days: '',
+        quantity: '1',
+        amountMode: 'PLAN',
+        customAmount: '',
+      });
       setShowCreate(false);
       await loadGiftCodes();
     } catch (err) {
@@ -2066,8 +2199,55 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
                   </div>
                 </div>
                 <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Amount Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewCode({ ...newCode, amountMode: 'PLAN', customAmount: '' })}
+                      className={`rounded-xl border px-3 py-2 text-xs font-semibold ${newCode.amountMode === 'PLAN' ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200' : 'border-white/10 bg-white/5 text-slate-300'}`}
+                    >
+                      Plan Amount
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewCode({ ...newCode, amountMode: 'CUSTOM' })}
+                      className={`rounded-xl border px-3 py-2 text-xs font-semibold ${newCode.amountMode === 'CUSTOM' ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200' : 'border-white/10 bg-white/5 text-slate-300'}`}
+                    >
+                      Custom Amount
+                    </button>
+                  </div>
+                </div>
+                {newCode.amountMode === 'CUSTOM' && (
+                  <div>
+                    <label htmlFor="gift-code-custom-amount" className="text-xs text-slate-400 mb-1 block">Custom Amount (USD)</label>
+                    <input
+                      id="gift-code-custom-amount"
+                      value={newCode.customAmount}
+                      onChange={(e) => setNewCode({ ...newCode, customAmount: e.target.value })}
+                      placeholder="e.g. 1"
+                      inputMode="decimal"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none"
+                    />
+                  </div>
+                )}
+                <div>
                   <label htmlFor="gift-code-days" className="text-xs text-slate-400 mb-1 block">Valid For (Days)</label>
-                  <input id="gift-code-days" type="number" value={newCode.days} onChange={e => setNewCode({ ...newCode, days: e.target.value })} placeholder="30" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none" />
+                  <input
+                    id="gift-code-days"
+                    type="text"
+                    inputMode="numeric"
+                    value={newCode.days}
+                    onChange={e => {
+                      const next = e.target.value;
+                      if (isNumericDaysInput(next)) {
+                        setNewCode({ ...newCode, days: next });
+                      } else {
+                        setError('Valid for days must contain numbers only.');
+                      }
+                    }}
+                    placeholder="e.g. 30"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:outline-none"
+                  />
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button onClick={() => setShowCreate(false)} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white">Cancel</button>
@@ -2088,24 +2268,87 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
 // =============================================
 // REWARDS MANAGEMENT COMPONENT
 // =============================================
-function RewardsManagement() {
+export function RewardsManagement({ token }: { token: string | null }) {
   const [activeTab, setActiveTab] = useState<'club' | 'individual'>('club');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [nextDistributionAt, setNextDistributionAt] = useState<string | null>(null);
+  const [summary, setSummary] = useState({
+    totalClaims: 0,
+    pendingClaims: 0,
+    approvedClaims: 0,
+    paidClaims: 0,
+    rejectedClaims: 0,
+    totalClaimedAmount: 0,
+    totalPaidAmount: 0,
+  });
+  const [clubIncentives, setClubIncentives] = useState<Array<{
+    id: string;
+    rank: string;
+    plan1: number;
+    plan2: number;
+    plan3: number;
+    plan4: number;
+    plan5: number;
+    plan6: number;
+    reward: number;
+  }>>([]);
+  const [individualIncentives, setIndividualIncentives] = useState<Array<{
+    id: string;
+    plan: string;
+    target: number;
+    reward: number;
+  }>>([]);
 
-  const clubIncentives = [
-    { id: 1, plan1: 25, plan2: 18, plan3: 14, plan4: 4, plan5: 2, plan6: 1, reward: 30, rank: 'Bronze Club' },
-    { id: 2, plan1: 50, plan2: 36, plan3: 28, plan4: 8, plan5: 4, plan6: 2, reward: 70, rank: 'Silver Club' },
-    { id: 3, plan1: 75, plan2: 54, plan3: 42, plan4: 12, plan5: 6, plan6: 3, reward: 110, rank: 'Gold Club' },
-    { id: 4, plan1: 100, plan2: 72, plan3: 56, plan4: 16, plan5: 8, plan6: 4, reward: 200, rank: 'Platinum Club' },
-  ];
+  const loadRewardsMetrics = useCallback(async () => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      setClubIncentives([]);
+      setIndividualIncentives([]);
+      setNextDistributionAt(null);
+      return;
+    }
 
-  const individualIncentives = [
-    { plan: 'Plan 1', target: 100, reward: 20 },
-    { plan: 'Plan 2', target: 75, reward: 25 },
-    { plan: 'Plan 3', target: 50, reward: 28 },
-    { plan: 'Plan 4', target: 25, reward: 25 },
-    { plan: 'Plan 5', target: 15, reward: 30 },
-    { plan: 'Plan 6', target: 10, reward: 30 },
-  ];
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getRewardsMetrics(token);
+      setNextDistributionAt(response.nextDistributionAt ?? null);
+      setSummary({
+        totalClaims: Number(response.summary?.totalClaims ?? 0),
+        pendingClaims: Number(response.summary?.pendingClaims ?? 0),
+        approvedClaims: Number(response.summary?.approvedClaims ?? 0),
+        paidClaims: Number(response.summary?.paidClaims ?? 0),
+        rejectedClaims: Number(response.summary?.rejectedClaims ?? 0),
+        totalClaimedAmount: Number(response.summary?.totalClaimedAmount ?? 0),
+        totalPaidAmount: Number(response.summary?.totalPaidAmount ?? 0),
+      });
+      setClubIncentives(Array.isArray(response.clubIncentives) ? response.clubIncentives : []);
+      setIndividualIncentives(Array.isArray(response.individualIncentives) ? response.individualIncentives : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load rewards metrics');
+      setNextDistributionAt(null);
+      setClubIncentives([]);
+      setIndividualIncentives([]);
+      setSummary({
+        totalClaims: 0,
+        pendingClaims: 0,
+        approvedClaims: 0,
+        paidClaims: 0,
+        rejectedClaims: 0,
+        totalClaimedAmount: 0,
+        totalPaidAmount: 0,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadRewardsMetrics();
+  }, [loadRewardsMetrics]);
+
+  const hasRewardConfig = Boolean(nextDistributionAt) || clubIncentives.length > 0 || individualIncentives.length > 0;
 
   return (
     <div className="space-y-6">
@@ -2117,9 +2360,49 @@ function RewardsManagement() {
         </div>
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 sm:px-4 py-2">
           <p className="text-[10px] sm:text-xs text-amber-400">Next Distribution</p>
-          <p className="font-mono text-base sm:text-lg font-bold text-amber-300">March 30, 2026</p>
+          {isLoading ? (
+            <p className="font-mono text-base sm:text-lg font-bold text-amber-300">Loading...</p>
+          ) : nextDistributionAt ? (
+            <p className="font-mono text-base sm:text-lg font-bold text-amber-300">{new Date(nextDistributionAt).toLocaleString()}</p>
+          ) : (
+            <p className="font-mono text-sm sm:text-base font-bold text-amber-200/90">Not configured</p>
+          )}
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-200">
+          <p>{error}</p>
+          <button
+            onClick={() => void loadRewardsMetrics()}
+            className="mt-2 inline-flex items-center gap-1 rounded-lg border border-rose-400/30 px-2 py-1 text-[11px] font-semibold text-rose-100 hover:bg-rose-500/10"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Claims', value: summary.totalClaims, color: '#22d3ee' },
+          { label: 'Pending Claims', value: summary.pendingClaims, color: '#fbbf24' },
+          { label: 'Paid Claims', value: summary.paidClaims, color: '#34d399' },
+          { label: 'Total Paid', value: formatUsd(summary.totalPaidAmount), color: '#e879f9' },
+        ].map((item) => (
+          <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider">{item.label}</p>
+            <p className="text-xl sm:text-2xl font-bold mt-1" style={{ color: item.color }}>{item.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {isLoading && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">Loading rewards configuration...</div>
+      )}
+      {!isLoading && !error && !hasRewardConfig && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">No rewards configuration found.</div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2">
@@ -2148,64 +2431,76 @@ function RewardsManagement() {
       {/* Club Incentives */}
       {activeTab === 'club' && (
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
-          <table className="w-full">
-            <thead className="bg-white/[0.03]">
-              <tr className="border-b border-white/10">
-                <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Rank</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 1 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 2 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 3 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 4 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 5 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 6 IDs</th>
-                <th className="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Reward</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clubIncentives.map((incentive) => (
-                <tr key={incentive.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-3 py-1 text-sm font-semibold text-rose-300">
-                      <Medal className="h-4 w-4" />
-                      {incentive.rank}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan1}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan2}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan3}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan4}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan5}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan6}</td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-lg font-bold text-emerald-400">${incentive.reward}</span>
-                  </td>
+          {clubIncentives.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-sm text-slate-300">No club incentives configured.</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-white/[0.03]">
+                <tr className="border-b border-white/10">
+                  <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Rank</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 1 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 2 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 3 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 4 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 5 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 6 IDs</th>
+                  <th className="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Reward</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {clubIncentives.map((incentive) => (
+                  <tr key={incentive.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-3 py-1 text-sm font-semibold text-rose-300">
+                        <Medal className="h-4 w-4" />
+                        {incentive.rank}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan1}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan2}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan3}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan4}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan5}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan6}</td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-lg font-bold text-emerald-400">{formatUsd(incentive.reward)}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
       {/* Individual Incentives */}
       {activeTab === 'individual' && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {individualIncentives.map((incentive, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="rounded-xl border border-white/10 bg-white/[0.04] p-5"
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{incentive.plan}</p>
-              <p className="mt-2 text-3xl font-bold text-white">{incentive.target}</p>
-              <p className="text-sm text-slate-400">Target IDs</p>
-              <div className="mt-4 flex items-center gap-2">
-                <Gift className="h-4 w-4 text-rose-400" />
-                <span className="text-lg font-bold text-emerald-400">${incentive.reward}</span>
-              </div>
-            </motion.div>
-          ))}
+          {individualIncentives.length === 0 ? (
+            <div className="col-span-full rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
+              No individual incentives configured.
+            </div>
+          ) : (
+            individualIncentives.map((incentive, index) => (
+              <motion.div
+                key={incentive.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="rounded-xl border border-white/10 bg-white/[0.04] p-5"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{incentive.plan}</p>
+                <p className="mt-2 text-3xl font-bold text-white">{incentive.target}</p>
+                <p className="text-sm text-slate-400">Target IDs</p>
+                <div className="mt-4 flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-rose-400" />
+                  <span className="text-lg font-bold text-emerald-400">{formatUsd(incentive.reward)}</span>
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
       )}
     </div>
@@ -2287,6 +2582,10 @@ function DailyIncomeManagement() {
 // =============================================
 export function SecurityLogs({ token }: { token: string | null }) {
   const [severityFilter, setSeverityFilter] = useState<'All' | 'Info' | 'Warning' | 'Critical'>('All');
+  const [actionFilter, setActionFilter] = useState('');
+  const [adminIdFilter, setAdminIdFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [logs, setLogs] = useState<Array<{
     id: string;
     timestamp: string;
@@ -2308,7 +2607,13 @@ export function SecurityLogs({ token }: { token: string | null }) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await adminApi.getAuditLogs(token, { limit: 100 });
+      const response = await adminApi.getAuditLogs(token, {
+        limit: 100,
+        action: actionFilter.trim() || undefined,
+        adminId: adminIdFilter.trim() || undefined,
+        from: fromDate ? new Date(`${fromDate}T00:00:00.000Z`).toISOString() : undefined,
+        to: toDate ? new Date(`${toDate}T23:59:59.999Z`).toISOString() : undefined,
+      });
       const mappedLogs = response.logs.map((log) => {
         const action = log.action.toUpperCase();
         const severity: 'Info' | 'Warning' | 'Critical' = action.includes('BLOCK') || action.includes('REJECT') || action.includes('DENIED')
@@ -2333,7 +2638,7 @@ export function SecurityLogs({ token }: { token: string | null }) {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [actionFilter, adminIdFilter, fromDate, toDate, token]);
 
   useEffect(() => {
     void loadAuditLogs();
@@ -2351,7 +2656,24 @@ export function SecurityLogs({ token }: { token: string | null }) {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Security Logs</h1>
           <p className="text-sm text-slate-400">Monitor system activity and security events</p>
         </div>
-        <button className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 w-full sm:w-auto">
+        <button
+          onClick={() =>
+            downloadCsv(
+              `admin-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`,
+              buildCsv(
+                filteredLogs.map((log) => ({
+                  timestamp: log.timestamp,
+                  action: log.action,
+                  user: log.user,
+                  details: log.details,
+                  severity: log.severity,
+                })),
+                ['timestamp', 'action', 'user', 'details', 'severity'],
+              ),
+            )
+          }
+          className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 w-full sm:w-auto"
+        >
           <Download className="h-4 w-4" />
           Export Logs
         </button>
@@ -2387,6 +2709,37 @@ export function SecurityLogs({ token }: { token: string | null }) {
           <option value="Warning" className="bg-[#0a0a0f]">Warning</option>
           <option value="Critical" className="bg-[#0a0a0f]">Critical</option>
         </select>
+        <input
+          value={actionFilter}
+          onChange={(e) => setActionFilter(e.target.value)}
+          placeholder="Action (e.g. POOL_DISTRIBUTED)"
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none"
+        />
+        <input
+          value={adminIdFilter}
+          onChange={(e) => setAdminIdFilter(e.target.value)}
+          placeholder="Admin ID"
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none"
+        />
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none"
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none"
+        />
+        <button
+          onClick={() => void loadAuditLogs()}
+          disabled={isLoading}
+          className="rounded-xl border border-cyan-400/30 bg-cyan-500/15 px-4 py-3 text-sm font-semibold text-cyan-200 disabled:opacity-60"
+        >
+          Apply Filters
+        </button>
       </div>
 
       {/* Logs Table */}
@@ -2437,10 +2790,121 @@ export function SecurityLogs({ token }: { token: string | null }) {
 // =============================================
 // SETTINGS COMPONENT
 // =============================================
-function Settings() {
+export function Settings({ token }: { token: string | null }) {
   const [killConfirm, setKillConfirm] = useState(false);
-  const [broadcastOpen, setBroadcastOpen] = useState(false);
-  const [broadcastMsg, setBroadcastMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSavingKey, setIsSavingKey] = useState<string | null>(null);
+  const [isTriggeringKill, setIsTriggeringKill] = useState(false);
+  const [configs, setConfigs] = useState<Record<string, string>>({});
+  const [walletDraft, setWalletDraft] = useState('');
+  const [killReason, setKillReason] = useState('');
+  const [killResult, setKillResult] = useState<string | null>(null);
+
+  const toggleSettings = useMemo(
+    () => [
+      { key: 'MAINTENANCE_MODE', label: 'Maintenance Mode', desc: 'Temporarily disable new registrations' },
+      { key: 'FLUSHOUT_ENABLED', label: 'Auto Flushout', desc: 'Enable automatic plan flushouts' },
+      { key: 'COMMISSION_DISTRIBUTION_ENABLED', label: 'Commission Distribution', desc: 'Auto-distribute level commissions' },
+      { key: 'AUTO_WITHDRAWAL_SIGNING_ENABLED', label: 'Auto Withdrawal Signing', desc: 'Enable EIP-712 automatic withdrawal authorization' },
+      { key: 'KILL_SWITCH_ACTIVE', label: 'Kill Switch Active', desc: 'Emergency state after kill switch execution' },
+    ],
+    [],
+  );
+
+  const isTrue = useCallback((value: string | undefined): boolean => {
+    if (!value) return false;
+    return ['true', '1', 'yes', 'on'].includes(value.trim().toLowerCase());
+  }, []);
+
+  const loadConfigs = useCallback(async () => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    setSaveError(null);
+    try {
+      const response = await adminApi.getSystemConfig(token);
+      const nextConfigs = Object.fromEntries(
+        (response.configs || []).map((item) => [item.key, item.value]),
+      );
+      setConfigs(nextConfigs);
+      setWalletDraft(nextConfigs.KILL_SWITCH_WALLET_ADDRESS || '');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load settings');
+      setConfigs({});
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadConfigs();
+  }, [loadConfigs]);
+
+  const upsertConfig = useCallback(
+    async (key: string, value: string, description: string) => {
+      if (!token) {
+        setSaveError('Permission denied. Admin login required.');
+        return;
+      }
+      setIsSavingKey(key);
+      setSaveError(null);
+      setSaveMessage(null);
+      try {
+        const response = await adminApi.updateSystemConfig(token, key, { value, description });
+        setConfigs((prev) => ({ ...prev, [response.config.key]: response.config.value }));
+        if (key === 'KILL_SWITCH_WALLET_ADDRESS') {
+          setWalletDraft(response.config.value);
+        }
+        setSaveMessage(`Updated ${key}`);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : `Failed to update ${key}`);
+      } finally {
+        setIsSavingKey(null);
+      }
+    },
+    [token],
+  );
+
+  const handleTriggerKillSwitch = useCallback(async () => {
+    if (!token) {
+      setSaveError('Permission denied. Admin login required.');
+      return;
+    }
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletDraft.trim())) {
+      setSaveError('Enter a valid BEP20 wallet address before kill switch trigger.');
+      return;
+    }
+
+    setIsTriggeringKill(true);
+    setSaveError(null);
+    setSaveMessage(null);
+    setKillResult(null);
+    try {
+      const response = await adminApi.triggerKillSwitch(token, {
+        reason: killReason.trim() || undefined,
+        confirmation: 'CONFIRM_KILL_SWITCH',
+      });
+      setKillResult(
+        `Transfer initiated to ${response.transfer.destinationWallet} for ${formatUsd(response.transfer.amount)}.`,
+      );
+      setKillConfirm(false);
+      setKillReason('');
+      await loadConfigs();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to trigger kill switch');
+    } finally {
+      setIsTriggeringKill(false);
+    }
+  }, [killReason, loadConfigs, token, walletDraft]);
+
+  const toggleCount = toggleSettings.length;
+  const hasAnyConfig = Object.keys(configs).length > 0;
 
   return (
     <div className="space-y-6">
@@ -2463,44 +2927,109 @@ function Settings() {
             <p className="text-sm text-slate-400">Critical system actions</p>
           </div>
         </div>
-        
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <button
-            onClick={() => setBroadcastOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm font-semibold text-white transition hover:bg-white/10"
-          >
-            <Radio className="h-4 w-4" /> Global Broadcast
-          </button>
-          <button
-            onClick={() => setKillConfirm(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-rose-300/30 bg-rose-700/35 px-4 py-4 text-sm font-semibold text-rose-50 transition hover:bg-rose-700/45"
-          >
-            <AlertOctagon className="h-4 w-4" /> KILL-SWITCH
-          </button>
+
+        <div className="space-y-3">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Admin BEP20 Wallet Address</label>
+            <input
+              value={walletDraft}
+              onChange={(e) => setWalletDraft(e.target.value)}
+              placeholder="0x..."
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/40"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                disabled={isSavingKey === 'KILL_SWITCH_WALLET_ADDRESS'}
+                onClick={() => void upsertConfig('KILL_SWITCH_WALLET_ADDRESS', walletDraft.trim(), 'Emergency destination BEP20 wallet for kill switch')}
+                className="rounded-lg border border-cyan-400/30 bg-cyan-500/15 px-3 py-2 text-xs font-semibold text-cyan-200 disabled:opacity-60"
+              >
+                {isSavingKey === 'KILL_SWITCH_WALLET_ADDRESS' ? 'Saving...' : 'Save Wallet'}
+              </button>
+              <button
+                onClick={() => setKillConfirm(true)}
+                disabled={isTriggeringKill}
+                className="rounded-lg border border-rose-300/30 bg-rose-700/35 px-3 py-2 text-xs font-semibold text-rose-50 disabled:opacity-60"
+              >
+                <AlertOctagon className="mr-1 inline h-3 w-3" /> Trigger Kill Switch
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500">Configured Wallet</p>
+              <p className="mt-1 break-all font-mono text-xs text-slate-200">{configs.KILL_SWITCH_WALLET_ADDRESS || 'Not configured'}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500">Kill Switch Status</p>
+              <p className={`mt-1 text-sm font-semibold ${isTrue(configs.KILL_SWITCH_ACTIVE) ? 'text-rose-300' : 'text-emerald-300'}`}>
+                {isTrue(configs.KILL_SWITCH_ACTIVE) ? 'ACTIVE' : 'INACTIVE'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500">Last Triggered</p>
+              <p className="mt-1 text-sm text-slate-300">
+                {configs.KILL_SWITCH_LAST_TRIGGERED_AT ? new Date(configs.KILL_SWITCH_LAST_TRIGGERED_AT).toLocaleString() : 'Never'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
+      {(error || saveError || saveMessage || killResult) && (
+        <div className="space-y-2">
+          {error && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</div>}
+          {saveError && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{saveError}</div>}
+          {saveMessage && <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">{saveMessage}</div>}
+          {killResult && <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">{killResult}</div>}
+        </div>
+      )}
+
       {/* System Settings */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-        <h3 className="mb-4 text-lg font-semibold text-white">System Configuration</h3>
-        <div className="space-y-4">
-          {[
-            { label: 'Maintenance Mode', desc: 'Temporarily disable new registrations', enabled: false },
-            { label: 'Auto Flushout', desc: 'Enable automatic plan flushouts', enabled: true },
-            { label: 'Commission Distribution', desc: 'Auto-distribute level commissions', enabled: true },
-            { label: 'Withdrawal Approval', desc: 'Require manual approval for withdrawals', enabled: true },
-          ].map((setting, index) => (
-            <div key={index} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-4">
-              <div>
-                <p className="text-sm font-medium text-white">{setting.label}</p>
-                <p className="text-xs text-slate-500">{setting.desc}</p>
-              </div>
-              <button className={`h-6 w-11 rounded-full transition ${setting.enabled ? 'bg-emerald-500' : 'bg-slate-600'}`}>
-                <div className={`h-5 w-5 rounded-full bg-white transition ${setting.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
-            </div>
-          ))}
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">System Configuration</h3>
+          <button
+            onClick={() => void loadConfigs()}
+            disabled={isLoading}
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 disabled:opacity-60"
+          >
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
+        {isLoading ? (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">Loading settings...</div>
+        ) : (
+          <div className="space-y-4">
+            {!hasAnyConfig && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
+                No system config found yet. Toggle values below to create config entries.
+              </div>
+            )}
+            {toggleSettings.map((setting) => {
+              const enabled = isTrue(configs[setting.key]);
+              return (
+                <div key={setting.key} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-4">
+                  <div>
+                    <p className="text-sm font-medium text-white">{setting.label}</p>
+                    <p className="text-xs text-slate-500">{setting.desc}</p>
+                  </div>
+                  <button
+                    aria-label={`Toggle ${setting.label}`}
+                    disabled={isSavingKey === setting.key}
+                    onClick={() => void upsertConfig(setting.key, String(!enabled), setting.desc)}
+                    className={`h-6 w-11 rounded-full transition disabled:opacity-60 ${enabled ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                  >
+                    <div className={`h-5 w-5 rounded-full bg-white transition ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+              );
+            })}
+            <p className="text-[11px] text-slate-500">
+              Loaded keys: {Object.keys(configs).length} • Managed toggles: {toggleCount}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Kill Switch Modal */}
@@ -2525,72 +3054,35 @@ function Settings() {
               </div>
               <h3 className="text-2xl font-semibold text-white">Execute Kill-Switch</h3>
               <p className="mt-3 text-sm text-slate-400">
-                This will instantly pause all operations, freeze actions, and lock the treasury.
+                This will initiate emergency transfer flow for available pool funds to configured admin BEP20 wallet.
               </p>
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">Destination Wallet</p>
+                <p className="mt-1 break-all font-mono text-xs text-slate-200">{walletDraft || 'Not configured'}</p>
+              </div>
+              <textarea
+                value={killReason}
+                onChange={(e) => setKillReason(e.target.value)}
+                placeholder="Reason (optional)"
+                rows={3}
+                className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-white placeholder:text-slate-500 outline-none"
+              />
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <button
-                  onClick={() => setKillConfirm(false)}
+                  onClick={() => {
+                    setKillConfirm(false);
+                    setKillReason('');
+                  }}
                   className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white"
                 >
                   Abort
                 </button>
                 <button
-                  onClick={() => setKillConfirm(false)}
-                  className="flex-1 rounded-xl border border-rose-300/30 bg-rose-700/45 py-3 text-sm font-semibold text-rose-50"
+                  onClick={() => void handleTriggerKillSwitch()}
+                  disabled={isTriggeringKill}
+                  className="flex-1 rounded-xl border border-rose-300/30 bg-rose-700/45 py-3 text-sm font-semibold text-rose-50 disabled:opacity-60"
                 >
-                  Confirm Override
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Broadcast Modal */}
-      <AnimatePresence>
-        {broadcastOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-            onClick={() => setBroadcastOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0f] p-6"
-            >
-              <div className="mb-4 flex items-center gap-4 border-b border-white/10 pb-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-                  <Radio className="h-6 w-6 text-slate-100" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-white">Global Broadcast</h3>
-                  <p className="text-sm text-slate-400">Push a message to all users</p>
-                </div>
-              </div>
-              <textarea
-                value={broadcastMsg}
-                onChange={(e) => setBroadcastMsg(e.target.value)}
-                placeholder="Type alert message to push to all users..."
-                rows={4}
-                className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white placeholder:text-slate-500 outline-none"
-              />
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <button
-                  onClick={() => setBroadcastOpen(false)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => setBroadcastOpen(false)}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 py-3 text-sm font-semibold text-white"
-                >
-                  <Send className="mr-2 inline h-4 w-4" /> Push Alert
+                  {isTriggeringKill ? 'Triggering...' : 'Confirm Override'}
                 </button>
               </div>
             </motion.div>
@@ -2605,11 +3097,56 @@ function Settings() {
 // MAIN ADMIN PANEL COMPONENT
 // =============================================
 export default function AdminPanel() {
-  const { token } = useAuth();
+  const { token: walletToken } = useAuth();
+  const [adminToken, setAdminToken] = useState<string | null>(() => sessionStorage.getItem(ADMIN_AUTH_TOKEN_KEY));
+  const [adminLoginId, setAdminLoginId] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false);
+  const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [plansData, setPlansData] = useState<Plan[]>([]);
   const previousOverflow = useRef<string | null>(null);
+  const effectiveToken = adminToken || walletToken;
+
+  const handleCredentialLogin = useCallback(async () => {
+    if (!adminLoginId.trim() || !adminPassword.trim()) {
+      setAdminLoginError('ID and password are required.');
+      return;
+    }
+
+    setIsAdminLoggingIn(true);
+    setAdminLoginError(null);
+    try {
+      const response = await adminApi.loginWithCredentials(adminLoginId.trim(), adminPassword);
+      sessionStorage.setItem(ADMIN_AUTH_TOKEN_KEY, response.token);
+      setAdminToken(response.token);
+      setAdminPassword('');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setAdminLoginError('Invalid credentials. Please try again.');
+      } else {
+        setAdminLoginError(err instanceof Error ? err.message : 'Admin login failed');
+      }
+    } finally {
+      setIsAdminLoggingIn(false);
+    }
+  }, [adminLoginId, adminPassword]);
+
+  const clearCredentialSession = useCallback(() => {
+    sessionStorage.removeItem(ADMIN_AUTH_TOKEN_KEY);
+    setAdminToken(null);
+  }, []);
+
+  const loadPlanEconomics = useCallback(async () => {
+    try {
+      const response = await systemApi.getPlanEconomics();
+      setPlansData(response.economics.plans.map(mapEconomicsPlanToAdminPlan));
+    } catch {
+      setPlansData([]);
+    }
+  }, []);
 
   const restoreBodyOverflow = useCallback(() => {
     if (previousOverflow.current !== null) {
@@ -2617,6 +3154,10 @@ export default function AdminPanel() {
       previousOverflow.current = null;
     }
   }, []);
+
+  useEffect(() => {
+    void loadPlanEconomics();
+  }, [loadPlanEconomics]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -2659,33 +3200,75 @@ export default function AdminPanel() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardOverview token={token} />;
+        return <DashboardOverview token={effectiveToken} />;
       case 'users':
         return <UsersManagement />;
       case 'plans':
-        return <PlansManagement />;
+        return <PlansManagement token={effectiveToken} plans={plansData} />;
       case 'pools':
-        return <PoolsManagement />;
-      case 'withdrawals':
-        return <WithdrawalsManagement />;
+        return <PoolsManagement token={effectiveToken} />;
       case 'flushouts':
-        return <FlushoutsManagement />;
+        return <FlushoutsManagement token={effectiveToken} plans={plansData} />;
       case 'commissions':
         return <CommissionsManagement />;
       case 'gift-codes':
-        return <GiftCodeManagement token={token} />;
+        return <GiftCodeManagement token={effectiveToken} />;
       case 'rewards':
-        return <RewardsManagement />;
+        return <RewardsManagement token={effectiveToken} />;
       case 'daily-income':
         return <DailyIncomeManagement />;
       case 'security':
-        return <SecurityLogs token={token} />;
+        return <SecurityLogs token={effectiveToken} />;
       case 'settings':
-        return <Settings />;
+        return <Settings token={effectiveToken} />;
       default:
-        return <DashboardOverview token={token} />;
+        return <DashboardOverview token={effectiveToken} />;
     }
   };
+
+  if (!effectiveToken) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] text-slate-200 p-4 sm:p-6">
+        <div className="mx-auto max-w-md rounded-2xl border border-white/10 bg-white/[0.04] p-6 space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Admin Login</h1>
+            <p className="text-sm text-slate-400">Sign in with requested credentials. Wallet-signature admin access remains supported as fallback.</p>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-400">ID</label>
+              <input
+                value={adminLoginId}
+                onChange={(e) => setAdminLoginId(e.target.value)}
+                placeholder="Admin ID"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-400">Password</label>
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="Password"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none"
+              />
+            </div>
+            {adminLoginError && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{adminLoginError}</div>
+            )}
+            <button
+              disabled={isAdminLoggingIn}
+              onClick={() => void handleCredentialLogin()}
+              className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {isAdminLoggingIn ? 'Logging in...' : 'Login'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#0a0a0f] text-slate-200">
@@ -2721,6 +3304,17 @@ export default function AdminPanel() {
 
       {/* Main Content */}
       <main className={`min-h-screen transition-all duration-300 p-3 sm:p-4 lg:p-6 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
+        {adminToken && (
+          <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3">
+            <p className="text-xs text-cyan-100">Credential-based admin session active. Wallet-signature auth remains available as fallback.</p>
+            <button
+              onClick={clearCredentialSession}
+              className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Use Wallet Session
+            </button>
+          </div>
+        )}
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

@@ -8,6 +8,15 @@ import {
 } from "../utils/commissionLogic";
 
 describe("Commission Logic", () => {
+  const planEconomics = [
+    { id: 1, joiningFee: 5, levelCommission: 0.5 },
+    { id: 2, joiningFee: 10, levelCommission: 1 },
+    { id: 3, joiningFee: 20, levelCommission: 2 },
+    { id: 4, joiningFee: 40, levelCommission: 4 },
+    { id: 5, joiningFee: 80, levelCommission: 8 },
+    { id: 6, joiningFee: 160, levelCommission: 16 },
+  ];
+
   it("should have 7 commission levels", () => {
     expect(COMMISSION_LEVELS).toHaveLength(7);
   });
@@ -31,47 +40,47 @@ describe("Commission Logic", () => {
     expect(total).toBe(10);
   });
 
-  it("should calculate commissions correctly for Plan 1 slotFee of $3", () => {
-    const commissions = calculateCommissions(3);
+  it("should calculate commissions correctly for Plan 1 joiningFee of $5", () => {
+    const commissions = calculateCommissions(5);
     expect(commissions).toHaveLength(7);
-    expect(commissions[0].amount).toBeCloseTo(0.12, 4); // 4% of $3
-    expect(commissions[1].amount).toBeCloseTo(0.06, 4); // 2% of $3
-    expect(commissions[2].amount).toBeCloseTo(0.03, 4); // 1% of $3
-    expect(commissions[3].amount).toBeCloseTo(0.03, 4); // 1% of $3
-    expect(commissions[4].amount).toBeCloseTo(0.03, 4); // 1% of $3
-    expect(commissions[5].amount).toBeCloseTo(0.015, 4); // 0.5% of $3
-    expect(commissions[6].amount).toBeCloseTo(0.015, 4); // 0.5% of $3
+    expect(commissions[0].amount).toBeCloseTo(0.2, 4); // 4% of $5
+    expect(commissions[1].amount).toBeCloseTo(0.1, 4); // 2% of $5
+    expect(commissions[2].amount).toBeCloseTo(0.05, 4); // 1% of $5
+    expect(commissions[3].amount).toBeCloseTo(0.05, 4); // 1% of $5
+    expect(commissions[4].amount).toBeCloseTo(0.05, 4); // 1% of $5
+    expect(commissions[5].amount).toBeCloseTo(0.025, 4); // 0.5% of $5
+    expect(commissions[6].amount).toBeCloseTo(0.025, 4); // 0.5% of $5
   });
 
-  it("should calculate commissions correctly for Plan 2 slotFee of $6", () => {
-    const commissions = calculateCommissions(6);
-    expect(commissions[0].amount).toBeCloseTo(0.24, 4); // 4% of $6
-    expect(commissions[1].amount).toBeCloseTo(0.12, 4); // 2% of $6
-    expect(commissions[2].amount).toBeCloseTo(0.06, 4); // 1% of $6
+  it("should calculate commissions correctly for Plan 2 joiningFee of $10", () => {
+    const commissions = calculateCommissions(10);
+    expect(commissions[0].amount).toBeCloseTo(0.4, 4); // 4% of $10
+    expect(commissions[1].amount).toBeCloseTo(0.2, 4); // 2% of $10
+    expect(commissions[2].amount).toBeCloseTo(0.1, 4); // 1% of $10
   });
 
-  it("should calculate commissions correctly for Plan 3 slotFee of $13", () => {
-    const commissions = calculateCommissions(13);
-    expect(commissions[0].amount).toBeCloseTo(0.52, 4); // 4% of $13
-    expect(commissions[1].amount).toBeCloseTo(0.26, 4); // 2% of $13
+  it("should calculate commissions correctly for Plan 3 joiningFee of $20", () => {
+    const commissions = calculateCommissions(20);
+    expect(commissions[0].amount).toBeCloseTo(0.8, 4); // 4% of $20
+    expect(commissions[1].amount).toBeCloseTo(0.4, 4); // 2% of $20
   });
 
-  it("should calculate commissions correctly for Plan 4 slotFee of $28", () => {
-    const commissions = calculateCommissions(28);
-    expect(commissions[0].amount).toBeCloseTo(1.12, 4); // 4% of $28
-    expect(commissions[1].amount).toBeCloseTo(0.56, 4); // 2% of $28
+  it("should calculate commissions correctly for Plan 4 joiningFee of $40", () => {
+    const commissions = calculateCommissions(40);
+    expect(commissions[0].amount).toBeCloseTo(1.6, 4); // 4% of $40
+    expect(commissions[1].amount).toBeCloseTo(0.8, 4); // 2% of $40
   });
 
-  it("should calculate commissions correctly for Plan 5 slotFee of $56", () => {
-    const commissions = calculateCommissions(56);
-    expect(commissions[0].amount).toBeCloseTo(2.24, 4); // 4% of $56
-    expect(commissions[1].amount).toBeCloseTo(1.12, 4); // 2% of $56
+  it("should calculate commissions correctly for Plan 5 joiningFee of $80", () => {
+    const commissions = calculateCommissions(80);
+    expect(commissions[0].amount).toBeCloseTo(3.2, 4); // 4% of $80
+    expect(commissions[1].amount).toBeCloseTo(1.6, 4); // 2% of $80
   });
 
-  it("should calculate commissions correctly for Plan 6 slotFee of $110", () => {
-    const commissions = calculateCommissions(110);
-    expect(commissions[0].amount).toBeCloseTo(4.4, 4); // 4% of $110
-    expect(commissions[1].amount).toBeCloseTo(2.2, 4); // 2% of $110
+  it("should calculate commissions correctly for Plan 6 joiningFee of $160", () => {
+    const commissions = calculateCommissions(160);
+    expect(commissions[0].amount).toBeCloseTo(6.4, 4); // 4% of $160
+    expect(commissions[1].amount).toBeCloseTo(3.2, 4); // 2% of $160
   });
 
   it("should have correct commission level structure", () => {
@@ -83,11 +92,11 @@ describe("Commission Logic", () => {
     });
   });
 
-  it("total commission from slotFee should equal 10% of slotFee", () => {
-    const slotFee = 100;
-    const commissions = calculateCommissions(slotFee);
+  it("total commission from joiningFee should equal 10% of joiningFee", () => {
+    const joiningFee = 100;
+    const commissions = calculateCommissions(joiningFee);
     const total = commissions.reduce((sum, c) => sum + c.amount, 0);
-    expect(total).toBeCloseTo(10, 4); // 10% of 100 (4+2+1+1+1+0.5+0.5)
+    expect(total).toBeCloseTo(10, 4); // 10% of 100
   });
 
   it("applies deterministic 6-decimal rounding for edge slotFee values", () => {
@@ -95,6 +104,14 @@ describe("Commission Logic", () => {
     expect(commissions[0].amount).toBe(0.08);
     expect(commissions[1].amount).toBe(0.04);
     expect(commissions[5].amount).toBe(0.01);
+  });
+
+  it("matches defined levelCommission totals for Plan 1-6", () => {
+    for (const plan of planEconomics) {
+      const commissions = calculateCommissions(plan.joiningFee);
+      const total = commissions.reduce((sum, c) => sum + c.amount, 0);
+      expect(total).toBe(plan.levelCommission);
+    }
   });
 
   it("handles missing and inactive uplines safely", () => {

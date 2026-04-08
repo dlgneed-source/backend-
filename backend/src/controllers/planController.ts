@@ -133,8 +133,8 @@ export async function enrollInPlan(req: AuthenticatedRequest, res: Response): Pr
       });
     }
 
-    // Distribute multi-level commissions from slotFee
-    await distributeCommissions(enrollment.id, userId, plan.slotFee, planId);
+    // Distribute multi-level commissions from joining fee
+    await distributeCommissions(enrollment.id, userId, plan.joiningFee, planId);
 
     // System fee to treasury
     await prisma.systemFeeLedger.create({

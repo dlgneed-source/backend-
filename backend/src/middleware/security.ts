@@ -59,23 +59,71 @@ export const apiRateLimiter = rateLimit({
 /**
  * Strict rate limiter for auth endpoints
  */
-export const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+export const AUTH_RATE_LIMIT_PROFILE = {
+  windowMs: 15 * 60 * 1000,
   max: 20,
+  message: { success: false, message: "Too many authentication attempts" },
+} as const;
+export const authRateLimiter = rateLimit({
+  ...AUTH_RATE_LIMIT_PROFILE,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: "Too many authentication attempts" },
 });
 
 /**
  * Withdrawal rate limiter
  */
-export const withdrawalRateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+export const WITHDRAWAL_RATE_LIMIT_PROFILE = {
+  windowMs: 60 * 60 * 1000,
   max: 5,
+  message: { success: false, message: "Too many withdrawal requests" },
+} as const;
+export const withdrawalRateLimiter = rateLimit({
+  ...WITHDRAWAL_RATE_LIMIT_PROFILE,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: "Too many withdrawal requests" },
+});
+
+/**
+ * Admin withdrawal-sign limiter
+ */
+export const WITHDRAWAL_ADMIN_RATE_LIMIT_PROFILE = {
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { success: false, message: "Too many admin withdrawal signing attempts" },
+} as const;
+export const withdrawalAdminRateLimiter = rateLimit({
+  ...WITHDRAWAL_ADMIN_RATE_LIMIT_PROFILE,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Gift code creation limiter
+ */
+export const GIFT_CODE_CREATE_RATE_LIMIT_PROFILE = {
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  message: { success: false, message: "Too many gift code creation attempts" },
+} as const;
+export const giftCodeCreateRateLimiter = rateLimit({
+  ...GIFT_CODE_CREATE_RATE_LIMIT_PROFILE,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Admin critical action limiter
+ */
+export const ADMIN_CRITICAL_ACTION_RATE_LIMIT_PROFILE = {
+  windowMs: 30 * 60 * 1000,
+  max: 40,
+  message: { success: false, message: "Too many critical admin actions, slow down" },
+} as const;
+export const adminCriticalActionRateLimiter = rateLimit({
+  ...ADMIN_CRITICAL_ACTION_RATE_LIMIT_PROFILE,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 /**

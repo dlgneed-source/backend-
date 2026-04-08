@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -35,7 +36,7 @@ async function main() {
       systemFee: 1,
       levelCommission: 1,
       slotFee: 6,
-      totalCollection: 36,
+      totalCollection: 38,
       memberProfit: 30,
       leaderPool: 2,
       rewardPool: 2,
@@ -52,7 +53,7 @@ async function main() {
       systemFee: 1,
       levelCommission: 2,
       slotFee: 13,
-      totalCollection: 91,
+      totalCollection: 94,
       memberProfit: 80,
       leaderPool: 4,
       rewardPool: 3,
@@ -69,7 +70,7 @@ async function main() {
       systemFee: 1,
       levelCommission: 4,
       slotFee: 28,
-      totalCollection: 224,
+      totalCollection: 226,
       memberProfit: 200,
       leaderPool: 8,
       rewardPool: 4,
@@ -86,7 +87,7 @@ async function main() {
       systemFee: 2,
       levelCommission: 8,
       slotFee: 56,
-      totalCollection: 448,
+      totalCollection: 452,
       memberProfit: 400,
       leaderPool: 16,
       rewardPool: 10,
@@ -103,7 +104,7 @@ async function main() {
       systemFee: 2,
       levelCommission: 16,
       slotFee: 110,
-      totalCollection: 880,
+      totalCollection: 890,
       memberProfit: 800,
       leaderPool: 24,
       rewardPool: 12,
@@ -250,12 +251,24 @@ async function main() {
   // SEED SUPER ADMIN
   // =============================================
   const adminWallet = process.env.ADMIN_WALLET || "0x0000000000000000000000000000000000000001";
+  const adminLoginId = (process.env.ADMIN_LOGIN_ID || "").trim().toLowerCase();
+  const adminLoginPassword = process.env.ADMIN_LOGIN_PASSWORD || "";
+  if (!adminLoginId || !adminLoginPassword) {
+    throw new Error("ADMIN_LOGIN_ID and ADMIN_LOGIN_PASSWORD must be set for admin credential seeding");
+  }
+  const passwordHash = await bcrypt.hash(adminLoginPassword, 12);
   await prisma.admin.upsert({
     where: { walletAddress: adminWallet },
-    update: {},
+    update: {
+      email: adminLoginId,
+      passwordHash,
+      isActive: true,
+    },
     create: {
       walletAddress: adminWallet,
       name: "Super Admin",
+      email: adminLoginId,
+      passwordHash,
       role: "SUPER_ADMIN",
       isActive: true,
     },

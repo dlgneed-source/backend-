@@ -21,6 +21,7 @@ const setViewportWidth = (width: number) => {
 };
 
 afterEach(() => {
+  sessionStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -64,6 +65,7 @@ describe('responsive interactions', () => {
 
   it('closes admin mobile sidebar on escape and desktop resize', async () => {
     setViewportWidth(375);
+    sessionStorage.setItem('ea_admin_token', 'test-admin-token');
     render(<AdminPanel />);
 
     fireEvent.click(screen.getByLabelText('Open admin menu'));

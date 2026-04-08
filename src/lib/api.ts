@@ -196,6 +196,64 @@ export const plansApi = {
     }>('/api/plans/members'),
 };
 
+export const systemApi = {
+  getPlanEconomics: () =>
+    apiRequest<{
+      success: boolean;
+      economics: {
+        generatedAt: string;
+        backendSourceOfTruth: boolean;
+        levelCommissionChain: {
+          directCommissionLabel: string;
+          levels: Array<{ level: number; percentage: number }>;
+          totalPercentage: number;
+          base: string;
+        };
+        flushoutRules: {
+          mode: string;
+          payoutFormula: string;
+        };
+        smartContract: {
+          contractAddress: string;
+          chainId: number | null;
+          placeholder: boolean;
+          note?: string;
+        };
+        plans: Array<{
+          planId: number;
+          name: string;
+          fees: {
+            joiningFee: number;
+            slotFee: number;
+            teamSize: number;
+            totalCollection: number;
+          };
+          distributions: {
+            directUpline: number;
+            levelCommission: number;
+            systemFee: number;
+            pools: {
+              leader: number;
+              reward: number;
+              sponsor: number;
+            };
+            memberProfit: number;
+          };
+          flushout: {
+            days: number;
+            payoutTotal: number;
+          };
+          validations: {
+            levelCommissionFromChain: number;
+            levelCommissionMatches: boolean;
+            payoutComponentsTotal: number;
+            totalCollectionMatches: boolean;
+          };
+        }>;
+      };
+    }>('/api/system/plan-economics'),
+};
+
 export const communityApi = {
   getBootstrap: () =>
     apiRequest<{
@@ -224,6 +282,22 @@ export const communityApi = {
 };
 
 export const adminApi = {
+  loginWithCredentials: (loginId: string, password: string) =>
+    apiRequest<{
+      success: boolean;
+      token: string;
+      admin: {
+        id: string;
+        walletAddress: string;
+        role: string;
+        loginId?: string | null;
+      };
+      authMethod: 'credentials';
+    }>('/api/admin/login/credentials', {
+      method: 'POST',
+      body: { loginId, password },
+    }),
+
   getDashboard: (token: string) =>
     apiRequest<{
       success: boolean;
@@ -276,6 +350,64 @@ export const adminApi = {
         }>;
       };
     }>('/api/admin/dashboard', { token }),
+
+  getPlanMetrics: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      planMetrics: Array<{
+        planId: number;
+        planName: string;
+        activeUsers: number;
+        maturedUsers: number;
+        flushedUsers: number;
+        totalEnrollments: number;
+        totalRevenue: number;
+        adoptionRate: number;
+      }>;
+      totals: {
+        totalEnrollments: number;
+      };
+    }>('/api/admin/plan-metrics', { token }),
+
+  getPoolMetrics: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      pools: Array<{
+        id: string;
+        planId: number;
+        planName: string;
+        type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR';
+        balance: number;
+        totalReceived: number;
+        totalDistributed: number;
+      }>;
+      totals: {
+        systemPool: number;
+        leaderPool: number;
+        rewardPool: number;
+        sponsorPool: number;
+        allFund: number;
+        systemFund: number;
+      };
+    }>('/api/admin/pool-metrics', { token }),
+
+  // If amount is omitted, backend withdraws the full available balance for the selected scope.
+  withdrawPoolFunds: (token: string, payload: { scope: 'REWARD' | 'ALL'; amount?: number; confirmation: 'CONFIRM_POOL_WITHDRAW' }) =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      withdrawal: {
+        scope: 'REWARD' | 'ALL';
+        requestedAmount: number;
+        withdrawnAmount: number;
+        affectedPools: Array<{
+          poolId: string;
+          type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR';
+          withdrawnAmount: number;
+          balanceAfter: number;
+        }>;
+      };
+    }>('/api/admin/pools/withdraw', { method: 'POST', token, body: payload }),
 
   getWithdrawals: (token: string, params?: { page?: number; limit?: number; status?: string }) => {
     const query = new URLSearchParams();
@@ -331,6 +463,106 @@ export const adminApi = {
     }>(`/api/admin/flushouts${queryString ? `?${queryString}` : ''}`, { token });
   },
 
+  manualFlushout: (token: string, enrollmentId: string, payload: { confirmation: 'CONFIRM_MANUAL_FLUSHOUT' }) =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      result?: {
+        status: 'success' | 'failed';
+        memberProfit?: number;
+        message?: string;
+      };
+    }>(`/api/admin/flushout/${encodeURIComponent(enrollmentId)}`, { method: 'POST', token, body: payload }),
+
+  getRewardsMetrics: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      nextDistributionAt: string | null;
+      summary: {
+        totalClaims: number;
+        pendingClaims: number;
+        approvedClaims: number;
+        paidClaims: number;
+        rejectedClaims: number;
+        totalClaimedAmount: number;
+        totalPaidAmount: number;
+      };
+      clubIncentives: Array<{
+        id: string;
+        rank: string;
+        plan1: number;
+        plan2: number;
+        plan3: number;
+        plan4: number;
+        plan5: number;
+        plan6: number;
+        reward: number;
+      }>;
+      individualIncentives: Array<{
+        id: string;
+        plan: string;
+        target: number;
+        reward: number;
+      }>;
+    }>('/api/admin/rewards-metrics', { token }),
+
+  getSystemConfig: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      configs: Array<{
+        id: string;
+        key: string;
+        value: string;
+        description?: string | null;
+        updatedBy?: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>('/api/admin/config', { token }),
+
+  updateSystemConfig: (token: string, key: string, payload: { value: string; description?: string }) =>
+    apiRequest<{
+      success: boolean;
+      config: {
+        id: string;
+        key: string;
+        value: string;
+        description?: string | null;
+        updatedBy?: string | null;
+        createdAt: string;
+        updatedAt: string;
+      };
+    }>(`/api/admin/config/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      token,
+      body: {
+        key,
+        value: payload.value,
+        description: payload.description,
+      },
+    }),
+
+  triggerKillSwitch: (token: string, payload: { reason?: string; confirmation: 'CONFIRM_KILL_SWITCH' }) =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      transfer: {
+        destinationWallet: string;
+        amount: number;
+        initiatedAt: string;
+        affectedPools: Array<{
+          poolId: string;
+          type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR';
+          transferredAmount: number;
+          balanceAfter: number;
+        }>;
+      };
+    }>('/api/admin/kill-switch/trigger', {
+      method: 'POST',
+      token,
+      body: payload,
+    }),
+
   getGiftCodes: (token: string, params?: { page?: number; limit?: number; status?: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED'; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
@@ -364,7 +596,7 @@ export const adminApi = {
     }>(`/api/admin/gift-codes${queryString ? `?${queryString}` : ''}`, { token });
   },
 
-  createGiftCode: (token: string, payload: { planId: number; expiryDays: number; quantity?: number; code?: string }) =>
+  createGiftCode: (token: string, payload: { planId: number; customAmount?: number; expiryDays?: number; quantity?: number; code?: string }) =>
     apiRequest<{
       success: boolean;
       giftCodes: Array<{
@@ -407,10 +639,14 @@ export const adminApi = {
       body: { status },
     }),
 
-  getAuditLogs: (token: string, params?: { page?: number; limit?: number }) => {
+  getAuditLogs: (token: string, params?: { page?: number; limit?: number; action?: string; adminId?: string; from?: string; to?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
     if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.action) query.set('action', params.action);
+    if (params?.adminId) query.set('adminId', params.adminId);
+    if (params?.from) query.set('from', params.from);
+    if (params?.to) query.set('to', params.to);
     const queryString = query.toString();
     return apiRequest<{
       success: boolean;

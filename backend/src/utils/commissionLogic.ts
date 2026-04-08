@@ -1,7 +1,7 @@
 /**
  * Commission Logic
  * Multi-level commission distribution: 4%, 2%, 1%, 1%, 1%, 0.5%, 0.5%
- * Applied on the slotFee (entry fee paid by new enrollee)
+ * Applied on joining fee so level commission pool matches plan economics.
  */
 
 import { PrismaClient, UserStatus } from "@prisma/client";
@@ -27,13 +27,13 @@ export interface CommissionBreakdown {
 }
 
 /**
- * Calculate commission amounts for a given slot fee
+ * Calculate commission amounts for a given joining fee
  */
-export function calculateCommissions(slotFee: number): Array<{ level: number; percentage: number; amount: number }> {
+export function calculateCommissions(joiningFee: number): Array<{ level: number; percentage: number; amount: number }> {
   return COMMISSION_LEVELS.map(({ level, percentage }) => ({
     level,
     percentage,
-    amount: roundMoney((slotFee * percentage) / 100),
+    amount: roundMoney((joiningFee * percentage) / 100),
   }));
 }
 
@@ -74,18 +74,18 @@ export async function getUplineChain(userId: string, maxLevels = 7): Promise<str
  * Distribute commissions to upline chain when a new enrollment happens
  * @param enrollmentId - The new enrollment ID
  * @param enrolleeId - The new user's ID
- * @param slotFee - The slot fee paid
+ * @param joiningFee - The joining fee paid
  * @param planId - The plan ID
  */
 export async function distributeCommissions(
   enrollmentId: string,
   enrolleeId: string,
-  slotFee: number,
+  joiningFee: number,
   planId: number
 ): Promise<CommissionBreakdown[]> {
   const prisma = getPrisma();
   const uplineChain = await getUplineChain(enrolleeId, COMMISSION_LEVELS.length);
-  const commissions = calculateCommissions(slotFee);
+  const commissions = calculateCommissions(joiningFee);
   const uplineCandidates = Array.from(new Set(uplineChain.slice(0, commissions.length)));
   const uplineUsers = uplineCandidates.length
     ? await prisma.user.findMany({
@@ -135,7 +135,7 @@ export async function distributeCommissions(
 }
 
 /**
- * Calculate total commission distributed from a slot fee
+ * Calculate total commission distributed from a joining fee percentage chain
  */
 export function totalCommissionPercentage(): number {
   return COMMISSION_LEVELS.reduce((sum, { percentage }) => sum + percentage, 0);
