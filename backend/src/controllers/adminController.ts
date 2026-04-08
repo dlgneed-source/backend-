@@ -1267,10 +1267,9 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
     const seriesWidth = String(totalToCreate).length;
     for (let i = 0; i < totalToCreate; i++) {
       const seriesSuffix = String(i + 1).padStart(seriesWidth, "0");
-      const maxBaseLength = Math.max(1, 32 - (seriesSuffix.length + 1));
       const code = normalizedRequestedCode
         ? totalToCreate > 1
-          ? `${normalizedRequestedCode.slice(0, maxBaseLength)}-${seriesSuffix}`
+          ? `${normalizedRequestedCode.slice(0, Math.max(1, 32 - (seriesSuffix.length + 1)))}-${seriesSuffix}`
           : normalizedRequestedCode
         : `EA${planId}-${uuidv4().replace(/-/g, "").toUpperCase().slice(0, 8)}`;
 

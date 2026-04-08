@@ -346,11 +346,11 @@ describe('AdminPanel gift code and audit integrations', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Create Code' })[1]);
 
     await waitFor(() => {
-      const postCall = fetchMock.mock.calls.find((call) => String(call[0]).includes('/api/admin/gift-codes') && call[1]?.method === 'POST');
+      const postCall = fetchMock.mock.calls.find((call) => typeof call[0] === 'string' && call[0].includes('/api/admin/gift-codes') && call[1]?.method === 'POST');
       expect(postCall).toBeTruthy();
-      const rawBody = postCall?.[1]?.body;
-      expect(typeof rawBody).toBe('string');
-      const payload = JSON.parse(String(rawBody));
+      const body = postCall?.[1]?.body;
+      expect(typeof body).toBe('string');
+      const payload = JSON.parse(body as string);
       expect(payload).toMatchObject({ code: 'SEASONAL1', quantity: 15, expiryDays: 30 });
     });
   });
