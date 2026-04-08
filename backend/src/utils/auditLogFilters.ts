@@ -1,4 +1,6 @@
-const AUDIT_ACTIONS = new Set([
+import type { AuditAction } from "@prisma/client";
+
+const AUDIT_ACTIONS = new Set<AuditAction>([
   "USER_CREATED",
   "USER_SUSPENDED",
   "USER_BLOCKED",
@@ -28,7 +30,7 @@ export function buildAuditLogWhere({ action, adminId, from, to }: AuditLogFilter
   const normalizedFrom = from?.trim();
   const normalizedTo = to?.trim();
 
-  if (normalizedAction && !AUDIT_ACTIONS.has(normalizedAction)) {
+  if (normalizedAction && !AUDIT_ACTIONS.has(normalizedAction as AuditAction)) {
     throw new Error("INVALID_ACTION_FILTER");
   }
 
@@ -42,7 +44,7 @@ export function buildAuditLogWhere({ action, adminId, from, to }: AuditLogFilter
   }
 
   return {
-    ...(normalizedAction ? { action: normalizedAction } : {}),
+    ...(normalizedAction ? { action: normalizedAction as AuditAction } : {}),
     ...(normalizedAdminId ? { adminId: normalizedAdminId } : {}),
     ...((fromDate || toDate)
       ? {

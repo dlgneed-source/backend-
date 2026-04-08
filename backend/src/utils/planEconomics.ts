@@ -46,7 +46,6 @@ export function buildPlanEconomicsSnapshot(plans: Plan[]) {
     .map((plan) => {
       const levelCommissionFromChain = roundMoney((plan.joiningFee * chainPercentageTotal) / 100);
       const payoutComponentsTotal = sumMoney([
-        plan.joiningFee,
         plan.uplineCommission,
         plan.systemFee,
         plan.levelCommission,
