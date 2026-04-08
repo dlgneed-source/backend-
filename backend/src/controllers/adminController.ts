@@ -911,7 +911,7 @@ export async function triggerKillSwitch(req: AuthenticatedRequest, res: Response
       select: { value: true },
     });
 
-    const destinationWallet = String(walletConfig?.value || "").trim().toLowerCase();
+    const destinationWallet = String(walletConfig?.value || "").trim();
     if (!destinationWallet || !isValidWalletAddress(destinationWallet)) {
       res.status(400).json({
         success: false,
