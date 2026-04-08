@@ -13,6 +13,7 @@ import { processFlushout } from "../utils/flushoutLogic";
 import { v4 as uuidv4 } from "uuid";
 import { isValidWalletAddress } from "../middleware/security";
 import { buildAuditLogWhere } from "../utils/auditLogFilters";
+import { upsertActiveUserByWallet } from "../utils/upsertUserByWallet";
 
 const prisma = new PrismaClient();
 const MAX_FLUSHOUTS_PAGE_SIZE = 5000;
@@ -1207,16 +1208,7 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
     }
 
     // Find or create admin's user record so gift codes can always be generated
-    const adminWallet = req.admin!.walletAddress.toLowerCase();
-    const adminUser = await prisma.user.upsert({
-      where: { walletAddress: adminWallet },
-      update: {},
-      create: {
-        walletAddress: adminWallet,
-        status: "ACTIVE",
-        referralCode: uuidv4().replace(/-/g, "").toUpperCase().slice(0, 12),
-      },
-    });
+    const adminUser = await upsertActiveUserByWallet(prisma, req.admin!.walletAddress);
 
     if (requestedCode && quantity > 1) {
       res.status(400).json({ success: false, message: "Custom code supports quantity 1 only" });

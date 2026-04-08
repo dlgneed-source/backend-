@@ -8,6 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { v4 as uuidv4 } from "uuid";
 import { getGiftCodeRedeemability } from "../utils/giftCodeRules";
+import { upsertActiveUserByWallet } from "../utils/upsertUserByWallet";
 
 const prisma = new PrismaClient();
 
@@ -22,17 +23,7 @@ export async function generateGiftCode(req: AuthenticatedRequest, res: Response)
   try {
     let actorUserId = generatedById;
     if (!actorUserId && req.admin?.walletAddress) {
-      const adminWallet = req.admin.walletAddress.toLowerCase();
-      const adminUser = await prisma.user.upsert({
-        where: { walletAddress: adminWallet },
-        update: {},
-        create: {
-          walletAddress: adminWallet,
-          status: "ACTIVE",
-          referralCode: uuidv4().replace(/-/g, "").toUpperCase().slice(0, 12),
-        },
-        select: { id: true },
-      });
+      const adminUser = await upsertActiveUserByWallet(prisma, req.admin.walletAddress);
       actorUserId = adminUser.id;
     }
 
