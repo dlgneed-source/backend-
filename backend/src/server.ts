@@ -31,6 +31,7 @@ import systemRoutes from "./routes/system";
 import { initCronJobs } from "./utils/cronJobs";
 import { initSmartContract } from "./utils/smartContract";
 import { initCommunitySocket } from "./socket/communitySocket";
+import { seedRoomsIfNeeded } from "./services/communityStore";
 
 const app = express();
 const httpServer = createServer(app);
@@ -104,6 +105,9 @@ async function startServer() {
   try {
     // Initialize smart contract connection
     initSmartContract();
+
+    // Seed community rooms into DB
+    await seedRoomsIfNeeded();
 
     // Start cron jobs (skip in test mode)
     if (config.NODE_ENV !== "test") {

@@ -22,11 +22,18 @@ export async function generateGiftCode(req: AuthenticatedRequest, res: Response)
   try {
     let actorUserId = generatedById;
     if (!actorUserId && req.admin?.walletAddress) {
-      const adminUser = await prisma.user.findFirst({
-        where: { walletAddress: req.admin.walletAddress.toLowerCase() },
+      const adminWallet = req.admin.walletAddress.toLowerCase();
+      const adminUser = await prisma.user.upsert({
+        where: { walletAddress: adminWallet },
+        update: {},
+        create: {
+          walletAddress: adminWallet,
+          status: "ACTIVE",
+          referralCode: uuidv4().replace(/-/g, "").toUpperCase().slice(0, 12),
+        },
         select: { id: true },
       });
-      actorUserId = adminUser?.id;
+      actorUserId = adminUser.id;
     }
 
     if (!actorUserId) {
