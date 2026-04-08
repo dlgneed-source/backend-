@@ -347,7 +347,7 @@ function Sidebar({ activeTab, setActiveTab, collapsed, setCollapsed, mobileOpen,
 // =============================================
 // DASHBOARD OVERVIEW COMPONENT
 // =============================================
-function DashboardOverview({ token }: { token: string | null }) {
+function DashboardOverview({ token, onPermissionDenied }: { token: string | null; onPermissionDenied?: () => void }) {
   const EXPORT_PAGE_SIZE = 500;
   const [isLoading, setIsLoading] = useState(false);
   const [isExportingWithdrawals, setIsExportingWithdrawals] = useState(false);
@@ -422,12 +422,15 @@ function DashboardOverview({ token }: { token: string | null }) {
         recentFlushouts: response.dashboard.recentFlushouts,
       });
     } catch (err) {
+      if (err instanceof ApiError && err.status === 403 && err.message === 'Admin permission denied') {
+        onPermissionDenied?.();
+      }
       setDashboard(null);
       setError(err instanceof Error ? err.message : 'Failed to load dashboard');
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [onPermissionDenied, token]);
 
   useEffect(() => {
     void loadDashboard();
@@ -3099,6 +3102,7 @@ export function Settings({ token }: { token: string | null }) {
 export default function AdminPanel() {
   const { token: walletToken, walletAddress } = useAuth();
   const [adminToken, setAdminToken] = useState<string | null>(() => sessionStorage.getItem(ADMIN_AUTH_TOKEN_KEY));
+  const [walletAdminAccessDenied, setWalletAdminAccessDenied] = useState(false);
   const [adminLinkedWallet, setAdminLinkedWallet] = useState<string | null>(null);
   const [adminLoginId, setAdminLoginId] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -3112,7 +3116,7 @@ export default function AdminPanel() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [plansData, setPlansData] = useState<Plan[]>([]);
   const previousOverflow = useRef<string | null>(null);
-  const effectiveToken = adminToken || walletToken;
+  const effectiveToken = adminToken || (!walletAdminAccessDenied ? walletToken : null);
 
   // Whether the connected wallet needs to be linked (admin logged in via credentials, wallet not yet linked)
   const showLinkWalletBanner = !!adminToken && !!walletAddress && !adminLinkedWallet;
@@ -3129,6 +3133,7 @@ export default function AdminPanel() {
       const response = await adminApi.loginWithCredentials(adminLoginId.trim(), adminPassword);
       sessionStorage.setItem(ADMIN_AUTH_TOKEN_KEY, response.token);
       setAdminToken(response.token);
+      setWalletAdminAccessDenied(false);
       setAdminLinkedWallet(response.admin.walletAddress ?? null);
       setAdminPassword('');
     } catch (err) {
@@ -3161,8 +3166,15 @@ export default function AdminPanel() {
   const clearCredentialSession = useCallback(() => {
     sessionStorage.removeItem(ADMIN_AUTH_TOKEN_KEY);
     setAdminToken(null);
+    setWalletAdminAccessDenied(false);
     setAdminLinkedWallet(null);
   }, []);
+
+  const handleWalletPermissionDenied = useCallback(() => {
+    if (!adminToken && walletToken) {
+      setWalletAdminAccessDenied(true);
+    }
+  }, [adminToken, walletToken]);
 
   const loadPlanEconomics = useCallback(async () => {
     try {
@@ -3225,7 +3237,7 @@ export default function AdminPanel() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardOverview token={effectiveToken} />;
+        return <DashboardOverview token={effectiveToken} onPermissionDenied={handleWalletPermissionDenied} />;
       case 'users':
         return <UsersManagement />;
       case 'plans':
@@ -3247,7 +3259,7 @@ export default function AdminPanel() {
       case 'settings':
         return <Settings token={effectiveToken} />;
       default:
-        return <DashboardOverview token={effectiveToken} />;
+        return <DashboardOverview token={effectiveToken} onPermissionDenied={handleWalletPermissionDenied} />;
     }
   };
 
