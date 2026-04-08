@@ -603,9 +603,17 @@ function DashboardOverview({ token }: { token: string | null }) {
     setIsExportingWithdrawals(true);
     setError(null);
     try {
-      const response = await adminApi.getWithdrawals(token, { page: 1, limit: 5000 });
+      const pageSize = 500;
+      const firstPage = await adminApi.getWithdrawals(token, { page: 1, limit: pageSize });
+      const allRows = [...firstPage.withdrawals];
+
+      for (let page = 2; page <= firstPage.pagination.pages; page += 1) {
+        const nextPage = await adminApi.getWithdrawals(token, { page, limit: pageSize });
+        allRows.push(...nextPage.withdrawals);
+      }
+
       const csv = toCsv(
-        response.withdrawals.map((item) => ({
+        allRows.map((item) => ({
           id: item.id,
           wallet: item.user.walletAddress,
           userName: item.user.name ?? '',
@@ -633,9 +641,17 @@ function DashboardOverview({ token }: { token: string | null }) {
     setIsExportingFlushouts(true);
     setError(null);
     try {
-      const response = await adminApi.getFlushouts(token, { page: 1, limit: 5000 });
+      const pageSize = 500;
+      const firstPage = await adminApi.getFlushouts(token, { page: 1, limit: pageSize });
+      const allRows = [...firstPage.flushouts];
+
+      for (let page = 2; page <= firstPage.pagination.pages; page += 1) {
+        const nextPage = await adminApi.getFlushouts(token, { page, limit: pageSize });
+        allRows.push(...nextPage.flushouts);
+      }
+
       const csv = toCsv(
-        response.flushouts.map((item) => ({
+        allRows.map((item) => ({
           id: item.id,
           wallet: item.wallet,
           userName: item.userName ?? '',

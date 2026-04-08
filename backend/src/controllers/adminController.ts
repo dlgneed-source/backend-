@@ -14,43 +14,49 @@ import { isValidWalletAddress } from "../middleware/security";
 
 const prisma = new PrismaClient();
 
+function extractEnrollmentIdFromManualFlushoutLog(log: { metadata: unknown; description: string }): string | undefined {
+  if (log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)) {
+    const value = (log.metadata as Record<string, unknown>).enrollmentId;
+    if (typeof value === "string") {
+      return value;
+    }
+  }
+
+  const matched = log.description.match(/#([a-zA-Z0-9]+)/);
+  if (matched?.[1]) {
+    return matched[1];
+  }
+
+  return undefined;
+}
+
 async function getManualFlushoutEnrollmentIds(enrollmentIds: string[]): Promise<Set<string>> {
   if (enrollmentIds.length === 0) {
     return new Set<string>();
   }
 
+  const uniqueEnrollmentIds = Array.from(new Set(enrollmentIds));
+
   const logs = await prisma.auditLog.findMany({
     where: {
       action: "ENROLLMENT_FLUSHED",
       description: { contains: "Manual flushout", mode: "insensitive" },
+      OR: uniqueEnrollmentIds.map((id) => ({
+        description: { contains: `#${id}` },
+      })),
     },
     select: {
       metadata: true,
       description: true,
     },
     orderBy: { createdAt: "desc" },
-    take: 10000,
   });
 
-  const idSet = new Set<string>(enrollmentIds);
+  const idSet = new Set<string>(uniqueEnrollmentIds);
   const manualIds = new Set<string>();
 
   logs.forEach((log) => {
-    let enrollmentId: string | undefined;
-
-    if (log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)) {
-      const value = (log.metadata as Record<string, unknown>).enrollmentId;
-      if (typeof value === "string") {
-        enrollmentId = value;
-      }
-    }
-
-    if (!enrollmentId) {
-      const matched = log.description.match(/#([a-zA-Z0-9]+)/);
-      if (matched?.[1]) {
-        enrollmentId = matched[1];
-      }
-    }
+    const enrollmentId = extractEnrollmentIdFromManualFlushoutLog(log);
 
     if (enrollmentId && idSet.has(enrollmentId)) {
       manualIds.add(enrollmentId);
