@@ -349,6 +349,7 @@ function Sidebar({ activeTab, setActiveTab, collapsed, setCollapsed, mobileOpen,
 // =============================================
 function DashboardOverview({ token, onPermissionDenied }: { token: string | null; onPermissionDenied?: () => void }) {
   const EXPORT_PAGE_SIZE = 500;
+  const onPermissionDeniedRef = useRef(onPermissionDenied);
   const [isLoading, setIsLoading] = useState(false);
   const [isExportingWithdrawals, setIsExportingWithdrawals] = useState(false);
   const [isExportingFlushouts, setIsExportingFlushouts] = useState(false);
@@ -395,6 +396,10 @@ function DashboardOverview({ token, onPermissionDenied }: { token: string | null
 
   const formatMoney = formatUsd;
 
+  useEffect(() => {
+    onPermissionDeniedRef.current = onPermissionDenied;
+  }, [onPermissionDenied]);
+
   const normalizeStatus = (status: string): RequestStatus => {
     const normalized = status.toUpperCase();
     if (normalized === 'PENDING') return 'Pending';
@@ -423,14 +428,14 @@ function DashboardOverview({ token, onPermissionDenied }: { token: string | null
       });
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
-        onPermissionDenied?.();
+        onPermissionDeniedRef.current?.();
       }
       setDashboard(null);
       setError(err instanceof Error ? err.message : 'Failed to load dashboard');
     } finally {
       setIsLoading(false);
     }
-  }, [onPermissionDenied, token]);
+  }, [token]);
 
   useEffect(() => {
     void loadDashboard();
@@ -3173,6 +3178,12 @@ export default function AdminPanel() {
   const handleWalletPermissionDenied = useCallback(() => {
     if (!adminToken && walletToken) {
       setWalletAdminAccessDenied(true);
+    }
+  }, [adminToken, walletToken]);
+
+  useEffect(() => {
+    if (!adminToken) {
+      setWalletAdminAccessDenied(false);
     }
   }, [adminToken, walletToken]);
 
