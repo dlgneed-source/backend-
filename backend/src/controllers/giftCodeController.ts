@@ -184,8 +184,8 @@ export async function redeemGiftCode(req: AuthenticatedRequest, res: Response): 
       });
     }
 
-    // Distribute commissions (gift code counts as enrollment, uses slotFee)
-    await distributeCommissions(enrollment.id, userId, giftCode.plan.slotFee, giftCode.planId);
+    // Distribute commissions (gift code counts as enrollment, uses joining fee economics)
+    await distributeCommissions(enrollment.id, userId, giftCode.plan.joiningFee, giftCode.planId);
 
     // System fee to treasury ledger
     await prisma.systemFeeLedger.create({

@@ -8,9 +8,9 @@
  * - leaderPool → added to LEADER pool
  * - rewardPool → added to REWARD pool (if > 0)
  * - sponsorPool → added to SPONSOR pool (if > 0)
- * - systemFee → retained by system
- * - uplineCommission → paid to direct referrer
- * - levelCommission → distributed across 7 upline levels per COMMISSION_LEVELS
+ *
+ * Enrollment-time payouts (system fee, direct upline, level chain) are handled
+ * during enrollment creation and should not be duplicated during flushout.
  */
 
 import { PrismaClient, EnrollmentStatus } from "@prisma/client";
@@ -84,11 +84,6 @@ export async function processFlushout(enrollmentId: string): Promise<FlushoutRes
     // Add to Sponsor pool
     if (plan.sponsorPool > 0) {
       await addToPool(plan.id, "SPONSOR", plan.sponsorPool, enrollmentId);
-    }
-
-    // System fee goes to treasury
-    if (plan.systemFee > 0) {
-      await addToSystemFee(plan.id, enrollmentId, plan.systemFee);
     }
 
     return {
@@ -167,32 +162,6 @@ async function addToPool(
       description: `Flushout contribution to ${type} pool`,
     },
   });
-}
-
-/**
- * Add to system fee ledger
- */
-async function addToSystemFee(planId: number, enrollmentId: string, amount: number): Promise<void> {
-  await prisma.systemFeeLedger.create({
-    data: {
-      enrollmentId,
-      planId,
-      amount,
-      description: "System fee from enrollment flushout",
-    },
-  });
-
-  // Update treasury
-  const treasury = await prisma.treasury.findFirst();
-  if (treasury) {
-    await prisma.treasury.update({
-      where: { id: treasury.id },
-      data: {
-        totalSystemFees: { increment: amount },
-        balance: { increment: amount },
-      },
-    });
-  }
 }
 
 /**

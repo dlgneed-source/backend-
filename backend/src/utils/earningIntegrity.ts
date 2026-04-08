@@ -3,11 +3,16 @@ import { roundMoney, sumMoney } from "./money";
 
 export interface PlanMathInput {
   planId: number;
+  joiningFee: number;
+  uplineCommission?: number;
+  systemFee?: number;
+  levelCommission?: number;
+  totalCollection?: number;
+  teamSize?: number;
   memberProfit: number;
   leaderPool: number;
   rewardPool: number;
   sponsorPool: number;
-  slotFee: number;
   enrollmentCount?: number;
 }
 
@@ -27,10 +32,24 @@ export function calculateFlushoutTotal(plan: Pick<PlanMathInput, "memberProfit" 
   return sumMoney([plan.memberProfit, calculatePoolTotal(plan)]);
 }
 
-export function calculateCommissionTotal(slotFee: number): number {
+export function calculateCommissionTotal(joiningFee: number): number {
   return sumMoney(
-    config.COMMISSION_LEVELS.map((level) => roundMoney((slotFee * level.percentage) / 100))
+    config.COMMISSION_LEVELS.map((level) => roundMoney((joiningFee * level.percentage) / 100))
   );
+}
+
+export function calculateEnrollmentPayoutTotal(
+  plan: Pick<PlanMathInput, "uplineCommission" | "systemFee" | "levelCommission" | "memberProfit" | "leaderPool" | "rewardPool" | "sponsorPool">
+): number {
+  return sumMoney([
+    plan.uplineCommission || 0,
+    plan.systemFee || 0,
+    plan.levelCommission || 0,
+    plan.memberProfit,
+    plan.leaderPool,
+    plan.rewardPool,
+    plan.sponsorPool,
+  ]);
 }
 
 export function calculatePlanTotals(plan: PlanMathInput): PlanMathTotals {
@@ -42,7 +61,7 @@ export function calculatePlanTotals(plan: PlanMathInput): PlanMathTotals {
     throw new Error("enrollmentCount must be an integer");
   }
   const enrollmentCount = requestedEnrollmentCount;
-  const commissionTotalPerEnrollment = calculateCommissionTotal(plan.slotFee);
+  const commissionTotalPerEnrollment = calculateCommissionTotal(plan.joiningFee);
   const flushoutTotalPerEnrollment = calculateFlushoutTotal(plan);
   const poolTotalPerEnrollment = calculatePoolTotal(plan);
 
