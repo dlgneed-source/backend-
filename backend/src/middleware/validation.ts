@@ -48,6 +48,10 @@ export const adminCredentialLoginSchema = z.object({
   password: z.string().min(1, "Password required").max(200, "Password too long"),
 });
 
+export const adminLinkWalletSchema = z.object({
+  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid wallet address"),
+});
+
 // =============================================
 // ENROLLMENT SCHEMAS
 // =============================================

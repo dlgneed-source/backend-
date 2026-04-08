@@ -3,6 +3,7 @@ import {
   getAdminNonce,
   adminLogin,
   adminCredentialLogin,
+  linkAdminWallet,
   getDashboard,
   getPlanMetrics,
   getPoolMetrics,
@@ -30,6 +31,7 @@ import {
   validate,
   adminLoginSchema,
   adminCredentialLoginSchema,
+  adminLinkWalletSchema,
   updateUserStatusSchema,
   systemConfigSchema,
   createGiftCodeSchema,
@@ -50,6 +52,7 @@ const withdrawPoolMiddleware = [
 router.get("/nonce/:walletAddress", authRateLimiter, getAdminNonce);
 router.post("/login", authRateLimiter, validate(adminLoginSchema), adminLogin);
 router.post("/login/credentials", authRateLimiter, validate(adminCredentialLoginSchema), adminCredentialLogin);
+router.post("/link-wallet", authenticateAdmin, validate(adminLinkWalletSchema), linkAdminWallet);
 
 // Dashboard
 router.get("/dashboard", authenticateAdmin, getDashboard);

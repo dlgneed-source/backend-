@@ -3097,18 +3097,25 @@ export function Settings({ token }: { token: string | null }) {
 // MAIN ADMIN PANEL COMPONENT
 // =============================================
 export default function AdminPanel() {
-  const { token: walletToken } = useAuth();
+  const { token: walletToken, walletAddress } = useAuth();
   const [adminToken, setAdminToken] = useState<string | null>(() => sessionStorage.getItem(ADMIN_AUTH_TOKEN_KEY));
+  const [adminLinkedWallet, setAdminLinkedWallet] = useState<string | null>(null);
   const [adminLoginId, setAdminLoginId] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false);
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
+  const [isLinkingWallet, setIsLinkingWallet] = useState(false);
+  const [linkWalletError, setLinkWalletError] = useState<string | null>(null);
+  const [linkWalletSuccess, setLinkWalletSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [plansData, setPlansData] = useState<Plan[]>([]);
   const previousOverflow = useRef<string | null>(null);
   const effectiveToken = adminToken || walletToken;
+
+  // Whether the connected wallet needs to be linked (admin logged in via credentials, wallet not yet linked)
+  const showLinkWalletBanner = !!adminToken && !!walletAddress && !adminLinkedWallet;
 
   const handleCredentialLogin = useCallback(async () => {
     if (!adminLoginId.trim() || !adminPassword.trim()) {
@@ -3122,6 +3129,7 @@ export default function AdminPanel() {
       const response = await adminApi.loginWithCredentials(adminLoginId.trim(), adminPassword);
       sessionStorage.setItem(ADMIN_AUTH_TOKEN_KEY, response.token);
       setAdminToken(response.token);
+      setAdminLinkedWallet(response.admin.walletAddress ?? null);
       setAdminPassword('');
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -3134,9 +3142,26 @@ export default function AdminPanel() {
     }
   }, [adminLoginId, adminPassword]);
 
+  const handleLinkWallet = useCallback(async () => {
+    if (!adminToken || !walletAddress) return;
+    setIsLinkingWallet(true);
+    setLinkWalletError(null);
+    setLinkWalletSuccess(null);
+    try {
+      const response = await adminApi.linkWallet(adminToken, walletAddress);
+      setAdminLinkedWallet(response.admin.walletAddress ?? null);
+      setLinkWalletSuccess('Wallet linked successfully!');
+    } catch (err) {
+      setLinkWalletError(err instanceof Error ? err.message : 'Failed to link wallet');
+    } finally {
+      setIsLinkingWallet(false);
+    }
+  }, [adminToken, walletAddress]);
+
   const clearCredentialSession = useCallback(() => {
     sessionStorage.removeItem(ADMIN_AUTH_TOKEN_KEY);
     setAdminToken(null);
+    setAdminLinkedWallet(null);
   }, []);
 
   const loadPlanEconomics = useCallback(async () => {
@@ -3305,14 +3330,36 @@ export default function AdminPanel() {
       {/* Main Content */}
       <main className={`min-h-screen transition-all duration-300 p-3 sm:p-4 lg:p-6 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
         {adminToken && (
-          <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3">
-            <p className="text-xs text-cyan-100">Credential-based admin session active. Wallet-signature auth remains available as fallback.</p>
-            <button
-              onClick={clearCredentialSession}
-              className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white"
-            >
-              Use Wallet Session
-            </button>
+          <div className="mb-4 space-y-2">
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3">
+              <p className="text-xs text-cyan-100">Credential-based admin session active. Wallet-signature auth remains available as fallback.</p>
+              <button
+                onClick={clearCredentialSession}
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                Use Wallet Session
+              </button>
+            </div>
+            {showLinkWalletBanner && (
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3">
+                <p className="text-xs text-violet-100">
+                  Wallet detected: <span className="font-mono">{walletAddress?.slice(0, 6)}…{walletAddress?.slice(-4)}</span>. Link it to your admin profile to enable wallet-dependent features.
+                </p>
+                <button
+                  disabled={isLinkingWallet}
+                  onClick={() => void handleLinkWallet()}
+                  className="rounded-lg border border-violet-400/40 bg-violet-500/20 px-3 py-1.5 text-xs font-semibold text-violet-100 disabled:opacity-60"
+                >
+                  {isLinkingWallet ? 'Linking…' : 'Link Wallet'}
+                </button>
+              </div>
+            )}
+            {linkWalletSuccess && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-200">{linkWalletSuccess}</div>
+            )}
+            {linkWalletError && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs text-rose-200">{linkWalletError}</div>
+            )}
           </div>
         )}
         <AnimatePresence mode="wait">

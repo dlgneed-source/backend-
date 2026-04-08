@@ -18,7 +18,7 @@ export interface AuthenticatedRequest extends Request {
   };
   admin?: {
     id: string;
-    walletAddress: string;
+    walletAddress: string | null;
     role: string;
   };
 }
@@ -102,7 +102,7 @@ export async function authenticateAdmin(
     let admin:
       | {
           id: string;
-          walletAddress: string;
+          walletAddress: string | null;
           role: string;
           isActive: boolean;
         }
@@ -193,7 +193,7 @@ export function generateUserToken(userId: string, walletAddress: string): string
 /**
  * Generate JWT token for admin
  */
-export function generateAdminToken(adminId: string, walletAddress: string, role: string): string {
+export function generateAdminToken(adminId: string, walletAddress: string | null, role: string): string {
   return jwt.sign(
     { id: adminId, walletAddress, role, type: "admin" },
     config.JWT_SECRET,
