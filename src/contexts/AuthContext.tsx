@@ -53,8 +53,10 @@ function getProvider(): EthereumProvider | null {
 
 function isMobileDevice(): boolean {
   if (typeof navigator === 'undefined') return false;
+  const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
+  if (nav.userAgentData?.mobile) return true;
   const userAgent = navigator.userAgent || '';
-  return /android|iphone|ipad|ipod|iemobile|opera mini|mobile/i.test(userAgent);
+  return /android|iphone|ipad|ipod|iemobile|opera mini|windows phone/i.test(userAgent);
 }
 
 function buildMetaMaskMobileAppLink(): string {
@@ -154,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!provider) {
       if (isMobileDevice()) {
         const message = 'MetaMask not found. Redirecting to MetaMask app...';
-        setWalletError(null);
+        setWalletError(message);
         toast.info(message);
         redirectToMetaMaskMobileApp();
         return false;
