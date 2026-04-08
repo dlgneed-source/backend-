@@ -485,143 +485,346 @@ function Sidebar({ activeTab, setActiveTab, collapsed, setCollapsed, mobileOpen,
 // =============================================
 // DASHBOARD OVERVIEW COMPONENT
 // =============================================
-function DashboardOverview() {
-  const stats = [
-    { icon: Users, label: 'Total Users', value: '3,336', subtext: '+124 this week', tone: 'bg-indigo-500/15', trend: { value: '+12.5%', positive: true } },
-    { icon: Wallet, label: 'Total Balance', value: '$1,248,392', subtext: 'Across all pools', tone: 'bg-emerald-500/15', trend: { value: '+8.2%', positive: true } },
-    { icon: ArrowUpRight, label: 'Total Withdrawals', value: '$456,789', subtext: 'This month', tone: 'bg-sky-500/15', trend: { value: '+15.3%', positive: true } },
-    { icon: Flame, label: 'Total Flushouts', value: '2,847', subtext: 'Auto + Manual', tone: 'bg-amber-500/15', trend: { value: '+5.7%', positive: true } },
-  ];
+function DashboardOverview({ token }: { token: string | null }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isExportingWithdrawals, setIsExportingWithdrawals] = useState(false);
+  const [isExportingFlushouts, setIsExportingFlushouts] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dashboard, setDashboard] = useState<{
+    stats: {
+      totalUsers: number;
+      totalBalance: number;
+      totalWithdrawals: number;
+      totalFlushouts: number;
+    };
+    planPerformance: Array<{
+      planId: number;
+      planName: string;
+      activeUsers: number;
+      maturedUsers: number;
+      flushedUsers: number;
+      totalEnrollments: number;
+      totalRevenue: number;
+    }>;
+    recentWithdrawals: Array<{
+      id: string;
+      userId: string;
+      wallet: string;
+      userName?: string | null;
+      amount: number;
+      status: string;
+      requestedAt: string;
+      processedAt?: string | null;
+      txHash?: string | null;
+    }>;
+    recentFlushouts: Array<{
+      id: string;
+      userId: string;
+      wallet: string;
+      userName?: string | null;
+      planId: number;
+      planName: string;
+      amount: number;
+      flushedAt: string;
+      type: 'Auto' | 'Manual';
+    }>;
+  } | null>(null);
 
-  const planStats = plansData.map(plan => ({
-    name: plan.name,
-    active: plan.activeUsers,
-    matured: plan.maturedUsers,
-    revenue: plan.totalRevenue,
-    color: plan.theme.primary,
-  }));
+  const formatMoney = (value: number) =>
+    `$${Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}`;
+
+  const normalizeStatus = (status: string): RequestStatus => {
+    const normalized = status.toUpperCase();
+    if (normalized === 'PENDING') return 'Pending';
+    if (normalized === 'PROCESSING') return 'Processing';
+    if (normalized === 'APPROVED' || normalized === 'COMPLETED') return 'Approved';
+    if (normalized === 'REJECTED') return 'Rejected';
+    return 'Pending';
+  };
+
+  const toCsv = (rows: Array<Record<string, string | number | null | undefined>>) => {
+    if (rows.length === 0) return '';
+    const headers = Object.keys(rows[0]);
+    const escape = (value: string | number | null | undefined) => {
+      const raw = value === null || value === undefined ? '' : String(value);
+      const escaped = raw.replace(/"/g, '""');
+      return `"${escaped}"`;
+    };
+    return [headers.join(','), ...rows.map((row) => headers.map((header) => escape(row[header])).join(','))].join('\n');
+  };
+
+  const downloadCsv = (filename: string, content: string) => {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const loadDashboard = useCallback(async () => {
+    if (!token) {
+      setDashboard(null);
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getDashboard(token);
+      setDashboard({
+        stats: response.dashboard.stats,
+        planPerformance: response.dashboard.planPerformance,
+        recentWithdrawals: response.dashboard.recentWithdrawals,
+        recentFlushouts: response.dashboard.recentFlushouts,
+      });
+    } catch (err) {
+      setDashboard(null);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  const handleExportWithdrawals = async () => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsExportingWithdrawals(true);
+    setError(null);
+    try {
+      const response = await adminApi.getWithdrawals(token, { page: 1, limit: 5000 });
+      const csv = toCsv(
+        response.withdrawals.map((item) => ({
+          id: item.id,
+          wallet: item.user.walletAddress,
+          userName: item.user.name ?? '',
+          amount: item.amount,
+          status: item.status,
+          requestedAt: item.requestedAt,
+          processedAt: item.processedAt ?? '',
+          txHash: item.txHash ?? '',
+        })),
+      );
+      downloadCsv(`admin-withdrawals-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export withdrawals');
+    } finally {
+      setIsExportingWithdrawals(false);
+    }
+  };
+
+  const handleExportFlushouts = async () => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsExportingFlushouts(true);
+    setError(null);
+    try {
+      const response = await adminApi.getFlushouts(token, { page: 1, limit: 5000 });
+      const csv = toCsv(
+        response.flushouts.map((item) => ({
+          id: item.id,
+          wallet: item.wallet,
+          userName: item.userName ?? '',
+          planId: item.planId,
+          planName: item.planName,
+          amount: item.amount,
+          type: item.type,
+          flushedAt: item.flushedAt,
+        })),
+      );
+      downloadCsv(`admin-flushouts-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export flushouts');
+    } finally {
+      setIsExportingFlushouts(false);
+    }
+  };
+
+  const stats = dashboard ? [
+    { icon: Users, label: 'Total Users', value: dashboard.stats.totalUsers.toLocaleString(), subtext: 'Registered users', tone: 'bg-indigo-500/15' },
+    { icon: Wallet, label: 'Total Balance', value: formatMoney(dashboard.stats.totalBalance), subtext: 'Across all pools', tone: 'bg-emerald-500/15' },
+    { icon: ArrowUpRight, label: 'Total Withdrawals', value: formatMoney(dashboard.stats.totalWithdrawals), subtext: 'Approved + completed', tone: 'bg-sky-500/15' },
+    { icon: Flame, label: 'Total Flushouts', value: dashboard.stats.totalFlushouts.toLocaleString(), subtext: 'Total flushed enrollments', tone: 'bg-amber-500/15' },
+  ] : [];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Dashboard Overview</h1>
-          <p className="text-sm text-slate-400">Welcome back! Here's what's happening today.</p>
+          <p className="text-sm text-slate-400">Live admin metrics from system data.</p>
         </div>
-        <div className="flex gap-2 sm:gap-3">
-          <button className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs sm:text-sm font-medium text-slate-300 hover:bg-white/10">
-            <Calendar className="h-4 w-4" />
-            <span className="hidden sm:inline">Last 30 Days</span>
-            <span className="sm:hidden">30d</span>
-          </button>
-          <button className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-3 py-2 text-xs sm:text-sm font-medium text-white">
-            <Download className="h-4 w-4" />
-            Export
-          </button>
-        </div>
+        <button
+          onClick={() => void loadDashboard()}
+          disabled={isLoading}
+          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs sm:text-sm font-medium text-slate-300 hover:bg-white/10 disabled:opacity-60"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
-          <StatCard key={index} {...stat} />
-        ))}
-      </div>
+      {error && (
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-200">
+          <p>{error}</p>
+          <button
+            onClick={() => void loadDashboard()}
+            className="mt-2 inline-flex items-center gap-1 rounded-lg border border-rose-400/30 px-2 py-1 text-[11px] font-semibold text-rose-100 hover:bg-rose-500/10"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </button>
+        </div>
+      )}
 
-      {/* Plans Overview */}
-      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-white">Plans Performance</h3>
-            <p className="text-sm text-slate-400">Active and matured users by plan</p>
+      {isLoading && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">Loading dashboard...</div>
+      )}
+
+      {!isLoading && dashboard && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat, index) => (
+              <StatCard key={index} {...stat} />
+            ))}
           </div>
-          <button className="text-sm text-cyan-400 hover:text-cyan-300">View All</button>
-        </div>
-        <div className="space-y-4">
-          {planStats.map((plan, index) => (
-            <div key={index} className="flex items-center gap-2 sm:gap-4">
-              <div className="w-20 sm:w-32 text-xs sm:text-sm font-medium text-slate-300 truncate">{plan.name}</div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/5">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(plan.active / (plan.active + plan.matured)) * 100}%` }}
-                      transition={{ duration: 1, delay: index * 0.1 }}
-                      className="h-full rounded-full"
-                      style={{ backgroundColor: plan.color }}
-                    />
-                  </div>
-                  <span className="w-12 sm:w-16 text-right text-[10px] sm:text-xs text-slate-400">{plan.active}</span>
-                </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Plans Performance</h3>
+                <p className="text-sm text-slate-400">Plan-wise active, matured and revenue stats</p>
               </div>
-              <div className="w-16 sm:w-24 text-right text-xs sm:text-sm font-medium text-emerald-400">${plan.revenue.toLocaleString()}</div>
             </div>
-          ))}
-        </div>
-      </div>
+            <div className="space-y-4">
+              {dashboard.planPerformance.length === 0 ? (
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">No plan performance data found.</div>
+              ) : dashboard.planPerformance.map((plan, index) => {
+                const denominator = Math.max(plan.totalEnrollments, 1);
+                const activeRatio = (plan.activeUsers / denominator) * 100;
+                return (
+                  <div key={plan.planId} className="flex items-center gap-2 sm:gap-4">
+                    <div className="w-24 sm:w-36 text-xs sm:text-sm font-medium text-slate-300 truncate">{plan.planName}</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/5">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${activeRatio}%` }}
+                            transition={{ duration: 0.6, delay: index * 0.05 }}
+                            className="h-full rounded-full bg-cyan-400"
+                          />
+                        </div>
+                        <span className="w-14 sm:w-24 text-right text-[10px] sm:text-xs text-slate-400">
+                          A:{plan.activeUsers} M:{plan.maturedUsers}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="w-20 sm:w-28 text-right text-xs sm:text-sm font-medium text-emerald-400">
+                      {formatMoney(plan.totalRevenue)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Withdrawals */}
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Recent Withdrawals</h3>
-            <button className="text-sm text-cyan-400 hover:text-cyan-300">View All</button>
-          </div>
-          <div className="space-y-3">
-            {withdrawalRequests.slice(0, 5).map((req) => (
-              <div key={req.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-2.5 sm:p-3">
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${statusStyle(req.status).split(' ')[1]}`}>
-                    <Wallet className={`h-4 w-4 ${statusStyle(req.status).split(' ')[0]}`} />
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-slate-200 truncate max-w-[100px] sm:max-w-none">{req.wallet}</p>
-                    <p className="text-[10px] text-slate-500 hidden sm:block">{req.requestedAt}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-white">${req.amount}</p>
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusStyle(req.status)}`}>
-                    {req.status}
-                  </span>
-                </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Recent Withdrawals</h3>
+                <button
+                  onClick={() => void handleExportWithdrawals()}
+                  disabled={isExportingWithdrawals}
+                  className="text-sm text-cyan-400 hover:text-cyan-300 disabled:opacity-60"
+                >
+                  {isExportingWithdrawals ? 'Exporting...' : 'Export All'}
+                </button>
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="space-y-3">
+                {dashboard.recentWithdrawals.length === 0 ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">No recent withdrawals.</div>
+                ) : dashboard.recentWithdrawals.map((req) => {
+                  const displayStatus = normalizeStatus(req.status);
+                  return (
+                    <div key={req.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-2.5 sm:p-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${statusStyle(displayStatus).split(' ')[1]}`}>
+                          <Wallet className={`h-4 w-4 ${statusStyle(displayStatus).split(' ')[0]}`} />
+                        </div>
+                        <div>
+                          <p className="text-xs sm:text-sm font-medium text-slate-200 truncate max-w-[120px] sm:max-w-none">{req.wallet}</p>
+                          <p className="text-[10px] text-slate-500 hidden sm:block">{new Date(req.requestedAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-white">{formatMoney(req.amount)}</p>
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusStyle(displayStatus)}`}>
+                          {displayStatus}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
-        {/* Recent Flushouts */}
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Recent Flushouts</h3>
-            <button className="text-sm text-cyan-400 hover:text-cyan-300">View All</button>
-          </div>
-          <div className="space-y-3">
-            {flushoutRecords.slice(0, 5).map((record) => (
-              <div key={record.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-2.5 sm:p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-                    <Flame className="h-4 w-4 text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-slate-200 truncate max-w-[100px] sm:max-w-none">{record.wallet}</p>
-                    <p className="text-[10px] text-slate-500">{record.planName}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-emerald-400">+${record.amount}</p>
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${record.type === 'Auto' ? 'text-sky-200 bg-sky-500/10 border-sky-400/20' : 'text-violet-200 bg-violet-500/10 border-violet-400/20'}`}>
-                    {record.type}
-                  </span>
-                </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Recent Flushouts</h3>
+                <button
+                  onClick={() => void handleExportFlushouts()}
+                  disabled={isExportingFlushouts}
+                  className="text-sm text-cyan-400 hover:text-cyan-300 disabled:opacity-60"
+                >
+                  {isExportingFlushouts ? 'Exporting...' : 'Export All'}
+                </button>
               </div>
-            ))}
+              <div className="space-y-3">
+                {dashboard.recentFlushouts.length === 0 ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">No recent flushouts.</div>
+                ) : dashboard.recentFlushouts.map((record) => (
+                  <div key={record.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-2.5 sm:p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
+                        <Flame className="h-4 w-4 text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs sm:text-sm font-medium text-slate-200 truncate max-w-[120px] sm:max-w-none">{record.wallet}</p>
+                        <p className="text-[10px] text-slate-500">{record.planName}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-emerald-400">+{formatMoney(record.amount)}</p>
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${record.type === 'Auto' ? 'text-sky-200 bg-sky-500/10 border-sky-400/20' : 'text-violet-200 bg-violet-500/10 border-violet-400/20'}`}>
+                        {record.type}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
+
+      {!isLoading && !error && !dashboard && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">No dashboard data available.</div>
+      )}
     </div>
   );
 }
@@ -2440,7 +2643,7 @@ export default function AdminPanel() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardOverview />;
+        return <DashboardOverview token={token} />;
       case 'users':
         return <UsersManagement />;
       case 'plans':
@@ -2464,7 +2667,7 @@ export default function AdminPanel() {
       case 'settings':
         return <Settings />;
       default:
-        return <DashboardOverview />;
+        return <DashboardOverview token={token} />;
     }
   };
 

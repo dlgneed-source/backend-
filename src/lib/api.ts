@@ -224,6 +224,113 @@ export const communityApi = {
 };
 
 export const adminApi = {
+  getDashboard: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      dashboard: {
+        users: number;
+        enrollments: Record<string, number>;
+        withdrawals: Record<string, number>;
+        treasury?: {
+          systemBalance?: number | null;
+          totalRevenue?: number | null;
+          totalWithdrawn?: number | null;
+        } | null;
+        pools: Record<string, number>;
+        stats: {
+          totalUsers: number;
+          totalBalance: number;
+          totalWithdrawals: number;
+          totalFlushouts: number;
+        };
+        planPerformance: Array<{
+          planId: number;
+          planName: string;
+          activeUsers: number;
+          maturedUsers: number;
+          flushedUsers: number;
+          totalEnrollments: number;
+          totalRevenue: number;
+        }>;
+        recentWithdrawals: Array<{
+          id: string;
+          userId: string;
+          wallet: string;
+          userName?: string | null;
+          amount: number;
+          status: string;
+          requestedAt: string;
+          processedAt?: string | null;
+          txHash?: string | null;
+        }>;
+        recentFlushouts: Array<{
+          id: string;
+          userId: string;
+          wallet: string;
+          userName?: string | null;
+          planId: number;
+          planName: string;
+          amount: number;
+          flushedAt: string;
+          type: 'Auto' | 'Manual';
+        }>;
+      };
+    }>('/api/admin/dashboard', { token }),
+
+  getWithdrawals: (token: string, params?: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.status) query.set('status', params.status);
+    const queryString = query.toString();
+    return apiRequest<{
+      success: boolean;
+      withdrawals: Array<{
+        id: string;
+        userId: string;
+        amount: number;
+        status: string;
+        requestedAt: string;
+        processedAt?: string | null;
+        txHash?: string | null;
+        user: { walletAddress: string; name?: string | null };
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }>(`/api/admin/withdrawals${queryString ? `?${queryString}` : ''}`, { token });
+  },
+
+  getFlushouts: (token: string, params?: { page?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.limit) query.set('limit', String(params.limit));
+    const queryString = query.toString();
+    return apiRequest<{
+      success: boolean;
+      flushouts: Array<{
+        id: string;
+        userId: string;
+        wallet: string;
+        userName?: string | null;
+        planId: number;
+        planName: string;
+        amount: number;
+        flushedAt: string;
+        type: 'Auto' | 'Manual';
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }>(`/api/admin/flushouts${queryString ? `?${queryString}` : ''}`, { token });
+  },
+
   getGiftCodes: (token: string, params?: { page?: number; limit?: number; status?: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED'; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));

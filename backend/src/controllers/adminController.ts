@@ -99,12 +99,33 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
  */
 export async function getDashboard(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const [users, enrollments, withdrawals, treasury, pools] = await Promise.all([
+    const [users, enrollments, withdrawals, treasury, pools, plans, recentWithdrawals, recentFlushouts] = await Promise.all([
       prisma.user.count(),
       prisma.enrollment.groupBy({ by: ["status"], _count: true }),
       prisma.withdrawal.groupBy({ by: ["status"], _count: true }),
       prisma.treasury.findFirst(),
       prisma.pool.groupBy({ by: ["type"], _sum: { balance: true } }),
+      prisma.plan.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, joiningFee: true },
+        orderBy: { id: "asc" },
+      }),
+      prisma.withdrawal.findMany({
+        include: { user: { select: { walletAddress: true, name: true } } },
+        orderBy: { requestedAt: "desc" },
+        take: 5,
+      }),
+      prisma.enrollment.findMany({
+        where: {
+          OR: [{ status: "FLUSHED" }, { flushoutAt: { not: null } }],
+        },
+        include: {
+          user: { select: { walletAddress: true, name: true } },
+          plan: { select: { id: true, name: true, memberProfit: true } },
+        },
+        orderBy: { flushoutAt: "desc" },
+        take: 5,
+      }),
     ]);
 
     const enrollmentMap: Record<string, number> = {};
@@ -116,6 +137,43 @@ export async function getDashboard(req: AuthenticatedRequest, res: Response): Pr
     const poolMap: Record<string, number> = {};
     pools.forEach((p) => { poolMap[p.type] = p._sum.balance || 0; });
 
+    const enrollmentsByPlan = await prisma.enrollment.groupBy({
+      by: ["planId", "status"],
+      _count: true,
+    });
+
+    const planStatusMap = new Map<number, { active: number; matured: number; flushed: number; totalEnrollments: number }>();
+    enrollmentsByPlan.forEach((entry) => {
+      const existing = planStatusMap.get(entry.planId) || { active: 0, matured: 0, flushed: 0, totalEnrollments: 0 };
+      if (entry.status === "ACTIVE") existing.active += entry._count;
+      if (entry.status === "MATURED") existing.matured += entry._count;
+      if (entry.status === "FLUSHED") existing.flushed += entry._count;
+      existing.totalEnrollments += entry._count;
+      planStatusMap.set(entry.planId, existing);
+    });
+
+    const totalPoolBalance = pools.reduce((sum, pool) => sum + (pool._sum.balance || 0), 0);
+    const totalWithdrawalsAmount = await prisma.withdrawal.aggregate({
+      where: { status: { in: ["APPROVED", "COMPLETED"] } },
+      _sum: { amount: true },
+    });
+    const totalFlushouts = enrollments.reduce((sum, row) => (
+      row.status === "FLUSHED" ? sum + row._count : sum
+    ), 0);
+
+    const planPerformance = plans.map((plan) => {
+      const counts = planStatusMap.get(plan.id) || { active: 0, matured: 0, flushed: 0, totalEnrollments: 0 };
+      return {
+        planId: plan.id,
+        planName: plan.name,
+        activeUsers: counts.active,
+        maturedUsers: counts.matured,
+        flushedUsers: counts.flushed,
+        totalEnrollments: counts.totalEnrollments,
+        totalRevenue: Number((counts.totalEnrollments * plan.joiningFee).toFixed(6)),
+      };
+    });
+
     res.json({
       success: true,
       dashboard: {
@@ -124,6 +182,35 @@ export async function getDashboard(req: AuthenticatedRequest, res: Response): Pr
         withdrawals: withdrawalMap,
         treasury,
         pools: poolMap,
+        stats: {
+          totalUsers: users,
+          totalBalance: Number(totalPoolBalance.toFixed(6)),
+          totalWithdrawals: Number((totalWithdrawalsAmount._sum.amount || 0).toFixed(6)),
+          totalFlushouts,
+        },
+        planPerformance,
+        recentWithdrawals: recentWithdrawals.map((withdrawal) => ({
+          id: withdrawal.id,
+          userId: withdrawal.userId,
+          wallet: withdrawal.user.walletAddress,
+          userName: withdrawal.user.name,
+          amount: withdrawal.amount,
+          status: withdrawal.status,
+          requestedAt: withdrawal.requestedAt,
+          processedAt: withdrawal.processedAt,
+          txHash: withdrawal.txHash,
+        })),
+        recentFlushouts: recentFlushouts.map((record) => ({
+          id: record.id,
+          userId: record.userId,
+          wallet: record.user.walletAddress,
+          userName: record.user.name,
+          planId: record.planId,
+          planName: record.plan.name,
+          amount: record.plan.memberProfit,
+          flushedAt: record.flushoutAt ?? record.updatedAt,
+          type: "Auto",
+        })),
       },
     });
   } catch (err) {
@@ -241,6 +328,53 @@ export async function getWithdrawals(req: AuthenticatedRequest, res: Response): 
     res.json({ success: true, withdrawals, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   } catch (err) {
     res.status(500).json({ success: false, message: "Failed to fetch withdrawals" });
+  }
+}
+
+/**
+ * GET /admin/flushouts
+ */
+export async function getFlushouts(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = Math.min(parseInt(req.query.limit as string) || 20, 5000);
+  const skip = (page - 1) * limit;
+
+  try {
+    const where = {
+      OR: [{ status: "FLUSHED" as const }, { flushoutAt: { not: null as Date | null } }],
+    };
+
+    const [flushouts, total] = await Promise.all([
+      prisma.enrollment.findMany({
+        where,
+        include: {
+          user: { select: { walletAddress: true, name: true } },
+          plan: { select: { id: true, name: true, memberProfit: true } },
+        },
+        orderBy: { flushoutAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.enrollment.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      flushouts: flushouts.map((record) => ({
+        id: record.id,
+        userId: record.userId,
+        wallet: record.user.walletAddress,
+        userName: record.user.name,
+        planId: record.planId,
+        planName: record.plan.name,
+        amount: record.plan.memberProfit,
+        flushedAt: record.flushoutAt ?? record.updatedAt,
+        type: "Auto",
+      })),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch flushouts" });
   }
 }
 
