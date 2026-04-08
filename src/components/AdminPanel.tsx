@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 
 const ADMIN_AUTH_TOKEN_KEY = 'ea_admin_token';
-const ADMIN_PERMISSION_DENIED_MESSAGE = 'Admin permission denied';
 
 // =============================================
 // TYPES & INTERFACES
@@ -423,7 +422,7 @@ function DashboardOverview({ token, onPermissionDenied }: { token: string | null
         recentFlushouts: response.dashboard.recentFlushouts,
       });
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403 && err.message === ADMIN_PERMISSION_DENIED_MESSAGE) {
+      if (err instanceof ApiError && err.status === 403) {
         onPermissionDenied?.();
       }
       setDashboard(null);
@@ -3117,7 +3116,7 @@ export default function AdminPanel() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [plansData, setPlansData] = useState<Plan[]>([]);
   const previousOverflow = useRef<string | null>(null);
-  const effectiveToken = adminToken || (!walletAdminAccessDenied ? walletToken : null);
+  const effectiveToken = adminToken || (walletAdminAccessDenied ? null : walletToken);
 
   // Whether the connected wallet needs to be linked (admin logged in via credentials, wallet not yet linked)
   const showLinkWalletBanner = !!adminToken && !!walletAddress && !adminLinkedWallet;
