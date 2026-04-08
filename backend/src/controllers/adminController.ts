@@ -4,7 +4,7 @@
  */
 
 import { Request, Response } from "express";
-import { PoolType, PrismaClient } from "@prisma/client";
+import { PoolType, Prisma, PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { generateAdminToken } from "../middleware/auth";
@@ -18,6 +18,50 @@ const prisma = new PrismaClient();
 const MAX_FLUSHOUTS_PAGE_SIZE = 5000;
 const CURRENCY_PRECISION = 6;
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync("invalid-credential-probe", 12);
+const REFERRAL_CODE_LENGTH = 12;
+
+function generateReferralCode(): string {
+  return uuidv4().replace(/-/g, "").toUpperCase().slice(0, REFERRAL_CODE_LENGTH);
+}
+
+function isReferralCodeUniqueConstraintError(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+    return false;
+  }
+
+  const target = error.meta?.target;
+  if (Array.isArray(target)) {
+    return target.includes("referralCode");
+  }
+
+  return target === "referralCode";
+}
+
+async function upsertActiveUserByWallet(walletAddress: string): Promise<{ id: string }> {
+  const normalizedWallet = walletAddress.toLowerCase();
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await prisma.user.upsert({
+        where: { walletAddress: normalizedWallet },
+        update: {},
+        create: {
+          walletAddress: normalizedWallet,
+          status: "ACTIVE",
+          referralCode: generateReferralCode(),
+        },
+        select: { id: true },
+      });
+    } catch (error) {
+      if (isReferralCodeUniqueConstraintError(error)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error("Failed to generate unique referral code for admin wallet");
+}
 
 function extractEnrollmentIdFromManualFlushoutLog(log: { metadata: unknown; description: string }): string | undefined {
   if (log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)) {
@@ -1207,16 +1251,7 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
     }
 
     // Find or create admin's user record so gift codes can always be generated
-    const adminWallet = req.admin!.walletAddress.toLowerCase();
-    const adminUser = await prisma.user.upsert({
-      where: { walletAddress: adminWallet },
-      update: {},
-      create: {
-        walletAddress: adminWallet,
-        status: "ACTIVE",
-        referralCode: uuidv4().replace(/-/g, "").toUpperCase().slice(0, 12),
-      },
-    });
+    const adminUser = await upsertActiveUserByWallet(req.admin!.walletAddress);
 
     if (requestedCode && quantity > 1) {
       res.status(400).json({ success: false, message: "Custom code supports quantity 1 only" });
