@@ -3,6 +3,7 @@ import {
   getAdminNonce,
   adminLogin,
   getDashboard,
+  getPlanMetrics,
   getUsers,
   updateUserStatus,
   getWithdrawals,
@@ -37,6 +38,7 @@ router.post("/login", authRateLimiter, validate(adminLoginSchema), adminLogin);
 
 // Dashboard
 router.get("/dashboard", authenticateAdmin, getDashboard);
+router.get("/plan-metrics", authenticateAdmin, getPlanMetrics);
 
 // Users
 router.get("/users", authenticateAdmin, getUsers);

@@ -43,9 +43,6 @@ interface Plan {
   sponsorPool: number;
   roi: number;
   flushoutDays: number;
-  activeUsers: number;
-  maturedUsers: number;
-  totalRevenue: number;
   theme: {
     primary: string;
     secondary: string;
@@ -125,9 +122,6 @@ const plansData: Plan[] = [
     sponsorPool: 0,
     roi: 240,
     flushoutDays: 3,
-    activeUsers: 1245,
-    maturedUsers: 892,
-    totalRevenue: 18675,
     theme: { primary: '#fbbf24', secondary: '#f59e0b', glow: 'rgba(251, 191, 36, 0.5)', bgGlow: 'rgba(251, 191, 36, 0.15)', text: '#fef3c7' },
   },
   {
@@ -146,9 +140,6 @@ const plansData: Plan[] = [
     sponsorPool: 0,
     roi: 300,
     flushoutDays: 8,
-    activeUsers: 892,
-    maturedUsers: 654,
-    totalRevenue: 32112,
     theme: { primary: '#22d3ee', secondary: '#0ea5e9', glow: 'rgba(34, 211, 238, 0.5)', bgGlow: 'rgba(34, 211, 238, 0.15)', text: '#cffafe' },
   },
   {
@@ -167,9 +158,6 @@ const plansData: Plan[] = [
     sponsorPool: 0,
     roi: 400,
     flushoutDays: 16,
-    activeUsers: 567,
-    maturedUsers: 423,
-    totalRevenue: 51597,
     theme: { primary: '#34d399', secondary: '#10b981', glow: 'rgba(52, 211, 153, 0.5)', bgGlow: 'rgba(52, 211, 153, 0.15)', text: '#d1fae5' },
   },
   {
@@ -188,9 +176,6 @@ const plansData: Plan[] = [
     sponsorPool: 2,
     roi: 500,
     flushoutDays: 25,
-    activeUsers: 345,
-    maturedUsers: 278,
-    totalRevenue: 77280,
     theme: { primary: '#e879f9', secondary: '#a855f7', glow: 'rgba(232, 121, 249, 0.5)', bgGlow: 'rgba(232, 121, 249, 0.15)', text: '#fae8ff' },
   },
   {
@@ -209,9 +194,6 @@ const plansData: Plan[] = [
     sponsorPool: 2,
     roi: 500,
     flushoutDays: 40,
-    activeUsers: 189,
-    maturedUsers: 156,
-    totalRevenue: 84672,
     theme: { primary: '#f472b6', secondary: '#ec4899', glow: 'rgba(244, 114, 182, 0.5)', bgGlow: 'rgba(244, 114, 182, 0.15)', text: '#fce7f3' },
   },
   {
@@ -230,9 +212,6 @@ const plansData: Plan[] = [
     sponsorPool: 4,
     roi: 500,
     flushoutDays: 60,
-    activeUsers: 98,
-    maturedUsers: 87,
-    totalRevenue: 86240,
     theme: { primary: '#e11d48', secondary: '#be123c', glow: 'rgba(225, 29, 72, 0.5)', bgGlow: 'rgba(225, 29, 72, 0.15)', text: '#fb7185' },
   },
 ];
@@ -1014,89 +993,185 @@ function UsersManagement() {
 // PLANS MANAGEMENT COMPONENT
 // =============================================
 function PlansManagement() {
+  const { token } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [planMetrics, setPlanMetrics] = useState<Array<{
+    planId: number;
+    planName: string;
+    activeUsers: number;
+    maturedUsers: number;
+    flushedUsers: number;
+    totalEnrollments: number;
+    totalRevenue: number;
+    adoptionRate: number;
+  }>>([]);
+  const [totalPlanEnrollments, setTotalPlanEnrollments] = useState(0);
+
+  const formatMoney = (value: number) =>
+    `$${Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}`;
+
+  const loadPlanMetrics = useCallback(async () => {
+    if (!token) {
+      setPlanMetrics([]);
+      setTotalPlanEnrollments(0);
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getPlanMetrics(token);
+      setPlanMetrics(response.planMetrics);
+      setTotalPlanEnrollments(response.totals.totalEnrollments);
+    } catch (err) {
+      setPlanMetrics([]);
+      setTotalPlanEnrollments(0);
+      setError(err instanceof Error ? err.message : 'Failed to load plan metrics');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadPlanMetrics();
+  }, [loadPlanMetrics]);
+
+  const planMetricsMap = useMemo(() => (
+    new Map(planMetrics.map((metric) => [metric.planId, metric]))
+  ), [planMetrics]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-white">Plans Management</h1>
-        <p className="text-sm text-slate-400">View and manage all investment plans</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Plans Management</h1>
+          <p className="text-sm text-slate-400">View and manage all investment plans</p>
+        </div>
+        <button
+          onClick={() => void loadPlanMetrics()}
+          disabled={isLoading}
+          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs sm:text-sm font-medium text-slate-300 hover:bg-white/10 disabled:opacity-60"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh Metrics
+        </button>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-200">
+          <p>{error}</p>
+          <button
+            onClick={() => void loadPlanMetrics()}
+            className="mt-2 inline-flex items-center gap-1 rounded-lg border border-rose-400/30 px-2 py-1 text-[11px] font-semibold text-rose-100 hover:bg-rose-500/10"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </button>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">Loading plan metrics...</div>
+      )}
+
+      {!isLoading && !error && planMetrics.length === 0 && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
+          No plan enrollment metrics found yet.
+        </div>
+      )}
 
       {/* Plans Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {plansData.map((plan) => (
-          <motion.div
-            key={plan.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="group relative overflow-hidden rounded-2xl border p-5 backdrop-blur-xl"
-            style={{
-              borderColor: `${plan.theme.primary}30`,
-              background: `linear-gradient(135deg, ${plan.theme.bgGlow} 0%, rgba(0,0,0,0.2) 100%)`,
-            }}
-          >
-            <div 
-              className="absolute inset-x-0 top-0 h-1"
-              style={{ background: `linear-gradient(90deg, transparent, ${plan.theme.primary}, transparent)` }}
-            />
-            
-            <div className="mb-4 flex items-start justify-between">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: plan.theme.primary }}>Plan {plan.id}</p>
-                <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-              </div>
-              <div 
-                className="flex h-12 w-12 items-center justify-center rounded-xl"
-                style={{ background: plan.theme.bgGlow, border: `1px solid ${plan.theme.primary}40` }}
-              >
-                <Layers className="h-5 w-5" style={{ color: plan.theme.primary }} />
-              </div>
-            </div>
+        {plansData.map((plan) => {
+          const metrics = planMetricsMap.get(plan.id);
+          const activeUsers = metrics?.activeUsers ?? 0;
+          const maturedUsers = metrics?.maturedUsers ?? 0;
+          const totalRevenue = metrics?.totalRevenue ?? 0;
+          const totalEnrollments = metrics?.totalEnrollments ?? 0;
+          const adoptionRate = metrics?.adoptionRate ?? (
+            totalPlanEnrollments > 0 ? Number(((totalEnrollments / totalPlanEnrollments) * 100).toFixed(2)) : 0
+          );
 
-            <div className="mb-4 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">Enrollment Fee</p>
-                <p className="text-lg font-bold text-white">${plan.joiningFee}</p>
-              </div>
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">ROI</p>
-                <p className="text-lg font-bold" style={{ color: plan.theme.primary }}>{plan.roi}%</p>
-              </div>
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">Team Size</p>
-                <p className="text-lg font-bold text-white">{plan.teamSize}</p>
-              </div>
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-[10px] text-slate-500">Guaranteed Flushout</p>
-                <p className="text-lg font-bold text-white">{plan.flushoutDays}d</p>
-              </div>
-            </div>
-
-            <div className="mb-4 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">Active Users</span>
-                <span className="font-medium text-white">{plan.activeUsers}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">Matured Users</span>
-                <span className="font-medium text-emerald-400">{plan.maturedUsers}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">Total Revenue</span>
-                <span className="font-medium" style={{ color: plan.theme.primary }}>${plan.totalRevenue.toLocaleString()}</span>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => setSelectedPlan(plan)}
-              className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+          return (
+            <motion.div
+              key={plan.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="group relative overflow-hidden rounded-2xl border p-5 backdrop-blur-xl"
+              style={{
+                borderColor: `${plan.theme.primary}30`,
+                background: `linear-gradient(135deg, ${plan.theme.bgGlow} 0%, rgba(0,0,0,0.2) 100%)`,
+              }}
             >
-              View Details
-            </button>
-          </motion.div>
-        ))}
+              <div
+                className="absolute inset-x-0 top-0 h-1"
+                style={{ background: `linear-gradient(90deg, transparent, ${plan.theme.primary}, transparent)` }}
+              />
+
+              <div className="mb-4 flex items-start justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: plan.theme.primary }}>Plan {plan.id}</p>
+                  <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                </div>
+                <div
+                  className="flex h-12 w-12 items-center justify-center rounded-xl"
+                  style={{ background: plan.theme.bgGlow, border: `1px solid ${plan.theme.primary}40` }}
+                >
+                  <Layers className="h-5 w-5" style={{ color: plan.theme.primary }} />
+                </div>
+              </div>
+
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-slate-500">Enrollment Fee</p>
+                  <p className="text-lg font-bold text-white">${plan.joiningFee}</p>
+                </div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-slate-500">ROI</p>
+                  <p className="text-lg font-bold" style={{ color: plan.theme.primary }}>{plan.roi}%</p>
+                </div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-slate-500">Team Size</p>
+                  <p className="text-lg font-bold text-white">{plan.teamSize}</p>
+                </div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-slate-500">Guaranteed Flushout</p>
+                  <p className="text-lg font-bold text-white">{plan.flushoutDays}d</p>
+                </div>
+              </div>
+
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Active Users</span>
+                  <span className="font-medium text-white">{activeUsers.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Matured Users</span>
+                  <span className="font-medium text-emerald-400">{maturedUsers.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Total Revenue</span>
+                  <span className="font-medium" style={{ color: plan.theme.primary }}>{formatMoney(totalRevenue)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Plan Adoption</span>
+                  <span className="font-medium text-sky-300">{adoptionRate.toFixed(2)}% ({totalEnrollments.toLocaleString()})</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedPlan(plan)}
+                className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+              >
+                View Details
+              </button>
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* Plan Detail Modal */}

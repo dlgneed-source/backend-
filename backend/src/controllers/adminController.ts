@@ -278,6 +278,65 @@ export async function getDashboard(req: AuthenticatedRequest, res: Response): Pr
   }
 }
 
+/**
+ * GET /admin/plan-metrics
+ */
+export async function getPlanMetrics(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const [plans, enrollmentsByPlan] = await Promise.all([
+      prisma.plan.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, joiningFee: true },
+        orderBy: { id: "asc" },
+      }),
+      prisma.enrollment.groupBy({
+        by: ["planId", "status"],
+        _count: true,
+      }),
+    ]);
+
+    const planStatusMap = new Map<number, { active: number; matured: number; flushed: number; totalEnrollments: number }>();
+    enrollmentsByPlan.forEach((entry) => {
+      const existing = planStatusMap.get(entry.planId) || { active: 0, matured: 0, flushed: 0, totalEnrollments: 0 };
+      if (entry.status === "ACTIVE") existing.active += entry._count;
+      if (entry.status === "MATURED") existing.matured += entry._count;
+      if (entry.status === "FLUSHED") existing.flushed += entry._count;
+      existing.totalEnrollments += entry._count;
+      planStatusMap.set(entry.planId, existing);
+    });
+
+    const totalEnrollments = plans.reduce((sum, plan) => (
+      sum + (planStatusMap.get(plan.id)?.totalEnrollments || 0)
+    ), 0);
+
+    const planMetrics = plans.map((plan) => {
+      const counts = planStatusMap.get(plan.id) || { active: 0, matured: 0, flushed: 0, totalEnrollments: 0 };
+      const adoptionRate = totalEnrollments > 0 ? (counts.totalEnrollments / totalEnrollments) * 100 : 0;
+
+      return {
+        planId: plan.id,
+        planName: plan.name,
+        activeUsers: counts.active,
+        maturedUsers: counts.matured,
+        flushedUsers: counts.flushed,
+        totalEnrollments: counts.totalEnrollments,
+        totalRevenue: counts.totalEnrollments * plan.joiningFee,
+        adoptionRate: Number(adoptionRate.toFixed(2)),
+      };
+    });
+
+    res.json({
+      success: true,
+      planMetrics,
+      totals: {
+        totalEnrollments,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch plan metrics" });
+  }
+}
+
 // =============================================
 // USER MANAGEMENT
 // =============================================

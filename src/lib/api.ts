@@ -277,6 +277,24 @@ export const adminApi = {
       };
     }>('/api/admin/dashboard', { token }),
 
+  getPlanMetrics: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      planMetrics: Array<{
+        planId: number;
+        planName: string;
+        activeUsers: number;
+        maturedUsers: number;
+        flushedUsers: number;
+        totalEnrollments: number;
+        totalRevenue: number;
+        adoptionRate: number;
+      }>;
+      totals: {
+        totalEnrollments: number;
+      };
+    }>('/api/admin/plan-metrics', { token }),
+
   getWithdrawals: (token: string, params?: { page?: number; limit?: number; status?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
