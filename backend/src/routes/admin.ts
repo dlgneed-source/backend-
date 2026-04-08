@@ -13,6 +13,7 @@ import {
   getFlushouts,
   getIncentiveClaims,
   approveIncentiveClaim,
+  getRewardsMetrics,
   getAdminGiftCodes,
   adminCreateGiftCode,
   updateAdminGiftCodeStatus,
@@ -64,6 +65,7 @@ router.get("/flushouts", authenticateAdmin, getFlushouts);
 // Incentives
 router.get("/incentive-claims", authenticateAdmin, getIncentiveClaims);
 router.patch("/incentive-claims/:claimId/approve", authenticateAdmin, approveIncentiveClaim);
+router.get("/rewards-metrics", authenticateAdmin, getRewardsMetrics);
 
 // Gift Codes
 router.get("/gift-codes", authenticateAdmin, getAdminGiftCodes);

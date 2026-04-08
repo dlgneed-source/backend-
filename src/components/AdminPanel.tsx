@@ -2396,24 +2396,87 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
 // =============================================
 // REWARDS MANAGEMENT COMPONENT
 // =============================================
-function RewardsManagement() {
+export function RewardsManagement({ token }: { token: string | null }) {
   const [activeTab, setActiveTab] = useState<'club' | 'individual'>('club');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [nextDistributionAt, setNextDistributionAt] = useState<string | null>(null);
+  const [summary, setSummary] = useState({
+    totalClaims: 0,
+    pendingClaims: 0,
+    approvedClaims: 0,
+    paidClaims: 0,
+    rejectedClaims: 0,
+    totalClaimedAmount: 0,
+    totalPaidAmount: 0,
+  });
+  const [clubIncentives, setClubIncentives] = useState<Array<{
+    id: string;
+    rank: string;
+    plan1: number;
+    plan2: number;
+    plan3: number;
+    plan4: number;
+    plan5: number;
+    plan6: number;
+    reward: number;
+  }>>([]);
+  const [individualIncentives, setIndividualIncentives] = useState<Array<{
+    id: string;
+    plan: string;
+    target: number;
+    reward: number;
+  }>>([]);
 
-  const clubIncentives = [
-    { id: 1, plan1: 25, plan2: 18, plan3: 14, plan4: 4, plan5: 2, plan6: 1, reward: 30, rank: 'Bronze Club' },
-    { id: 2, plan1: 50, plan2: 36, plan3: 28, plan4: 8, plan5: 4, plan6: 2, reward: 70, rank: 'Silver Club' },
-    { id: 3, plan1: 75, plan2: 54, plan3: 42, plan4: 12, plan5: 6, plan6: 3, reward: 110, rank: 'Gold Club' },
-    { id: 4, plan1: 100, plan2: 72, plan3: 56, plan4: 16, plan5: 8, plan6: 4, reward: 200, rank: 'Platinum Club' },
-  ];
+  const loadRewardsMetrics = useCallback(async () => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      setClubIncentives([]);
+      setIndividualIncentives([]);
+      setNextDistributionAt(null);
+      return;
+    }
 
-  const individualIncentives = [
-    { plan: 'Plan 1', target: 100, reward: 20 },
-    { plan: 'Plan 2', target: 75, reward: 25 },
-    { plan: 'Plan 3', target: 50, reward: 28 },
-    { plan: 'Plan 4', target: 25, reward: 25 },
-    { plan: 'Plan 5', target: 15, reward: 30 },
-    { plan: 'Plan 6', target: 10, reward: 30 },
-  ];
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await adminApi.getRewardsMetrics(token);
+      setNextDistributionAt(response.nextDistributionAt ?? null);
+      setSummary({
+        totalClaims: Number(response.summary?.totalClaims ?? 0),
+        pendingClaims: Number(response.summary?.pendingClaims ?? 0),
+        approvedClaims: Number(response.summary?.approvedClaims ?? 0),
+        paidClaims: Number(response.summary?.paidClaims ?? 0),
+        rejectedClaims: Number(response.summary?.rejectedClaims ?? 0),
+        totalClaimedAmount: Number(response.summary?.totalClaimedAmount ?? 0),
+        totalPaidAmount: Number(response.summary?.totalPaidAmount ?? 0),
+      });
+      setClubIncentives(Array.isArray(response.clubIncentives) ? response.clubIncentives : []);
+      setIndividualIncentives(Array.isArray(response.individualIncentives) ? response.individualIncentives : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load rewards metrics');
+      setNextDistributionAt(null);
+      setClubIncentives([]);
+      setIndividualIncentives([]);
+      setSummary({
+        totalClaims: 0,
+        pendingClaims: 0,
+        approvedClaims: 0,
+        paidClaims: 0,
+        rejectedClaims: 0,
+        totalClaimedAmount: 0,
+        totalPaidAmount: 0,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadRewardsMetrics();
+  }, [loadRewardsMetrics]);
+
+  const hasRewardConfig = Boolean(nextDistributionAt) || clubIncentives.length > 0 || individualIncentives.length > 0;
 
   return (
     <div className="space-y-6">
@@ -2425,9 +2488,49 @@ function RewardsManagement() {
         </div>
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 sm:px-4 py-2">
           <p className="text-[10px] sm:text-xs text-amber-400">Next Distribution</p>
-          <p className="font-mono text-base sm:text-lg font-bold text-amber-300">March 30, 2026</p>
+          {isLoading ? (
+            <p className="font-mono text-base sm:text-lg font-bold text-amber-300">Loading...</p>
+          ) : nextDistributionAt ? (
+            <p className="font-mono text-base sm:text-lg font-bold text-amber-300">{new Date(nextDistributionAt).toLocaleString()}</p>
+          ) : (
+            <p className="font-mono text-sm sm:text-base font-bold text-amber-200/90">Not configured</p>
+          )}
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-200">
+          <p>{error}</p>
+          <button
+            onClick={() => void loadRewardsMetrics()}
+            className="mt-2 inline-flex items-center gap-1 rounded-lg border border-rose-400/30 px-2 py-1 text-[11px] font-semibold text-rose-100 hover:bg-rose-500/10"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Claims', value: summary.totalClaims, color: '#22d3ee' },
+          { label: 'Pending Claims', value: summary.pendingClaims, color: '#fbbf24' },
+          { label: 'Paid Claims', value: summary.paidClaims, color: '#34d399' },
+          { label: 'Total Paid', value: formatUsd(summary.totalPaidAmount), color: '#e879f9' },
+        ].map((item) => (
+          <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider">{item.label}</p>
+            <p className="text-xl sm:text-2xl font-bold mt-1" style={{ color: item.color }}>{item.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {isLoading && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">Loading rewards configuration...</div>
+      )}
+      {!isLoading && !error && !hasRewardConfig && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">No rewards configuration found.</div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2">
@@ -2456,64 +2559,76 @@ function RewardsManagement() {
       {/* Club Incentives */}
       {activeTab === 'club' && (
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
-          <table className="w-full">
-            <thead className="bg-white/[0.03]">
-              <tr className="border-b border-white/10">
-                <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Rank</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 1 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 2 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 3 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 4 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 5 IDs</th>
-                <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 6 IDs</th>
-                <th className="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Reward</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clubIncentives.map((incentive) => (
-                <tr key={incentive.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-3 py-1 text-sm font-semibold text-rose-300">
-                      <Medal className="h-4 w-4" />
-                      {incentive.rank}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan1}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan2}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan3}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan4}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan5}</td>
-                  <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan6}</td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-lg font-bold text-emerald-400">${incentive.reward}</span>
-                  </td>
+          {clubIncentives.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-sm text-slate-300">No club incentives configured.</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-white/[0.03]">
+                <tr className="border-b border-white/10">
+                  <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Rank</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 1 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 2 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 3 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 4 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 5 IDs</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Plan 6 IDs</th>
+                  <th className="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Reward</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {clubIncentives.map((incentive) => (
+                  <tr key={incentive.id} className="border-b border-white/5 transition hover:bg-white/[0.03]">
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-3 py-1 text-sm font-semibold text-rose-300">
+                        <Medal className="h-4 w-4" />
+                        {incentive.rank}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan1}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan2}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan3}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan4}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan5}</td>
+                    <td className="px-6 py-4 text-center text-sm text-slate-300">{incentive.plan6}</td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-lg font-bold text-emerald-400">{formatUsd(incentive.reward)}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
       {/* Individual Incentives */}
       {activeTab === 'individual' && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {individualIncentives.map((incentive, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="rounded-xl border border-white/10 bg-white/[0.04] p-5"
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{incentive.plan}</p>
-              <p className="mt-2 text-3xl font-bold text-white">{incentive.target}</p>
-              <p className="text-sm text-slate-400">Target IDs</p>
-              <div className="mt-4 flex items-center gap-2">
-                <Gift className="h-4 w-4 text-rose-400" />
-                <span className="text-lg font-bold text-emerald-400">${incentive.reward}</span>
-              </div>
-            </motion.div>
-          ))}
+          {individualIncentives.length === 0 ? (
+            <div className="col-span-full rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
+              No individual incentives configured.
+            </div>
+          ) : (
+            individualIncentives.map((incentive, index) => (
+              <motion.div
+                key={incentive.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="rounded-xl border border-white/10 bg-white/[0.04] p-5"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{incentive.plan}</p>
+                <p className="mt-2 text-3xl font-bold text-white">{incentive.target}</p>
+                <p className="text-sm text-slate-400">Target IDs</p>
+                <div className="mt-4 flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-rose-400" />
+                  <span className="text-lg font-bold text-emerald-400">{formatUsd(incentive.reward)}</span>
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
       )}
     </div>
@@ -2981,7 +3096,7 @@ export default function AdminPanel() {
       case 'gift-codes':
         return <GiftCodeManagement token={token} />;
       case 'rewards':
-        return <RewardsManagement />;
+        return <RewardsManagement token={token} />;
       case 'daily-income':
         return <DailyIncomeManagement />;
       case 'security':

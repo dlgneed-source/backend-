@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GiftCodeManagement, SecurityLogs } from './AdminPanel';
+import { GiftCodeManagement, RewardsManagement, SecurityLogs } from './AdminPanel';
 
 type MockResponse = {
   ok: boolean;
@@ -324,5 +324,81 @@ describe('AdminPanel gift code and audit integrations', () => {
     await screen.findByText('GIFT_CODE_CREATED');
     await screen.findByText('Created 1 gift code(s) for Plan 1');
     await screen.findByText('0xadmin');
+  });
+});
+
+describe('AdminPanel rewards integrations', () => {
+  it('renders backend-driven rewards metrics and distribution date', async () => {
+    queueFetchResponses([
+      {
+        ok: true,
+        status: 200,
+        body: {
+          success: true,
+          nextDistributionAt: '2030-01-31T00:00:00.000Z',
+          summary: {
+            totalClaims: 10,
+            pendingClaims: 3,
+            approvedClaims: 2,
+            paidClaims: 4,
+            rejectedClaims: 1,
+            totalClaimedAmount: 150,
+            totalPaidAmount: 100,
+          },
+          clubIncentives: [
+            {
+              id: 'club-1',
+              rank: 'Bronze Club',
+              plan1: 25,
+              plan2: 18,
+              plan3: 14,
+              plan4: 4,
+              plan5: 2,
+              plan6: 1,
+              reward: 30,
+            },
+          ],
+          individualIncentives: [
+            { id: 'ind-1', plan: 'Plan 1', target: 100, reward: 20 },
+          ],
+        },
+      },
+    ]);
+
+    render(<RewardsManagement token="admin-token" />);
+
+    await screen.findByText('Bronze Club');
+    await screen.findByText('$30.00');
+    await screen.findByText('$100.00');
+    expect(screen.queryByText('March 30, 2026')).not.toBeInTheDocument();
+  });
+
+  it('renders rewards empty state when no backend config exists', async () => {
+    queueFetchResponses([
+      {
+        ok: true,
+        status: 200,
+        body: {
+          success: true,
+          nextDistributionAt: null,
+          summary: {
+            totalClaims: 0,
+            pendingClaims: 0,
+            approvedClaims: 0,
+            paidClaims: 0,
+            rejectedClaims: 0,
+            totalClaimedAmount: 0,
+            totalPaidAmount: 0,
+          },
+          clubIncentives: [],
+          individualIncentives: [],
+        },
+      },
+    ]);
+
+    render(<RewardsManagement token="admin-token" />);
+
+    await screen.findByText('No rewards configuration found.');
+    await screen.findByText('No club incentives configured.');
   });
 });

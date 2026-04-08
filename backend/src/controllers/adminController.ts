@@ -795,6 +795,106 @@ export async function approveIncentiveClaim(req: AuthenticatedRequest, res: Resp
   }
 }
 
+/**
+ * GET /admin/rewards-metrics
+ * Rewards and incentive metrics from DB + system config
+ */
+export async function getRewardsMetrics(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const parseConfigArray = (rawValue: string | undefined): unknown[] => {
+      if (!rawValue) return [];
+      try {
+        const parsed = JSON.parse(rawValue);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const [statusGroups, totalAggregate, paidAggregate, configs] = await Promise.all([
+      prisma.incentiveClaim.groupBy({
+        by: ["status"],
+        _count: { _all: true },
+      }),
+      prisma.incentiveClaim.aggregate({
+        _count: { _all: true },
+        _sum: { reward: true },
+      }),
+      prisma.incentiveClaim.aggregate({
+        where: { status: "PAID" },
+        _sum: { reward: true },
+      }),
+      prisma.systemConfig.findMany({
+        where: {
+          key: {
+            in: [
+              "REWARDS_NEXT_DISTRIBUTION_AT",
+              "REWARDS_CLUB_INCENTIVES",
+              "REWARDS_INDIVIDUAL_INCENTIVES",
+            ],
+          },
+        },
+      }),
+    ]);
+
+    const configMap = new Map(configs.map((item) => [item.key, item.value]));
+    const nextDistributionRaw = configMap.get("REWARDS_NEXT_DISTRIBUTION_AT");
+    const nextDistributionDate = nextDistributionRaw ? new Date(nextDistributionRaw) : null;
+    const nextDistributionAt = nextDistributionDate && !Number.isNaN(nextDistributionDate.getTime())
+      ? nextDistributionDate.toISOString()
+      : null;
+
+    const clubParsed = parseConfigArray(configMap.get("REWARDS_CLUB_INCENTIVES"));
+    const clubIncentives = Array.isArray(clubParsed)
+      ? clubParsed
+          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+          .map((item, index) => ({
+            id: String(item.id ?? index + 1),
+            rank: typeof item.rank === "string" ? item.rank : `Rank ${index + 1}`,
+            plan1: Number(item.plan1 ?? 0),
+            plan2: Number(item.plan2 ?? 0),
+            plan3: Number(item.plan3 ?? 0),
+            plan4: Number(item.plan4 ?? 0),
+            plan5: Number(item.plan5 ?? 0),
+            plan6: Number(item.plan6 ?? 0),
+            reward: Number(item.reward ?? 0),
+          }))
+      : [];
+
+    const individualParsed = parseConfigArray(configMap.get("REWARDS_INDIVIDUAL_INCENTIVES"));
+    const individualIncentives = Array.isArray(individualParsed)
+      ? individualParsed
+          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+          .map((item, index) => ({
+            id: String(item.id ?? index + 1),
+            plan: typeof item.plan === "string" ? item.plan : `Plan ${index + 1}`,
+            target: Number(item.target ?? 0),
+            reward: Number(item.reward ?? 0),
+          }))
+      : [];
+
+    const statusCountMap = new Map(statusGroups.map((item) => [item.status, item._count._all]));
+
+    res.json({
+      success: true,
+      nextDistributionAt,
+      summary: {
+        totalClaims: totalAggregate._count._all ?? 0,
+        pendingClaims: statusCountMap.get("PENDING") ?? 0,
+        approvedClaims: statusCountMap.get("APPROVED") ?? 0,
+        paidClaims: statusCountMap.get("PAID") ?? 0,
+        rejectedClaims: statusCountMap.get("REJECTED") ?? 0,
+        totalClaimedAmount: Number((totalAggregate._sum.reward ?? 0).toFixed(CURRENCY_PRECISION)),
+        totalPaidAmount: Number((paidAggregate._sum.reward ?? 0).toFixed(CURRENCY_PRECISION)),
+      },
+      clubIncentives,
+      individualIncentives,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch rewards metrics" });
+  }
+}
+
 // =============================================
 // GIFT CODE MANAGEMENT
 // =============================================

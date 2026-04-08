@@ -400,6 +400,38 @@ export const adminApi = {
       };
     }>(`/api/admin/flushout/${encodeURIComponent(enrollmentId)}`, { method: 'POST', token }),
 
+  getRewardsMetrics: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      nextDistributionAt: string | null;
+      summary: {
+        totalClaims: number;
+        pendingClaims: number;
+        approvedClaims: number;
+        paidClaims: number;
+        rejectedClaims: number;
+        totalClaimedAmount: number;
+        totalPaidAmount: number;
+      };
+      clubIncentives: Array<{
+        id: string;
+        rank: string;
+        plan1: number;
+        plan2: number;
+        plan3: number;
+        plan4: number;
+        plan5: number;
+        plan6: number;
+        reward: number;
+      }>;
+      individualIncentives: Array<{
+        id: string;
+        plan: string;
+        target: number;
+        reward: number;
+      }>;
+    }>('/api/admin/rewards-metrics', { token }),
+
   getGiftCodes: (token: string, params?: { page?: number; limit?: number; status?: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED'; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
