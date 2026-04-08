@@ -9,6 +9,7 @@ import {
   approveWithdrawal,
   rejectWithdrawal,
   manualFlushout,
+  getFlushouts,
   getIncentiveClaims,
   approveIncentiveClaim,
   getAdminGiftCodes,
@@ -52,6 +53,7 @@ router.patch("/withdrawals/:withdrawalId/reject", authenticateAdmin, validate(re
 
 // Flushout
 router.post("/flushout/:enrollmentId", authenticateAdmin, manualFlushout);
+router.get("/flushouts", authenticateAdmin, getFlushouts);
 
 // Incentives
 router.get("/incentive-claims", authenticateAdmin, getIncentiveClaims);
