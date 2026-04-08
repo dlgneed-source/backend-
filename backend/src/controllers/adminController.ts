@@ -305,8 +305,8 @@ export async function getPlanMetrics(req: AuthenticatedRequest, res: Response): 
       planStatusMap.set(entry.planId, existing);
     });
 
-    const totalEnrollments = plans.reduce((sum, plan) => (
-      sum + (planStatusMap.get(plan.id)?.totalEnrollments || 0)
+    const totalEnrollments = Array.from(planStatusMap.values()).reduce((sum, counts) => (
+      sum + counts.totalEnrollments
     ), 0);
 
     const planMetrics = plans.map((plan) => {
@@ -321,7 +321,7 @@ export async function getPlanMetrics(req: AuthenticatedRequest, res: Response): 
         flushedUsers: counts.flushed,
         totalEnrollments: counts.totalEnrollments,
         totalRevenue: counts.totalEnrollments * plan.joiningFee,
-        adoptionRate: Number(adoptionRate.toFixed(2)),
+        adoptionRate: Math.round(adoptionRate * 100) / 100,
       };
     });
 
@@ -333,6 +333,7 @@ export async function getPlanMetrics(req: AuthenticatedRequest, res: Response): 
       },
     });
   } catch (err) {
+    console.error("[admin] Failed to fetch plan metrics:", err);
     res.status(500).json({ success: false, message: "Failed to fetch plan metrics" });
   }
 }

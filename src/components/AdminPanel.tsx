@@ -486,8 +486,9 @@ function DashboardOverview({ token }: { token: string | null }) {
     }>;
   } | null>(null);
 
-  const formatMoney = (value: number) =>
-    `$${Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}`;
+  const formatMoney = useCallback((value: number) => (
+    `$${Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}`
+  ), []);
 
   const normalizeStatus = (status: string): RequestStatus => {
     const normalized = status.toUpperCase();
@@ -1007,7 +1008,6 @@ function PlansManagement() {
     totalRevenue: number;
     adoptionRate: number;
   }>>([]);
-  const [totalPlanEnrollments, setTotalPlanEnrollments] = useState(0);
 
   const formatMoney = (value: number) =>
     `$${Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}`;
@@ -1015,7 +1015,6 @@ function PlansManagement() {
   const loadPlanMetrics = useCallback(async () => {
     if (!token) {
       setPlanMetrics([]);
-      setTotalPlanEnrollments(0);
       setError('Permission denied. Admin login required.');
       return;
     }
@@ -1025,10 +1024,8 @@ function PlansManagement() {
     try {
       const response = await adminApi.getPlanMetrics(token);
       setPlanMetrics(response.planMetrics);
-      setTotalPlanEnrollments(response.totals.totalEnrollments);
     } catch (err) {
       setPlanMetrics([]);
-      setTotalPlanEnrollments(0);
       setError(err instanceof Error ? err.message : 'Failed to load plan metrics');
     } finally {
       setIsLoading(false);
@@ -1092,9 +1089,7 @@ function PlansManagement() {
           const maturedUsers = metrics?.maturedUsers ?? 0;
           const totalRevenue = metrics?.totalRevenue ?? 0;
           const totalEnrollments = metrics?.totalEnrollments ?? 0;
-          const adoptionRate = metrics?.adoptionRate ?? (
-            totalPlanEnrollments > 0 ? Number(((totalEnrollments / totalPlanEnrollments) * 100).toFixed(2)) : 0
-          );
+          const adoptionRate = metrics?.adoptionRate ?? 0;
 
           return (
             <motion.div
