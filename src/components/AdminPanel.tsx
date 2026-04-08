@@ -2056,6 +2056,7 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
     amountMode: 'PLAN' as 'PLAN' | 'CUSTOM',
     customAmount: '',
   });
+  const isNumericDaysInput = (value: string): boolean => /^\d*$/.test(value);
 
   const loadGiftCodes = useCallback(async () => {
     if (!token) {
@@ -2088,7 +2089,8 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
     }
 
     const daysRaw = newCode.days.trim();
-    const days = daysRaw.length > 0 ? Number(daysRaw) : undefined;
+    const daysInputProvided = daysRaw.length > 0;
+    const days = daysInputProvided ? Number(daysRaw) : undefined;
     const quantity = Number(newCode.quantity);
     const planId = Number(newCode.planId);
     const code = newCode.code.trim().toUpperCase();
@@ -2099,7 +2101,7 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
       setError('Plan must be between 1 and 6.');
       return;
     }
-    if (daysRaw && !/^\d+$/.test(daysRaw)) {
+    if (daysInputProvided && !isNumericDaysInput(daysRaw)) {
       setError('Valid for days must contain numbers only.');
       return;
     }
@@ -2365,7 +2367,7 @@ export function GiftCodeManagement({ token }: { token: string | null }) {
                     value={newCode.days}
                     onChange={e => {
                       const next = e.target.value;
-                      if (/^\d*$/.test(next)) {
+                      if (isNumericDaysInput(next)) {
                         setNewCode({ ...newCode, days: next });
                       } else {
                         setError('Valid for days must contain numbers only.');

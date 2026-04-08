@@ -875,7 +875,7 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
   const {
     planId,
     customAmount,
-    expiryDays = 30,
+    expiryDays,
     quantity = 1,
     code: requestedCode,
   } = req.body as { planId: number; customAmount?: number; expiryDays?: number; quantity?: number; code?: string };
@@ -909,7 +909,7 @@ export async function adminCreateGiftCode(req: AuthenticatedRequest, res: Respon
 
     const now = new Date();
     const expiresAt = new Date(now);
-    expiresAt.setDate(expiresAt.getDate() + expiryDays);
+    expiresAt.setDate(expiresAt.getDate() + (expiryDays ?? 30));
 
     const createdCodes = [];
     for (let i = 0; i < Math.min(quantity, 50); i++) {
