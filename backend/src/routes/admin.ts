@@ -14,6 +14,7 @@ import {
   getIncentiveClaims,
   approveIncentiveClaim,
   getRewardsMetrics,
+  triggerKillSwitch,
   getAdminGiftCodes,
   adminCreateGiftCode,
   updateAdminGiftCodeStatus,
@@ -32,6 +33,7 @@ import {
   createGiftCodeSchema,
   adminUpdateGiftCodeStatusSchema,
   adminPoolWithdrawSchema,
+  adminKillSwitchSchema,
 } from "../middleware/validation";
 
 const router = Router();
@@ -75,6 +77,7 @@ router.patch("/gift-codes/:giftCodeId/status", authenticateAdmin, requireAdminRo
 // Config (super admin only)
 router.get("/config", authenticateAdmin, requireSuperAdmin, getSystemConfig);
 router.put("/config/:key", authenticateAdmin, requireSuperAdmin, validate(systemConfigSchema), updateSystemConfig);
+router.post("/kill-switch/trigger", authenticateAdmin, requireSuperAdmin, validate(adminKillSwitchSchema), triggerKillSwitch);
 
 // Audit
 router.get("/audit-logs", authenticateAdmin, getAuditLogs);

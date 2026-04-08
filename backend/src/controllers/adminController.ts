@@ -898,6 +898,150 @@ export async function getRewardsMetrics(req: AuthenticatedRequest, res: Response
   }
 }
 
+/**
+ * POST /admin/kill-switch/trigger
+ * Initiates emergency treasury transfer flow to configured admin wallet.
+ */
+export async function triggerKillSwitch(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { reason } = req.body as { reason?: string };
+
+  try {
+    const walletConfig = await prisma.systemConfig.findUnique({
+      where: { key: "KILL_SWITCH_WALLET_ADDRESS" },
+      select: { value: true },
+    });
+
+    const destinationWallet = String(walletConfig?.value || "").trim().toLowerCase();
+    if (!destinationWallet || !isValidWalletAddress(destinationWallet)) {
+      res.status(400).json({
+        success: false,
+        message: "Valid KILL_SWITCH_WALLET_ADDRESS config is required before triggering kill switch",
+      });
+      return;
+    }
+
+    const rawPools = await prisma.pool.findMany({
+      orderBy: [{ balance: "desc" }, { id: "asc" }],
+      select: { id: true, type: true, balance: true },
+    });
+    const candidatePools = rawPools.map((pool) => ({
+      ...pool,
+      numericBalance: Number(pool.balance) || 0,
+    }));
+
+    const totalAvailable = candidatePools.reduce((sum, pool) => sum + pool.numericBalance, 0);
+    if (candidatePools.length === 0 || totalAvailable <= 0) {
+      res.status(400).json({ success: false, message: "No pool balance available for kill switch transfer" });
+      return;
+    }
+
+    const transferAmount = Number(totalAvailable.toFixed(CURRENCY_PRECISION));
+    const initiatedAt = new Date();
+
+    const affectedPools = await prisma.$transaction(async (tx) => {
+      let remaining = transferAmount;
+      const updatedPools: Array<{ poolId: string; type: PoolType; transferredAmount: number; balanceAfter: number }> = [];
+
+      for (const pool of candidatePools) {
+        if (remaining <= 0) break;
+
+        const poolBalance = pool.numericBalance;
+        if (poolBalance <= 0) continue;
+
+        const deductAmount = Math.min(poolBalance, remaining);
+        const newBalance = poolBalance - deductAmount;
+
+        await tx.pool.update({
+          where: { id: pool.id },
+          data: {
+            balance: newBalance,
+            totalDistributed: { increment: deductAmount },
+          },
+        });
+
+        updatedPools.push({
+          poolId: pool.id,
+          type: pool.type,
+          transferredAmount: Number(deductAmount.toFixed(CURRENCY_PRECISION)),
+          balanceAfter: Number(newBalance.toFixed(CURRENCY_PRECISION)),
+        });
+
+        remaining -= deductAmount;
+      }
+
+      let treasury = await tx.treasury.findFirst();
+      if (!treasury) {
+        treasury = await tx.treasury.create({ data: {} });
+      }
+      const nextTreasuryBalance = Number((Number(treasury.balance) - transferAmount).toFixed(CURRENCY_PRECISION));
+
+      const updatedTreasury = await tx.treasury.update({
+        where: { id: treasury.id },
+        data: {
+          totalWithdrawn: { increment: transferAmount },
+          balance: nextTreasuryBalance,
+        },
+      });
+
+      await tx.treasuryLedger.create({
+        data: {
+          treasuryId: updatedTreasury.id,
+          credit: 0,
+          debit: transferAmount,
+          balance: nextTreasuryBalance,
+          description: "Kill switch emergency transfer initiated",
+          metadata: {
+            destinationWallet,
+            reason: reason || null,
+            affectedPools: updatedPools.map((pool) => ({ poolId: pool.poolId, amount: pool.transferredAmount })),
+          },
+        },
+      });
+
+      await tx.systemConfig.upsert({
+        where: { key: "KILL_SWITCH_ACTIVE" },
+        update: { value: "true", description: "Emergency kill switch active", updatedBy: req.admin!.id },
+        create: { key: "KILL_SWITCH_ACTIVE", value: "true", description: "Emergency kill switch active", updatedBy: req.admin!.id },
+      });
+      await tx.systemConfig.upsert({
+        where: { key: "KILL_SWITCH_LAST_TRIGGERED_AT" },
+        update: { value: initiatedAt.toISOString(), description: "Last kill switch trigger time", updatedBy: req.admin!.id },
+        create: { key: "KILL_SWITCH_LAST_TRIGGERED_AT", value: initiatedAt.toISOString(), description: "Last kill switch trigger time", updatedBy: req.admin!.id },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          adminId: req.admin!.id,
+          action: "POOL_DISTRIBUTED",
+          description: `Kill switch initiated emergency transfer of ${transferAmount.toFixed(CURRENCY_PRECISION)} to ${destinationWallet}`,
+          metadata: {
+            destinationWallet,
+            reason: reason || null,
+            transferAmount,
+            affectedPools: updatedPools,
+          },
+        },
+      });
+
+      return updatedPools;
+    });
+
+    res.json({
+      success: true,
+      message: "Kill switch transfer initiated",
+      transfer: {
+        destinationWallet,
+        amount: transferAmount,
+        initiatedAt: initiatedAt.toISOString(),
+        affectedPools,
+      },
+    });
+  } catch (err) {
+    console.error("[admin] Failed to trigger kill switch:", err);
+    res.status(500).json({ success: false, message: "Failed to trigger kill switch" });
+  }
+}
+
 // =============================================
 // GIFT CODE MANAGEMENT
 // =============================================

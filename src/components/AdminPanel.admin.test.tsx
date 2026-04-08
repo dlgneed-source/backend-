@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GiftCodeManagement, RewardsManagement, SecurityLogs } from './AdminPanel';
+import { GiftCodeManagement, RewardsManagement, SecurityLogs, Settings } from './AdminPanel';
 
 type MockResponse = {
   ok: boolean;
@@ -400,5 +400,107 @@ describe('AdminPanel rewards integrations', () => {
 
     await screen.findByText('No rewards configuration found.');
     await screen.findByText('No club incentives configured.');
+  });
+});
+
+describe('AdminPanel settings integrations', () => {
+  it('loads backend system config and updates a toggle', async () => {
+    const fetchMock = queueFetchResponses([
+      {
+        ok: true,
+        status: 200,
+        body: {
+          success: true,
+          configs: [
+            { id: '1', key: 'MAINTENANCE_MODE', value: 'false', createdAt: '2030-01-01T00:00:00.000Z', updatedAt: '2030-01-01T00:00:00.000Z' },
+            { id: '2', key: 'FLUSHOUT_ENABLED', value: 'true', createdAt: '2030-01-01T00:00:00.000Z', updatedAt: '2030-01-01T00:00:00.000Z' },
+            { id: '3', key: 'KILL_SWITCH_WALLET_ADDRESS', value: '0x1111111111111111111111111111111111111111', createdAt: '2030-01-01T00:00:00.000Z', updatedAt: '2030-01-01T00:00:00.000Z' },
+          ],
+        },
+      },
+      {
+        ok: true,
+        status: 200,
+        body: {
+          success: true,
+          config: {
+            id: '1',
+            key: 'MAINTENANCE_MODE',
+            value: 'true',
+            createdAt: '2030-01-01T00:00:00.000Z',
+            updatedAt: '2030-01-01T00:00:00.000Z',
+          },
+        },
+      },
+    ]);
+
+    render(<Settings token="admin-token" />);
+
+    await screen.findByDisplayValue('0x1111111111111111111111111111111111111111');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Maintenance Mode' }));
+
+    await waitFor(() => {
+      const updateCall = fetchMock.mock.calls.find(
+        (call) => String(call[0]).includes('/api/admin/config/MAINTENANCE_MODE') && call[1]?.method === 'PUT',
+      );
+      expect(updateCall).toBeTruthy();
+    });
+    await screen.findByText('Updated MAINTENANCE_MODE');
+  });
+
+  it('triggers kill switch using backend endpoint', async () => {
+    const fetchMock = queueFetchResponses([
+      {
+        ok: true,
+        status: 200,
+        body: {
+          success: true,
+          configs: [
+            { id: '1', key: 'KILL_SWITCH_WALLET_ADDRESS', value: '0x2222222222222222222222222222222222222222', createdAt: '2030-01-01T00:00:00.000Z', updatedAt: '2030-01-01T00:00:00.000Z' },
+            { id: '2', key: 'KILL_SWITCH_ACTIVE', value: 'false', createdAt: '2030-01-01T00:00:00.000Z', updatedAt: '2030-01-01T00:00:00.000Z' },
+          ],
+        },
+      },
+      {
+        ok: true,
+        status: 200,
+        body: {
+          success: true,
+          message: 'Kill switch transfer initiated',
+          transfer: {
+            destinationWallet: '0x2222222222222222222222222222222222222222',
+            amount: 123.45,
+            initiatedAt: '2030-01-01T00:00:00.000Z',
+            affectedPools: [],
+          },
+        },
+      },
+      {
+        ok: true,
+        status: 200,
+        body: {
+          success: true,
+          configs: [
+            { id: '1', key: 'KILL_SWITCH_WALLET_ADDRESS', value: '0x2222222222222222222222222222222222222222', createdAt: '2030-01-01T00:00:00.000Z', updatedAt: '2030-01-01T00:00:00.000Z' },
+            { id: '2', key: 'KILL_SWITCH_ACTIVE', value: 'true', createdAt: '2030-01-01T00:00:00.000Z', updatedAt: '2030-01-01T00:00:00.000Z' },
+          ],
+        },
+      },
+    ]);
+
+    render(<Settings token="admin-token" />);
+
+    await screen.findByDisplayValue('0x2222222222222222222222222222222222222222');
+    fireEvent.click(screen.getByRole('button', { name: /Trigger Kill Switch/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Override/i }));
+
+    await waitFor(() => {
+      const triggerCall = fetchMock.mock.calls.find(
+        (call) => String(call[0]).includes('/api/admin/kill-switch/trigger') && call[1]?.method === 'POST',
+      );
+      expect(triggerCall).toBeTruthy();
+    });
+    await screen.findByText(/Transfer initiated to/i);
   });
 });

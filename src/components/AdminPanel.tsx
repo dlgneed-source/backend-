@@ -4,8 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ApiError, adminApi, teamApi } from '@/lib/api';
 import { getDirectReferralIncome, toSafeNonNegativeNumber } from '@/lib/referral';
 import {
-  AlertOctagon, Ban, Briefcase, ChevronRight, Copy, Gift, Radio, RefreshCw,
-  Search, Send, Shield, TrendingUp, Wallet, Zap, Users, LayoutDashboard,
+  AlertOctagon, Ban, Briefcase, ChevronRight, Copy, Gift, RefreshCw,
+  Search, Shield, TrendingUp, Wallet, Zap, Users, LayoutDashboard,
   Layers, Award, Crown, Gem, Network, ArrowUpRight, ArrowDownLeft, X,
   Check, Clock, AlertCircle, Info, Filter, Download, MoreHorizontal,
   Settings as SettingsIcon, LogOut, Bell, MessageSquare, FileText, BarChart3, PieChart,
@@ -2860,10 +2860,120 @@ export function SecurityLogs({ token }: { token: string | null }) {
 // =============================================
 // SETTINGS COMPONENT
 // =============================================
-function Settings() {
+export function Settings({ token }: { token: string | null }) {
   const [killConfirm, setKillConfirm] = useState(false);
-  const [broadcastOpen, setBroadcastOpen] = useState(false);
-  const [broadcastMsg, setBroadcastMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSavingKey, setIsSavingKey] = useState<string | null>(null);
+  const [isTriggeringKill, setIsTriggeringKill] = useState(false);
+  const [configs, setConfigs] = useState<Record<string, string>>({});
+  const [walletDraft, setWalletDraft] = useState('');
+  const [killReason, setKillReason] = useState('');
+  const [killResult, setKillResult] = useState<string | null>(null);
+
+  const toggleSettings = useMemo(
+    () => [
+      { key: 'MAINTENANCE_MODE', label: 'Maintenance Mode', desc: 'Temporarily disable new registrations' },
+      { key: 'FLUSHOUT_ENABLED', label: 'Auto Flushout', desc: 'Enable automatic plan flushouts' },
+      { key: 'COMMISSION_DISTRIBUTION_ENABLED', label: 'Commission Distribution', desc: 'Auto-distribute level commissions' },
+      { key: 'AUTO_WITHDRAWAL_SIGNING_ENABLED', label: 'Auto Withdrawal Signing', desc: 'Enable EIP-712 automatic withdrawal authorization' },
+      { key: 'KILL_SWITCH_ACTIVE', label: 'Kill Switch Active', desc: 'Emergency state after kill switch execution' },
+    ],
+    [],
+  );
+
+  const isTrue = useCallback((value: string | undefined): boolean => {
+    if (!value) return false;
+    return ['true', '1', 'yes', 'on'].includes(value.trim().toLowerCase());
+  }, []);
+
+  const loadConfigs = useCallback(async () => {
+    if (!token) {
+      setError('Permission denied. Admin login required.');
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    setSaveError(null);
+    try {
+      const response = await adminApi.getSystemConfig(token);
+      const nextConfigs = Object.fromEntries(
+        (response.configs || []).map((item) => [item.key, item.value]),
+      );
+      setConfigs(nextConfigs);
+      setWalletDraft(nextConfigs.KILL_SWITCH_WALLET_ADDRESS || '');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load settings');
+      setConfigs({});
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadConfigs();
+  }, [loadConfigs]);
+
+  const upsertConfig = useCallback(
+    async (key: string, value: string, description: string) => {
+      if (!token) {
+        setSaveError('Permission denied. Admin login required.');
+        return;
+      }
+      setIsSavingKey(key);
+      setSaveError(null);
+      setSaveMessage(null);
+      try {
+        const response = await adminApi.updateSystemConfig(token, key, { value, description });
+        setConfigs((prev) => ({ ...prev, [response.config.key]: response.config.value }));
+        if (key === 'KILL_SWITCH_WALLET_ADDRESS') {
+          setWalletDraft(response.config.value);
+        }
+        setSaveMessage(`Updated ${key}`);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : `Failed to update ${key}`);
+      } finally {
+        setIsSavingKey(null);
+      }
+    },
+    [token],
+  );
+
+  const handleTriggerKillSwitch = useCallback(async () => {
+    if (!token) {
+      setSaveError('Permission denied. Admin login required.');
+      return;
+    }
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletDraft.trim())) {
+      setSaveError('Enter a valid BEP20 wallet address before kill switch trigger.');
+      return;
+    }
+
+    setIsTriggeringKill(true);
+    setSaveError(null);
+    setSaveMessage(null);
+    setKillResult(null);
+    try {
+      const response = await adminApi.triggerKillSwitch(token, {
+        reason: killReason.trim() || undefined,
+      });
+      setKillResult(
+        `Transfer initiated to ${response.transfer.destinationWallet} for ${formatUsd(response.transfer.amount)}.`,
+      );
+      setKillConfirm(false);
+      setKillReason('');
+      await loadConfigs();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to trigger kill switch');
+    } finally {
+      setIsTriggeringKill(false);
+    }
+  }, [killReason, loadConfigs, token, walletDraft]);
+
+  const toggleCount = toggleSettings.length;
+  const hasAnyConfig = Object.keys(configs).length > 0;
 
   return (
     <div className="space-y-6">
@@ -2886,44 +2996,109 @@ function Settings() {
             <p className="text-sm text-slate-400">Critical system actions</p>
           </div>
         </div>
-        
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <button
-            onClick={() => setBroadcastOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm font-semibold text-white transition hover:bg-white/10"
-          >
-            <Radio className="h-4 w-4" /> Global Broadcast
-          </button>
-          <button
-            onClick={() => setKillConfirm(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-rose-300/30 bg-rose-700/35 px-4 py-4 text-sm font-semibold text-rose-50 transition hover:bg-rose-700/45"
-          >
-            <AlertOctagon className="h-4 w-4" /> KILL-SWITCH
-          </button>
+
+        <div className="space-y-3">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Admin BEP20 Wallet Address</label>
+            <input
+              value={walletDraft}
+              onChange={(e) => setWalletDraft(e.target.value)}
+              placeholder="0x..."
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/40"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                disabled={isSavingKey === 'KILL_SWITCH_WALLET_ADDRESS'}
+                onClick={() => void upsertConfig('KILL_SWITCH_WALLET_ADDRESS', walletDraft.trim(), 'Emergency destination BEP20 wallet for kill switch')}
+                className="rounded-lg border border-cyan-400/30 bg-cyan-500/15 px-3 py-2 text-xs font-semibold text-cyan-200 disabled:opacity-60"
+              >
+                {isSavingKey === 'KILL_SWITCH_WALLET_ADDRESS' ? 'Saving...' : 'Save Wallet'}
+              </button>
+              <button
+                onClick={() => setKillConfirm(true)}
+                disabled={isTriggeringKill}
+                className="rounded-lg border border-rose-300/30 bg-rose-700/35 px-3 py-2 text-xs font-semibold text-rose-50 disabled:opacity-60"
+              >
+                <AlertOctagon className="mr-1 inline h-3 w-3" /> Trigger Kill Switch
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500">Configured Wallet</p>
+              <p className="mt-1 break-all font-mono text-xs text-slate-200">{configs.KILL_SWITCH_WALLET_ADDRESS || 'Not configured'}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500">Kill Switch Status</p>
+              <p className={`mt-1 text-sm font-semibold ${isTrue(configs.KILL_SWITCH_ACTIVE) ? 'text-rose-300' : 'text-emerald-300'}`}>
+                {isTrue(configs.KILL_SWITCH_ACTIVE) ? 'ACTIVE' : 'INACTIVE'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500">Last Triggered</p>
+              <p className="mt-1 text-sm text-slate-300">
+                {configs.KILL_SWITCH_LAST_TRIGGERED_AT ? new Date(configs.KILL_SWITCH_LAST_TRIGGERED_AT).toLocaleString() : 'Never'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
+      {(error || saveError || saveMessage || killResult) && (
+        <div className="space-y-2">
+          {error && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</div>}
+          {saveError && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{saveError}</div>}
+          {saveMessage && <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">{saveMessage}</div>}
+          {killResult && <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">{killResult}</div>}
+        </div>
+      )}
+
       {/* System Settings */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-        <h3 className="mb-4 text-lg font-semibold text-white">System Configuration</h3>
-        <div className="space-y-4">
-            {[
-              { label: 'Maintenance Mode', desc: 'Temporarily disable new registrations', enabled: false },
-              { label: 'Auto Flushout', desc: 'Enable automatic plan flushouts', enabled: true },
-              { label: 'Commission Distribution', desc: 'Auto-distribute level commissions', enabled: true },
-              { label: 'Auto Withdrawal Signing', desc: 'Use EIP-712 automatic withdrawal authorization', enabled: true },
-            ].map((setting, index) => (
-            <div key={index} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-4">
-              <div>
-                <p className="text-sm font-medium text-white">{setting.label}</p>
-                <p className="text-xs text-slate-500">{setting.desc}</p>
-              </div>
-              <button className={`h-6 w-11 rounded-full transition ${setting.enabled ? 'bg-emerald-500' : 'bg-slate-600'}`}>
-                <div className={`h-5 w-5 rounded-full bg-white transition ${setting.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
-            </div>
-          ))}
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">System Configuration</h3>
+          <button
+            onClick={() => void loadConfigs()}
+            disabled={isLoading}
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 disabled:opacity-60"
+          >
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
+        {isLoading ? (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">Loading settings...</div>
+        ) : (
+          <div className="space-y-4">
+            {!hasAnyConfig && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
+                No system config found yet. Toggle values below to create config entries.
+              </div>
+            )}
+            {toggleSettings.map((setting) => {
+              const enabled = isTrue(configs[setting.key]);
+              return (
+                <div key={setting.key} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-4">
+                  <div>
+                    <p className="text-sm font-medium text-white">{setting.label}</p>
+                    <p className="text-xs text-slate-500">{setting.desc}</p>
+                  </div>
+                  <button
+                    aria-label={`Toggle ${setting.label}`}
+                    disabled={isSavingKey === setting.key}
+                    onClick={() => void upsertConfig(setting.key, String(!enabled), setting.desc)}
+                    className={`h-6 w-11 rounded-full transition disabled:opacity-60 ${enabled ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                  >
+                    <div className={`h-5 w-5 rounded-full bg-white transition ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+              );
+            })}
+            <p className="text-[11px] text-slate-500">
+              Loaded keys: {Object.keys(configs).length} • Managed toggles: {toggleCount}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Kill Switch Modal */}
@@ -2948,72 +3123,35 @@ function Settings() {
               </div>
               <h3 className="text-2xl font-semibold text-white">Execute Kill-Switch</h3>
               <p className="mt-3 text-sm text-slate-400">
-                This will instantly pause all operations, freeze actions, and lock the treasury.
+                This will initiate emergency transfer flow for available pool funds to configured admin BEP20 wallet.
               </p>
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">Destination Wallet</p>
+                <p className="mt-1 break-all font-mono text-xs text-slate-200">{walletDraft || 'Not configured'}</p>
+              </div>
+              <textarea
+                value={killReason}
+                onChange={(e) => setKillReason(e.target.value)}
+                placeholder="Reason (optional)"
+                rows={3}
+                className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-white placeholder:text-slate-500 outline-none"
+              />
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <button
-                  onClick={() => setKillConfirm(false)}
+                  onClick={() => {
+                    setKillConfirm(false);
+                    setKillReason('');
+                  }}
                   className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white"
                 >
                   Abort
                 </button>
                 <button
-                  onClick={() => setKillConfirm(false)}
-                  className="flex-1 rounded-xl border border-rose-300/30 bg-rose-700/45 py-3 text-sm font-semibold text-rose-50"
+                  onClick={() => void handleTriggerKillSwitch()}
+                  disabled={isTriggeringKill}
+                  className="flex-1 rounded-xl border border-rose-300/30 bg-rose-700/45 py-3 text-sm font-semibold text-rose-50 disabled:opacity-60"
                 >
-                  Confirm Override
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Broadcast Modal */}
-      <AnimatePresence>
-        {broadcastOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-            onClick={() => setBroadcastOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0f] p-6"
-            >
-              <div className="mb-4 flex items-center gap-4 border-b border-white/10 pb-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-                  <Radio className="h-6 w-6 text-slate-100" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-white">Global Broadcast</h3>
-                  <p className="text-sm text-slate-400">Push a message to all users</p>
-                </div>
-              </div>
-              <textarea
-                value={broadcastMsg}
-                onChange={(e) => setBroadcastMsg(e.target.value)}
-                placeholder="Type alert message to push to all users..."
-                rows={4}
-                className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white placeholder:text-slate-500 outline-none"
-              />
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <button
-                  onClick={() => setBroadcastOpen(false)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => setBroadcastOpen(false)}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 py-3 text-sm font-semibold text-white"
-                >
-                  <Send className="mr-2 inline h-4 w-4" /> Push Alert
+                  {isTriggeringKill ? 'Triggering...' : 'Confirm Override'}
                 </button>
               </div>
             </motion.div>
@@ -3102,7 +3240,7 @@ export default function AdminPanel() {
       case 'security':
         return <SecurityLogs token={token} />;
       case 'settings':
-        return <Settings />;
+        return <Settings token={token} />;
       default:
         return <DashboardOverview token={token} />;
     }

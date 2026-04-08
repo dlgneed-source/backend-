@@ -432,6 +432,63 @@ export const adminApi = {
       }>;
     }>('/api/admin/rewards-metrics', { token }),
 
+  getSystemConfig: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      configs: Array<{
+        id: string;
+        key: string;
+        value: string;
+        description?: string | null;
+        updatedBy?: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>('/api/admin/config', { token }),
+
+  updateSystemConfig: (token: string, key: string, payload: { value: string; description?: string }) =>
+    apiRequest<{
+      success: boolean;
+      config: {
+        id: string;
+        key: string;
+        value: string;
+        description?: string | null;
+        updatedBy?: string | null;
+        createdAt: string;
+        updatedAt: string;
+      };
+    }>(`/api/admin/config/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      token,
+      body: {
+        key,
+        value: payload.value,
+        description: payload.description,
+      },
+    }),
+
+  triggerKillSwitch: (token: string, payload?: { reason?: string }) =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      transfer: {
+        destinationWallet: string;
+        amount: number;
+        initiatedAt: string;
+        affectedPools: Array<{
+          poolId: string;
+          type: 'SYSTEM' | 'LEADER' | 'REWARD' | 'SPONSOR';
+          transferredAmount: number;
+          balanceAfter: number;
+        }>;
+      };
+    }>('/api/admin/kill-switch/trigger', {
+      method: 'POST',
+      token,
+      body: payload || {},
+    }),
+
   getGiftCodes: (token: string, params?: { page?: number; limit?: number; status?: 'ACTIVE' | 'USED' | 'EXPIRED' | 'DISABLED'; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));

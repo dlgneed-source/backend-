@@ -101,6 +101,10 @@ export const adminPoolWithdrawSchema = z.object({
   amount: z.number().positive("Amount must be positive").optional(),
 });
 
+export const adminKillSwitchSchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+});
+
 // =============================================
 // GIFT CODE SCHEMAS
 // =============================================
