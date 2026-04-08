@@ -58,7 +58,7 @@ function isMobileDevice(): boolean {
 }
 
 function buildMetaMaskMobileAppLink(): string {
-  const dappUrl = `${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const dappUrl = window.location.href;
   return `${METAMASK_MOBILE_APP_LINK_BASE}${encodeURIComponent(dappUrl)}`;
 }
 
