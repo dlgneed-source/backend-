@@ -6,6 +6,7 @@ import {
   getTransactions,
   getEnrollments,
   getReferralLink,
+  searchUserByMemberId,
 } from "../controllers/userController";
 import { authenticateUser } from "../middleware/auth";
 
@@ -17,5 +18,6 @@ router.get("/balance", authenticateUser, getBalance);
 router.get("/transactions", authenticateUser, getTransactions);
 router.get("/enrollments", authenticateUser, getEnrollments);
 router.get("/referral-link", authenticateUser, getReferralLink);
+router.get("/search", authenticateUser, searchUserByMemberId);
 
 export default router;
