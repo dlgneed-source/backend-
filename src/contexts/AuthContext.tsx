@@ -45,6 +45,7 @@ const AUTH_TOKEN_KEY = 'ea_auth_token';
 const DEFAULT_BSC_CHAIN_ID = '0x38';
 const EXPECTED_CHAIN_ID = normalizeChainId(import.meta.env.VITE_CHAIN_ID || DEFAULT_BSC_CHAIN_ID);
 const METAMASK_MOBILE_APP_LINK_BASE = 'https://metamask.app.link/dapp/';
+const TRUST_WALLET_MOBILE_APP_LINK_BASE = 'https://link.trustwallet.com/open_url?url=';
 const AuthContext = createContext<AuthContextType | null>(null);
 
 function getProvider(): EthereumProvider | null {
@@ -59,14 +60,28 @@ function isMobileDevice(): boolean {
   return /android|iphone|ipad|ipod|iemobile|opera mini|windows phone/i.test(userAgent);
 }
 
+function buildMobileDappTarget(): string {
+  const currentUrl = new URL(window.location.href);
+  const pathWithQuery = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
+  return `${currentUrl.host}${pathWithQuery}`;
+}
+
 function buildMetaMaskMobileAppLink(): string {
-  const dappUrl = window.location.href;
-  return `${METAMASK_MOBILE_APP_LINK_BASE}${encodeURIComponent(dappUrl)}`;
+  return `${METAMASK_MOBILE_APP_LINK_BASE}${buildMobileDappTarget()}`;
+}
+
+function buildTrustWalletMobileAppLink(): string {
+  return `${TRUST_WALLET_MOBILE_APP_LINK_BASE}${encodeURIComponent(window.location.href)}`;
 }
 
 function redirectToMetaMaskMobileApp(): void {
   if (import.meta.env.MODE === 'test') return;
   window.location.assign(buildMetaMaskMobileAppLink());
+}
+
+function redirectToTrustWalletMobileApp(): void {
+  if (import.meta.env.MODE === 'test') return;
+  window.location.assign(buildTrustWalletMobileAppLink());
 }
 
 function normalizeAddress(value: unknown): string | null {
@@ -155,10 +170,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const provider = getProvider();
     if (!provider) {
       if (isMobileDevice()) {
-        const message = 'Mobile wallet flow detected. Opening MetaMask app...';
-        setWalletError(null);
-        toast.info(message);
-        redirectToMetaMaskMobileApp();
+        const message = 'Wallet not detected in this browser. Open in MetaMask or Trust Wallet.';
+        setWalletError(message);
+        toast.info(message, {
+          action: {
+            label: 'MetaMask',
+            onClick: redirectToMetaMaskMobileApp,
+          },
+          cancel: {
+            label: 'Trust Wallet',
+            onClick: redirectToTrustWalletMobileApp,
+          },
+        });
         return false;
       }
 

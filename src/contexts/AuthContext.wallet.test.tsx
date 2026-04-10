@@ -96,8 +96,14 @@ describe('AuthContext wallet flow', () => {
     render(<AuthProvider><TestHarness /></AuthProvider>);
     fireEvent.click(screen.getByText('connect'));
 
-    await waitFor(() => expect(toast.info).toHaveBeenCalledWith('Mobile wallet flow detected. Opening MetaMask app...'));
-    expect(screen.getByTestId('wallet-error')).toHaveTextContent('');
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(
+      'Wallet not detected in this browser. Open in MetaMask or Trust Wallet.',
+      expect.objectContaining({
+        action: expect.objectContaining({ label: 'MetaMask' }),
+        cancel: expect.objectContaining({ label: 'Trust Wallet' }),
+      })
+    ));
+    expect(screen.getByTestId('wallet-error')).toHaveTextContent('Wallet not detected in this browser. Open in MetaMask or Trust Wallet.');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
