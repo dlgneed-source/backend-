@@ -48,9 +48,10 @@ initCommunitySocket(io);
 // MIDDLEWARE
 // =============================================
 
+app.use(corsMiddleware);
+app.options('*', corsMiddleware);
 app.use(requestIdMiddleware);
 app.use(helmetMiddleware);
-app.use(corsMiddleware);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 

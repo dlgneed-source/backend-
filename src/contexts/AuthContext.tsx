@@ -124,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    console.log('[AuthFlow] Starting auth flow for address:', normalizedAddress);
     setIsLoading(true);
     setWalletError(null);
 
@@ -131,26 +132,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const addressAtStart = normalizedAddress;
 
     try {
+      console.log('[AuthFlow] Requesting nonce from backend…');
       const nonceResponse = await authApi.getNonce(addressAtStart);
+      console.log('[AuthFlow] Nonce received, requesting wallet signature…');
 
       let signature: string;
       try {
         signature = await signMessageAsync({ message: nonceResponse.message });
+        console.log('[AuthFlow] Signature obtained successfully.');
       } catch (error) {
         const maybeError = error as { code?: number; message?: string };
         const message = maybeError?.code === 4001
           ? 'Signature request was rejected.'
           : (maybeError?.message || 'Signature failed.');
+        console.warn('[AuthFlow] Signature step failed:', message);
         setWalletError(message);
         toast.error(message);
+        disconnect();
         return;
       }
 
+      console.log('[AuthFlow] Sending signature to backend for verification…');
       const verifyResponse = await authApi.verify(addressAtStart, signature);
+      console.log('[AuthFlow] Verification successful, building user session…');
       const authenticatedUser = await buildAuthenticatedUser(verifyResponse.token, verifyResponse.user);
 
       // Guard: ensure the wallet is still connected with the same address before committing session
       if (normalizeAddress(addressRef.current) !== addressAtStart) {
+        console.warn('[AuthFlow] Address changed during auth flow, aborting session commit.');
         return;
       }
 
@@ -159,18 +168,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(authenticatedUser);
       setWalletAddress(authenticatedUser.walletAddress);
       setWalletError(null);
+      console.log('[AuthFlow] Auth flow complete. User logged in:', authenticatedUser.walletAddress);
       toast.success('Wallet connected');
     } catch (error) {
       const maybeError = error as { code?: number; message?: string };
       const message = maybeError?.code === 4001
         ? 'Wallet connection request was rejected.'
         : (maybeError?.message || 'Wallet login failed');
+      console.error('[AuthFlow] Auth flow error:', maybeError);
       setWalletError(message);
       toast.error(message);
+      disconnect();
     } finally {
       setIsLoading(false);
     }
-  }, [signMessageAsync, buildAuthenticatedUser]);
+  }, [signMessageAsync, buildAuthenticatedUser, disconnect]);
 
   const login = useCallback(async (): Promise<boolean> => {
     setWalletError(null);

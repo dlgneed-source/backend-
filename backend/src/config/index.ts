@@ -24,7 +24,7 @@ const config = {
   JWT_ADMIN_EXPIRES_IN: (process.env.JWT_ADMIN_EXPIRES_IN || "1d") as StringValue,
 
   // CORS
-  CORS_ORIGINS: (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000").split(","),
+  CORS_ORIGINS: (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000,http://localhost:8080").split(",").map(o => o.trim()).filter(Boolean),
 
   // Blockchain / Smart Contract
   RPC_URL: process.env.RPC_URL || "https://mainnet.infura.io/v3/YOUR_INFURA_KEY",

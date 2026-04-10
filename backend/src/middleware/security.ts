@@ -24,25 +24,39 @@ export const helmetMiddleware = helmet({
   },
 });
 
+const ALWAYS_ALLOWED_ORIGINS = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
 /**
  * CORS configuration
  */
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
+    console.log(`[CORS] Incoming origin: ${origin ?? "(no origin)"}`);
     if (!origin) {
       // Allow non-browser requests (Postman, server-to-server)
       callback(null, true);
       return;
     }
-    if (config.CORS_ORIGINS.includes(origin) || config.NODE_ENV === "development") {
+    const allowed = ALWAYS_ALLOWED_ORIGINS.includes(origin)
+      || config.CORS_ORIGINS.includes(origin)
+      || config.NODE_ENV === "development";
+    if (allowed) {
+      console.log(`[CORS] Origin allowed: ${origin}`);
       callback(null, true);
     } else {
+      console.log(`[CORS] Origin BLOCKED: ${origin}`);
       callback(new Error(`CORS: Origin ${origin} not allowed`));
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
+  exposedHeaders: ["X-Request-ID"],
+  maxAge: 86400,
 });
 
 /**
