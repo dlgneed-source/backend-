@@ -285,6 +285,7 @@ export async function getMyEnrollments(req: AuthenticatedRequest, res: Response)
       plans: Object.values(byPlan).sort((a, b) => a.planId - b.planId),
     });
   } catch (err) {
+    console.error("Error fetching user enrollments:", err);
     res.status(500).json({ success: false, message: "Failed to fetch enrollments" });
   }
 }

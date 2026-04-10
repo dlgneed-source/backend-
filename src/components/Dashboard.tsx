@@ -1459,7 +1459,7 @@ const DetailsPageContent = ({ transactions, plans, token }: { transactions: Tran
           <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4"><p className="text-[10px] text-slate-500">Direct Referrals</p><p className="text-2xl font-bold text-purple-400">{directReferrals === null ? '—' : directReferrals}</p></div>
         </div>
         <div className="mb-5">
-          <h4 className="mb-3 text-sm font-semibold text-white">Available Plans</h4>
+          <h4 className="mb-3 text-sm font-semibold text-white">Plan Options</h4>
           <div className="space-y-2">
             {plans.slice(0, 3).map((p, i) => (
               <div key={i} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
