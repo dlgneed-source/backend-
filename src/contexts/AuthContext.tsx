@@ -60,14 +60,14 @@ function isMobileDevice(): boolean {
   return /android|iphone|ipad|ipod|iemobile|opera mini|windows phone/i.test(userAgent);
 }
 
-function buildDappUrlWithoutScheme(): string {
+function buildDappUrlHostAndPath(): string {
   const currentUrl = new URL(window.location.href);
   const pathWithQueryAndHash = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
   return `${currentUrl.host}${pathWithQueryAndHash}`;
 }
 
 function buildMetaMaskMobileAppLink(): string {
-  return `${METAMASK_MOBILE_APP_LINK_BASE}${encodeURIComponent(buildDappUrlWithoutScheme())}`;
+  return `${METAMASK_MOBILE_APP_LINK_BASE}${encodeURIComponent(buildDappUrlHostAndPath())}`;
 }
 
 function buildTrustWalletMobileAppLink(): string {
