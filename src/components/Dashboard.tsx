@@ -884,15 +884,36 @@ const FlushoutSchedulePage = ({ token }: { token: string | null }) => {
 // =============================================
 // REDEEM GIFT CODE BUTTON
 // =============================================
-const RedeemGiftCodeButton = () => {
+const RedeemGiftCodeButton = ({ onSuccess }: { onSuccess?: () => void }) => {
+  const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
   const [redeemed, setRedeemed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleRedeem = () => {
-    if (code.trim().length > 0) {
+  React.useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  const handleRedeem = async () => {
+    const trimmedCode = code.trim();
+    if (!trimmedCode) return;
+    if (!token) { setError('Authentication required. Please log in again.'); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      await plansApi.redeemGiftCode(token, trimmedCode);
       setRedeemed(true);
-      setTimeout(() => { setRedeemed(false); setOpen(false); setCode(''); }, 3000);
+      onSuccess?.();
+      closeTimerRef.current = setTimeout(() => { setRedeemed(false); setOpen(false); setCode(''); }, 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to redeem gift code');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -937,9 +958,10 @@ const RedeemGiftCodeButton = () => {
                     placeholder="XXXX-XXXX-XXXX"
                     className="w-full rounded-xl border border-red-500/20 bg-white/5 px-4 py-3 text-center text-lg font-mono tracking-widest text-red-200 placeholder:text-slate-600 focus:border-red-500/50 focus:outline-none"
                   />
-                  <button onClick={handleRedeem} disabled={!code.trim()} className="w-full rounded-xl bg-gradient-to-r from-red-600 to-rose-500 py-3 text-sm font-bold text-white disabled:opacity-40 hover:from-red-500 hover:to-rose-400 transition-all">
-                    Redeem Now 🎉
+                  <button onClick={() => void handleRedeem()} disabled={!code.trim() || loading} className="w-full rounded-xl bg-gradient-to-r from-red-600 to-rose-500 py-3 text-sm font-bold text-white disabled:opacity-40 hover:from-red-500 hover:to-rose-400 transition-all">
+                    {loading ? 'Redeeming…' : 'Redeem Now 🎉'}
                   </button>
+                  {error && <p className="text-xs text-rose-400 text-center">{error}</p>}
                 </div>
               ) : (
                 <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="flex flex-col items-center gap-4 py-4">
@@ -1779,7 +1801,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
                 <button onClick={() => setActiveTab('plans')} className="flex flex-col items-center gap-1.5 rounded-xl border border-rose-400/30 bg-gradient-to-br from-rose-900/40 to-slate-400/10 py-3 text-xs text-slate-200 hover:from-rose-800/50 hover:to-slate-300/15"><Layers className="h-5 w-5 text-rose-300" /><span>Plan</span></button>
               </div>
               {/* Redeem Gift Code Button */}
-              <RedeemGiftCodeButton />
+              <RedeemGiftCodeButton onSuccess={() => setActiveTab('flushout-schedule')} />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <PoolStatsCard />
                 <ReferralNetworkCard />
