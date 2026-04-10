@@ -32,11 +32,15 @@ export async function getNonce(req: Request, res: Response): Promise<void> {
 
     // Store nonce temporarily in user record (or create pending user)
     const existingUser = await prisma.user.findUnique({ where: { walletAddress: walletAddress.toLowerCase() } });
+    const shouldAssignMemberId = !existingUser?.memberId;
     const memberId = existingUser?.memberId ?? await generateUniqueMemberId();
 
     await prisma.user.upsert({
       where: { walletAddress: walletAddress.toLowerCase() },
-      update: { nonce },
+      update: {
+        nonce,
+        ...(shouldAssignMemberId ? { memberId } : {}),
+      },
       create: {
         walletAddress: walletAddress.toLowerCase(),
         nonce,
@@ -102,11 +106,13 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     // Clear nonce and update login
+    const generatedMemberId = user.memberId ?? await generateUniqueMemberId();
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: {
         nonce: null,
         lastLoginAt: new Date(),
+        ...(user.memberId ? {} : { memberId: generatedMemberId }),
         ...(referredById && !user.referredById ? { referredById } : {}),
       },
     });
@@ -194,12 +200,14 @@ export async function devLogin(req: Request, res: Response): Promise<void> {
 
   try {
     const existingUserForDev = await prisma.user.findUnique({ where: { walletAddress } });
+    const shouldAssignMemberId = !existingUserForDev?.memberId;
     const memberIdForDev = existingUserForDev?.memberId ?? await generateUniqueMemberId();
 
     const user = await prisma.user.upsert({
       where: { walletAddress },
       update: {
         ...(name ? { name } : {}),
+        ...(shouldAssignMemberId ? { memberId: memberIdForDev } : {}),
         lastLoginAt: new Date(),
       },
       create: {

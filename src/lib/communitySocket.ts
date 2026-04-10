@@ -35,7 +35,10 @@ interface SocketDM {
 class CommunitySocketClient {
   private socket: Socket | null = null;
   public typingUsers = new Map<string, Set<string>>();
+  public onlineUsers: string[] = [];
+  private lastSeenByUser = new Map<string, string>();
   private connectionListeners = new Set<(connected: boolean) => void>();
+  private presenceListeners = new Set<(onlineUserIds: string[]) => void>();
 
   get isConnected() {
     return !!this.socket?.connected;
@@ -60,7 +63,29 @@ class CommunitySocketClient {
 
     this.socket.on('disconnect', () => {
       this.typingUsers.clear();
+      this.onlineUsers = [];
+      this.lastSeenByUser.clear();
+      this.notifyPresenceChange();
       this.notifyConnectionChange(false);
+    });
+
+    this.socket.on('presence_state', ({ onlineUserIds }: { onlineUserIds?: string[] }) => {
+      this.onlineUsers = Array.isArray(onlineUserIds) ? onlineUserIds : [];
+      this.notifyPresenceChange();
+    });
+
+    this.socket.on('presence_update', ({ userId, online, lastSeen }: { userId?: string; online?: boolean; lastSeen?: string }) => {
+      if (!userId) return;
+      const onlineSet = new Set(this.onlineUsers);
+      if (online) {
+        onlineSet.add(userId);
+        this.lastSeenByUser.delete(userId);
+      } else {
+        onlineSet.delete(userId);
+        if (lastSeen) this.lastSeenByUser.set(userId, lastSeen);
+      }
+      this.onlineUsers = Array.from(onlineSet);
+      this.notifyPresenceChange();
     });
 
     this.socket.on('typing_start', ({ roomId, userId }: { roomId: string; userId: string }) => {
@@ -88,6 +113,9 @@ class CommunitySocketClient {
     this.socket.disconnect();
     this.socket = null;
     this.typingUsers.clear();
+    this.onlineUsers = [];
+    this.lastSeenByUser.clear();
+    this.notifyPresenceChange();
     this.notifyConnectionChange(false);
   }
 
@@ -96,6 +124,14 @@ class CommunitySocketClient {
     cb(this.isConnected);
     return () => {
       this.connectionListeners.delete(cb);
+    };
+  }
+
+  onPresenceChange(cb: (onlineUserIds: string[]) => void) {
+    this.presenceListeners.add(cb);
+    cb(this.onlineUsers);
+    return () => {
+      this.presenceListeners.delete(cb);
     };
   }
 
@@ -147,8 +183,16 @@ class CommunitySocketClient {
     return () => this.socket?.off('message_pinned', cb);
   }
 
+  getLastSeen(userId: string): string | undefined {
+    return this.lastSeenByUser.get(userId);
+  }
+
   private notifyConnectionChange(connected: boolean) {
     this.connectionListeners.forEach((listener) => listener(connected));
+  }
+
+  private notifyPresenceChange() {
+    this.presenceListeners.forEach((listener) => listener(this.onlineUsers));
   }
 }
 
