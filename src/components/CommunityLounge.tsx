@@ -384,31 +384,35 @@ const CommunityLounge: React.FC = () => {
     const targetRoomId = selectedDM ? `dm:${selectedDM}` : selectedRoomId;
     const msgText = input.trim();
     
-    if (isSocketConnected) {
-      // Use Socket.IO for real-time
-      if (selectedDM) {
-        socket.sendDM(selectedDM, msgText);
-      } else {
-        socket.sendMessage(selectedRoomId, msgText, replyTo?.id);
-      }
+    if (selectedDM && token) {
+      messagesApi.sendDm(token, selectedDM, msgText)
+        .then((res) => {
+          const sent = res.message;
+          setMessages((prev) => {
+            if (prev.some((m) => String(m.id) === String(sent.id))) return prev;
+            return [...prev, {
+              id: sent.id,
+              roomId: targetRoomId,
+              user: user?.name || 'You',
+              initials: (user?.name || 'YO').slice(0, 2).toUpperCase(),
+              text: sent.text,
+              time: new Date(sent.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              isOwn: true,
+              userId: sent.senderId,
+              role: 'You',
+              wallet: user?.walletAddress || '—',
+              replyToId: replyTo?.id,
+            }];
+          });
+          setContacts((prev) => prev.map((c) => (
+            c.id === selectedDM ? { ...c, lastMsg: sent.text } : c
+          )));
+        })
+        .catch(() => undefined);
+    } else if (isSocketConnected) {
+      // Use Socket.IO for real-time community room messages
+      socket.sendMessage(selectedRoomId, msgText, replyTo?.id);
       socket.stopTyping(selectedRoomId);
-    } else if (selectedDM && token) {
-      // REST API fallback for DMs
-      const optimistic: Msg = {
-        id: String(Date.now()),
-        roomId: targetRoomId,
-        user: user?.name || 'You',
-        initials: (user?.name || 'YO').slice(0, 2).toUpperCase(),
-        text: msgText,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isOwn: true,
-        userId: user?.id || 'you',
-        role: 'You',
-        wallet: user?.walletAddress || '—',
-        replyToId: replyTo?.id,
-      };
-      setMessages((prev) => [...prev, optimistic]);
-      messagesApi.sendDm(token, selectedDM, msgText).catch(() => undefined);
     } else {
       // Fallback: local-only message (community rooms offline)
       setMessages((prev) => [...prev, { 
@@ -504,7 +508,7 @@ const CommunityLounge: React.FC = () => {
         time: new Date(dm.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isOwn: dm.senderId === user?.id,
         userId: dm.senderId,
-      }]);
+      }].filter((m, idx, arr) => arr.findIndex((x) => String(x.id) === String(m.id)) === idx));
     });
 
     const offDelete = socket.onDelete(({ messageId }) => {
