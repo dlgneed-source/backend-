@@ -173,6 +173,50 @@ export async function getEnrollments(req: AuthenticatedRequest, res: Response): 
 }
 
 /**
+ * GET /users/search?memberId=XXXXXX
+ * Search for a user by their 6-digit memberId (for DM search)
+ */
+export async function searchUserByMemberId(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { memberId } = req.query;
+
+  if (!memberId || typeof memberId !== "string") {
+    res.status(400).json({ success: false, message: "memberId query parameter is required" });
+    return;
+  }
+
+  try {
+    const foundUser = await prisma.user.findUnique({
+      where: { memberId: memberId.trim() },
+      select: { id: true, memberId: true, name: true, walletAddress: true, avatarUrl: true },
+    });
+
+    if (!foundUser) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
+    }
+
+    // Don't return own profile
+    if (foundUser.id === req.user!.id) {
+      res.status(400).json({ success: false, message: "Cannot search for yourself" });
+      return;
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: foundUser.id,
+        memberId: foundUser.memberId,
+        name: foundUser.name,
+        walletAddress: foundUser.walletAddress,
+        avatarUrl: foundUser.avatarUrl,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to search user" });
+  }
+}
+
+/**
  * GET /users/referral-link
  * Get user's referral link
  */

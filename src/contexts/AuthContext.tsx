@@ -32,6 +32,7 @@ interface AuthContextType {
   login: () => Promise<boolean>;
   logout: () => void;
   clearWalletError: () => void;
+  updateUser: (updates: Partial<AuthUser>) => void;
 }
 
 const AUTH_TOKEN_KEY = 'ea_auth_token';
@@ -286,6 +287,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [address, isConnected, clearSession]);
 
+  const updateUser = useCallback((updates: Partial<AuthUser>) => {
+    setUser((prev) => (prev ? { ...prev, ...updates } : null));
+  }, []);
+
   const value = useMemo<AuthContextType>(() => ({
     user,
     token,
@@ -296,7 +301,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     clearWalletError,
-  }), [clearWalletError, isLoading, login, logout, token, user, walletAddress, walletError]);
+    updateUser,
+  }), [clearWalletError, isLoading, login, logout, token, user, walletAddress, walletError, updateUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

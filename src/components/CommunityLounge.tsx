@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationPanel from '@/components/NotificationPanel';
-import { communityApi } from '@/lib/api';
+import { communityApi, messagesApi, usersApi } from '@/lib/api';
 import { communitySocket } from '@/lib/communitySocket';
 import {
   ArrowLeft, BadgeCheck, ChevronDown, Hash, Lock, Pin, Plus, Reply, 
@@ -85,25 +85,11 @@ const seedRooms: Room[] = [
   { id: 'nft-alpha', name: 'nft-alpha', unread: 0, isVip: true, description: 'NFT drops & whitelists', icon: 'star', memberCount: 380 },
 ];
 
-const dmContacts: Contact[] = [
-  { id: 'dm1', name: 'AIDevSara', initials: 'AS', online: true, role: 'Moderator', wallet: '0x71C...4A2b', lastMsg: 'Thanks for the tip! 🚀', badge: 'trusted', lastSeen: 'now' },
-  { id: 'dm2', name: 'Web3Wizard', initials: 'WW', online: true, role: 'Admin', wallet: '0x99B...1C3d', lastMsg: 'Let me check the docs...', badge: 'team', lastSeen: 'now' },
-  { id: 'dm3', name: 'NodeRunner', initials: 'NR', online: false, role: 'VIP Member', wallet: '0x11A...9F8e', lastMsg: 'Validator setup complete ✅', badge: 'vip', lastSeen: '2h ago' },
-  { id: 'dm4', name: 'CryptoKing', initials: 'CK', online: true, role: 'Member', wallet: '0x44D...2E1f', lastMsg: 'BEP-20 deployed 🚀', badge: 'member', lastSeen: 'now' },
-  { id: 'dm5', name: 'DeFiQueen', initials: 'DQ', online: false, role: 'VIP Member', wallet: '0x88F...3A7c', lastMsg: 'APY looking good!', badge: 'vip', lastSeen: '5h ago' },
-];
+const dmContacts: Contact[] = [];
 
-const communityMembers: Contact[] = [...dmContacts, 
-  { id: 'dm6', name: 'SignalFox', initials: 'SF', online: true, role: 'VIP Member', wallet: '0x22D...1B9f', lastMsg: 'Entry confirmed', badge: 'vip', lastSeen: 'now' },
-  { id: 'dm7', name: 'BlockMaster', initials: 'BM', online: true, role: 'Moderator', wallet: '0x33E...5C2a', lastMsg: 'Rules updated', badge: 'trusted', lastSeen: 'now' },
-];
+const communityMembers: Contact[] = [];
 
-const seedMessages: Msg[] = [
-  { id: '1', roomId: 'announcements', user: 'Web3Wizard', initials: 'WW', text: '🎉 Welcome to the new E@Akhuwat Premium Lounge! Experience the future of community.', time: '09:15', userId: 'dm2', role: 'Admin', wallet: '0x99B...1C3d', reactions: [{ emoji: '🎉', count: 24, users: [] }, { emoji: '🔥', count: 18, users: [] }] },
-  { id: '2', roomId: 'general', user: 'CryptoKing', initials: 'CK', text: 'This UI is absolutely fire! The glassmorphism effects are chefs kiss 👌', time: '09:18', userId: 'dm4', role: 'Member', wallet: '0x44D...2E1f', reactions: [{ emoji: '❤️', count: 8, users: [] }] },
-  { id: '3', roomId: 'general', user: 'AIDevSara', initials: 'AS', text: 'Agreed! The mobile experience is so smooth now 🚀', time: '09:19', userId: 'dm1', role: 'Moderator', wallet: '0x71C...4A2b', replyToId: '2', reactions: [{ emoji: '💯', count: 5, users: [] }] },
-  { id: '4', roomId: 'general', user: 'NodeRunner', initials: 'NR', text: 'Just staked my tokens. The yield is insane! 📈', time: '09:22', userId: 'dm3', role: 'VIP Member', wallet: '0x11A...9F8e' },
-];
+const seedMessages: Msg[] = [];
 
 const emojis = ['👍', '❤️', '🔥', '😂', '🎉', '👏', '😍', '🤔', '👎', '😢'];
 
@@ -118,7 +104,7 @@ const CommunityLounge: React.FC = () => {
 
   // Auth
   const socket = communitySocket;
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, token } = useAuth();
   const [isSocketConnected, setIsSocketConnected] = useState(socket.isConnected);
 
   // Check mobile on mount and resize
@@ -160,6 +146,14 @@ const CommunityLounge: React.FC = () => {
   const [isNewRoomVip, setIsNewRoomVip] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
+
+  // DM search state
+  const [dmSearchInput, setDmSearchInput] = useState('');
+  const [dmSearchResult, setDmSearchResult] = useState<{ id: string; memberId: string | null; name: string | null; walletAddress: string; avatarUrl: string | null } | null>(null);
+  const [dmSearchLoading, setDmSearchLoading] = useState(false);
+  const [dmSearchError, setDmSearchError] = useState<string | null>(null);
+  // Active DM user info (from backend when opening a DM)
+  const [activeDMInfo, setActiveDMInfo] = useState<{ id: string; name: string | null; memberId: string | null; avatarUrl: string | null } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -212,8 +206,11 @@ const CommunityLounge: React.FC = () => {
 
   const activeRoom = rooms.find((r) => r.id === selectedRoomId) ?? rooms[0];
   const activeDMObj = selectedDM ? contacts.find((c) => c.id === selectedDM) ?? null : null;
-  const activeTitle = selectedDM ? activeDMObj?.name ?? 'Direct Message' : `#${activeRoom?.name ?? 'announcements'}`;
-  const activeDescription = selectedDM ? `${activeDMObj?.role} • Last seen ${activeDMObj?.lastSeen}` : `${activeRoom?.memberCount?.toLocaleString() ?? '0'} members • ${activeRoom?.description ?? 'Community space'}`;
+  const activeDMName = activeDMInfo?.name || activeDMObj?.name || 'Direct Message';
+  const activeTitle = selectedDM ? activeDMName : `#${activeRoom?.name ?? 'announcements'}`;
+  const activeDescription = selectedDM
+    ? `Member #${activeDMInfo?.memberId || activeDMObj?.id?.slice(0, 6) || '—'}`
+    : `${activeRoom?.memberCount?.toLocaleString() ?? '0'} members • ${activeRoom?.description ?? 'Community space'}`;
 
   const activeChannelMessages = useMemo(() => {
     const base = messages.filter((m) => m.roomId === (selectedDM ? `dm:${selectedDM}` : selectedRoomId));
@@ -272,29 +269,98 @@ const CommunityLounge: React.FC = () => {
     setSelectedDM(contactId); 
     setSelectedRoomId('announcements'); 
     setReplyTo(null); 
-    if (isMobile) setMobileShowChat(true); 
+    if (isMobile) setMobileShowChat(true);
+    // Load DM history from backend
+    if (token) {
+      messagesApi.getDmHistory(token, contactId)
+        .then((res) => {
+          if (res.otherUser) {
+            setActiveDMInfo({
+              id: res.otherUser.id,
+              name: res.otherUser.name,
+              memberId: res.otherUser.memberId,
+              avatarUrl: res.otherUser.avatarUrl,
+            });
+          }
+          if (res.messages?.length) {
+            const dmRoomId = `dm:${contactId}`;
+            // Remove existing DM messages for this contact and replace with backend data
+            setMessages((prev) => {
+              const filtered = prev.filter((m) => m.roomId !== dmRoomId);
+              const fetched: Msg[] = res.messages.map((m) => ({
+                id: m.id,
+                roomId: dmRoomId,
+                user: m.isOwn ? (user?.name || 'You') : (res.otherUser?.name || m.senderId.slice(0, 8)),
+                initials: m.isOwn
+                  ? (user?.name || 'YO').slice(0, 2).toUpperCase()
+                  : (res.otherUser?.name || 'U?').slice(0, 2).toUpperCase(),
+                text: m.text,
+                time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isOwn: m.isOwn,
+                userId: m.senderId,
+              }));
+              return [...filtered, ...fetched];
+            });
+          }
+        })
+        .catch(() => undefined);
+    }
+  };
+
+  const searchUserForDM = async () => {
+    const q = dmSearchInput.trim();
+    if (!q || !token) return;
+    setDmSearchLoading(true);
+    setDmSearchError(null);
+    setDmSearchResult(null);
+    try {
+      const res = await usersApi.searchByMemberId(token, q);
+      setDmSearchResult(res.user);
+    } catch {
+      setDmSearchError('User not found. Check the 6-digit Member ID.');
+    } finally {
+      setDmSearchLoading(false);
+    }
   };
 
   const send = () => {
     if (!input.trim()) return;
     const targetRoomId = selectedDM ? `dm:${selectedDM}` : selectedRoomId;
+    const msgText = input.trim();
     
     if (isSocketConnected) {
       // Use Socket.IO for real-time
       if (selectedDM) {
-        socket.sendDM(selectedDM, input.trim());
+        socket.sendDM(selectedDM, msgText);
       } else {
-        socket.sendMessage(selectedRoomId, input.trim(), replyTo?.id);
+        socket.sendMessage(selectedRoomId, msgText, replyTo?.id);
       }
       socket.stopTyping(selectedRoomId);
+    } else if (selectedDM && token) {
+      // REST API fallback for DMs
+      const optimistic: Msg = {
+        id: String(Date.now()),
+        roomId: targetRoomId,
+        user: user?.name || 'You',
+        initials: (user?.name || 'YO').slice(0, 2).toUpperCase(),
+        text: msgText,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isOwn: true,
+        userId: user?.id || 'you',
+        role: 'You',
+        wallet: user?.walletAddress || '—',
+        replyToId: replyTo?.id,
+      };
+      setMessages((prev) => [...prev, optimistic]);
+      messagesApi.sendDm(token, selectedDM, msgText).catch(() => undefined);
     } else {
-      // Fallback: local-only message
+      // Fallback: local-only message (community rooms offline)
       setMessages((prev) => [...prev, { 
         id: String(Date.now()), 
         roomId: targetRoomId, 
         user: user?.name || 'You', 
         initials: (user?.name || 'YO').slice(0, 2).toUpperCase(), 
-        text: input.trim(), 
+        text: msgText, 
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
         isOwn: true, 
         userId: user?.id || 'you', 
@@ -605,62 +671,110 @@ const CommunityLounge: React.FC = () => {
             </div>
           </>
         ) : (
-          <div className="space-y-1">
-            {/* DM Search */}
-            <div className="flex items-center gap-2 rounded-xl border px-3 py-2.5 mb-3" style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderColor: 'rgba(255,255,255,0.08)' }}>
-              <Search className="h-4 w-4" style={{ color: '#64748b' }} />
-              <input 
-                placeholder="Search messages..." 
-                className="flex-1 bg-transparent text-xs outline-none"
-                style={{ color: 'white' }}
-              />
+          <div className="space-y-2">
+            {/* DM Search by Member ID */}
+            <div className="mb-3">
+              <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#64748b' }}>Search User to DM</p>
+              <div className="flex items-center gap-2 rounded-xl border px-3 py-2.5" style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                <Search className="h-4 w-4 shrink-0" style={{ color: '#64748b' }} />
+                <input 
+                  placeholder="Enter 6-digit Member ID..." 
+                  className="flex-1 bg-transparent text-xs outline-none"
+                  style={{ color: 'white' }}
+                  value={dmSearchInput}
+                  onChange={(e) => {
+                    setDmSearchInput(e.target.value);
+                    setDmSearchResult(null);
+                    setDmSearchError(null);
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') searchUserForDM(); }}
+                  maxLength={8}
+                />
+                <button
+                  onClick={searchUserForDM}
+                  disabled={!dmSearchInput.trim() || dmSearchLoading}
+                  className="px-2 py-1 rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                  style={{ background: 'linear-gradient(to right, #10b981, #14b8a6)', color: 'white' }}
+                >
+                  {dmSearchLoading ? '...' : 'Find'}
+                </button>
+              </div>
+
+              {/* Search Error */}
+              {dmSearchError && (
+                <p className="mt-2 text-xs text-red-400 px-1">{dmSearchError}</p>
+              )}
+
+              {/* Search Result */}
+              {dmSearchResult && (
+                <div className="mt-2 rounded-xl border p-3 flex items-center gap-3"
+                  style={{ backgroundColor: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.25)' }}
+                >
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white overflow-hidden"
+                    style={{ background: 'linear-gradient(135deg, #10b981, #14b8a6)' }}
+                  >
+                    {dmSearchResult.avatarUrl
+                      ? <img src={dmSearchResult.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                      : (dmSearchResult.name || 'U?').slice(0, 2).toUpperCase()
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-white truncate">{dmSearchResult.name || 'Unknown User'}</p>
+                    <p className="text-xs" style={{ color: '#64748b' }}>ID: #{dmSearchResult.memberId || '—'}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      openDM(dmSearchResult.id);
+                      setDmSearchInput('');
+                      setDmSearchResult(null);
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-bold text-white transition-all hover:scale-105"
+                    style={{ background: 'linear-gradient(to right, #7c3aed, #d946ef)' }}
+                  >
+                    Chat
+                  </button>
+                </div>
+              )}
             </div>
 
-            {contacts.map((c) => (
-              <button 
-                key={c.id} 
-                onClick={() => openDM(c.id)} 
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 border ${
-                  selectedDM === c.id 
-                    ? 'text-emerald-300' 
-                    : 'border-transparent hover:bg-white/5'
-                }`}
-                style={selectedDM === c.id ? { background: 'linear-gradient(to right, rgba(16,185,129,0.15), rgba(20,184,166,0.15))', borderColor: 'rgba(16,185,129,0.3)' } : {}}
-              >
-                <div className="relative shrink-0">
-                  <div className={`flex h-11 w-11 items-center justify-center rounded-full text-xs font-bold text-white ${
-                    selectedDM === c.id ? '' : ''
-                  }`}
-                  style={selectedDM === c.id ? { background: 'linear-gradient(135deg, #10b981, #14b8a6)' } : { backgroundColor: 'rgba(255,255,255,0.1)' }}
+            {/* Active DM conversations */}
+            {contacts.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-bold uppercase tracking-widest mb-2 px-1" style={{ color: '#64748b' }}>Recent DMs</p>
+                {contacts.map((c) => (
+                  <button 
+                    key={c.id} 
+                    onClick={() => openDM(c.id)} 
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 border ${
+                      selectedDM === c.id 
+                        ? 'text-emerald-300' 
+                        : 'border-transparent hover:bg-white/5'
+                    }`}
+                    style={selectedDM === c.id ? { background: 'linear-gradient(to right, rgba(16,185,129,0.15), rgba(20,184,166,0.15))', borderColor: 'rgba(16,185,129,0.3)' } : {}}
                   >
-                    {c.initials}
-                  </div>
-                  {c.online && (
-                    <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 bg-emerald-500" style={{ borderColor: '#0a0c12' }} />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex justify-between items-center">
-                    <span className={`truncate font-semibold text-sm ${selectedDM === c.id ? 'text-emerald-300' : 'text-white'}`}>
-                      {c.name}
-                    </span>
-                    <span className="text-xs" style={{ color: '#64748b' }}>{c.lastSeen}</span>
-                  </div>
-                  <p className="truncate text-xs mt-0.5" style={{ color: '#94a3b8' }}>{c.lastMsg}</p>
-                </div>
-                {c.badge && (
-                  <div className={`px-1.5 py-0.5 rounded text-xs font-bold uppercase ${
-                    c.badge === 'team' ? 'text-violet-300' :
-                    c.badge === 'vip' ? 'text-amber-300' :
-                    'text-emerald-300'
-                  }`}
-                  style={c.badge === 'team' ? { backgroundColor: 'rgba(139,92,246,0.3)' } : c.badge === 'vip' ? { backgroundColor: 'rgba(251,191,36,0.3)' } : { backgroundColor: 'rgba(16,185,129,0.3)' }}
-                  >
-                    {c.badge}
-                  </div>
-                )}
-              </button>
-            ))}
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white overflow-hidden"
+                      style={selectedDM === c.id ? { background: 'linear-gradient(135deg, #10b981, #14b8a6)' } : { backgroundColor: 'rgba(255,255,255,0.1)' }}
+                    >
+                      {c.avatar ? <img src={c.avatar} alt={c.name} className="w-full h-full object-cover" /> : c.initials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className={`truncate font-semibold text-sm block ${selectedDM === c.id ? 'text-emerald-300' : 'text-white'}`}>
+                        {c.name}
+                      </span>
+                      <p className="truncate text-xs mt-0.5" style={{ color: '#94a3b8' }}>{c.lastMsg}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {contacts.length === 0 && !dmSearchResult && !dmSearchError && (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <MessageCircle className="h-12 w-12 mb-3" style={{ color: '#334155', opacity: 0.6 }} />
+                <p className="text-sm font-semibold" style={{ color: '#64748b' }}>No DMs yet</p>
+                <p className="text-xs mt-1" style={{ color: '#475569' }}>Search for a user above to start chatting</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -682,23 +796,28 @@ const CommunityLounge: React.FC = () => {
       <div className="p-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
         <button 
           onClick={() => openProfile({
-            id: 'you',
-            name: 'You',
-            initials: 'YO',
+            id: user?.id || 'you',
+            name: user?.name || 'You',
+            initials: (user?.name || 'YO').slice(0, 2).toUpperCase(),
             online: true,
             role: 'Member',
-            wallet: '0xYour...Wallet',
-            bio: 'Premium member since 2024',
-            joinedDate: 'March 2024'
+            wallet: user?.walletAddress || '—',
+            bio: 'Premium member',
+            joinedDate: '2024',
+            avatar: user?.avatarUrl || undefined,
           })}
           className="flex w-full items-center gap-3 rounded-xl p-2 hover:bg-white/5 transition-colors"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white" style={{ background: 'linear-gradient(135deg, #8b5cf6, #d946ef)' }}>
-            YO
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white overflow-hidden" style={{ background: 'linear-gradient(135deg, #8b5cf6, #d946ef)' }}>
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="You" className="w-full h-full object-cover" />
+            ) : (
+              (user?.name || 'YO').slice(0, 2).toUpperCase()
+            )}
           </div>
           <div className="flex-1 min-w-0 text-left">
-            <p className="text-sm font-semibold text-white truncate">You</p>
-            <p className="text-xs" style={{ color: '#a78bfa' }}>Premium Member</p>
+            <p className="text-sm font-semibold text-white truncate">{user?.name || 'You'}</p>
+            <p className="text-xs" style={{ color: '#a78bfa' }}>Member #{user?.memberId || '—'}</p>
           </div>
           <Settings className="h-4 w-4" style={{ color: '#64748b' }} />
         </button>
@@ -710,7 +829,7 @@ const CommunityLounge: React.FC = () => {
      CHAT CANVAS COMPONENT
      ═══════════════════════════════════════════════════════════════════════════════ */
   const ChatCanvas = (
-    <div className="flex h-full w-full flex-col" style={{ backgroundColor: '#07080c' }}>
+    <div className="flex h-full w-full flex-col" style={{ backgroundColor: '#18181b' }}>
       {/* Premium Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)', backgroundColor: 'rgba(10,12,18,0.85)', backdropFilter: 'blur(20px)' }}>
         <div className="flex items-center gap-3 min-w-0">
@@ -995,7 +1114,7 @@ const CommunityLounge: React.FC = () => {
       </div>
 
       {/* Input Area */}
-      <div className="border-t px-4 py-4" style={{ borderColor: 'rgba(255,255,255,0.06)', backgroundColor: '#0a0c12' }}>
+      <div className="border-t px-4 pt-4 pb-safe" style={{ borderColor: 'rgba(255,255,255,0.06)', backgroundColor: '#0a0c12', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}>
         {/* Reply Preview */}
         {replyTo && (
           <div className="mb-3 flex items-center justify-between rounded-xl border px-4 py-2.5"
@@ -1575,7 +1694,7 @@ const CommunityLounge: React.FC = () => {
      MAIN RENDER
      ═══════════════════════════════════════════════════════════════════════════════ */
   return (
-    <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: '#05060a', color: 'white' }}>
+    <div className="flex w-full overflow-hidden" style={{ backgroundColor: '#05060a', color: 'white', height: '100dvh' }}>
       {isMobile ? (
         mobileShowChat ? (
           <div className="flex-1 w-full">{ChatCanvas}</div>

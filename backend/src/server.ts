@@ -26,6 +26,7 @@ import poolRoutes from "./routes/pools";
 import adminRoutes from "./routes/admin";
 import communityRoutes from "./routes/community";
 import systemRoutes from "./routes/system";
+import messagesRoutes from "./routes/messages";
 
 // Utils
 import { initCronJobs } from "./utils/cronJobs";
@@ -90,6 +91,7 @@ app.use("/api/pools", poolRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/community", communityRoutes);
 app.use("/api/system", systemRoutes);
+app.use("/api/messages", messagesRoutes);
 
 // =============================================
 // ERROR HANDLING

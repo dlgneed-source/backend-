@@ -139,6 +139,18 @@ export const usersApi = {
       referralCode: string;
       referralLink: string;
     }>('/api/users/referral-link', { token }),
+
+  searchByMemberId: (token: string, memberId: string) =>
+    apiRequest<{
+      success: boolean;
+      user: {
+        id: string;
+        memberId: string | null;
+        name: string | null;
+        walletAddress: string;
+        avatarUrl: string | null;
+      };
+    }>(`/api/users/search?memberId=${encodeURIComponent(memberId)}`, { token }),
 };
 
 export const teamApi = {
@@ -366,6 +378,45 @@ export const communityApi = {
         isPinned?: boolean;
       }>;
     }>('/api/community/bootstrap'),
+};
+
+export const messagesApi = {
+  getDmHistory: (token: string, userId: string) =>
+    apiRequest<{
+      success: boolean;
+      messages: Array<{
+        id: string;
+        senderId: string;
+        receiverId: string;
+        text: string;
+        createdAt: string;
+        isOwn: boolean;
+      }>;
+      otherUser: {
+        id: string;
+        memberId: string | null;
+        name: string | null;
+        walletAddress: string;
+        avatarUrl: string | null;
+      } | null;
+    }>(`/api/messages/dm/${userId}`, { token }),
+
+  sendDm: (token: string, receiverId: string, text: string) =>
+    apiRequest<{
+      success: boolean;
+      message: {
+        id: string;
+        senderId: string;
+        receiverId: string;
+        text: string;
+        createdAt: string;
+        isOwn: boolean;
+      };
+    }>('/api/messages/dm', {
+      method: 'POST',
+      token,
+      body: { receiverId, text },
+    }),
 };
 
 export const adminApi = {
