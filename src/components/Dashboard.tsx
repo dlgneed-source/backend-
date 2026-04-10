@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { systemApi, teamApi, usersApi } from '@/lib/api';
+import { systemApi, teamApi, usersApi, incentivesApi, plansApi } from '@/lib/api';
 import { getDirectReferralIncome, toSafeNonEmptyString, toSafeNonNegativeNumber } from '@/lib/referral';
 import { DashboardPoolMetrics, fetchDashboardPoolMetrics } from '@/lib/poolStats';
 import { exportCsv } from '@/utils/exportCsv';
@@ -22,14 +22,14 @@ import {
   BookOpen, Layers, User, Send, Gift, CheckCircle, ChevronRight, ChevronDown, ChevronUp,
   Info, AlertCircle, Flame, Crown, Gem, Award, Medal, Trophy, Network, RefreshCw,
   Repeat, BarChart3, Calendar, GraduationCap, Code2, Shield, Brain, Database, Server,
-  MessageSquare, Copy, Menu, LayoutDashboard, Check, Zap, Sparkles, Star, Rocket, Target, Diamond
+  MessageSquare, Copy, Menu, LayoutDashboard, Check, Zap, Sparkles, Star, Rocket, Target, Diamond, Timer
 } from 'lucide-react';
 
 // =============================================
 // TYPES & INTERFACES
 // =============================================
 type TreeNode = ReferralDisplayNode;
-type DashboardTab = 'overview' | 'plans' | 'network' | 'rewards';
+type DashboardTab = 'overview' | 'plans' | 'network' | 'rewards' | 'flushout-schedule';
 type TransactionItem = { id: string | number; type: string; amount: string; time: string };
 
 export interface PlanData {
@@ -112,7 +112,6 @@ export const individualIncentives = [
   { plan: 'Plan 5', target: 15, reward: 30 },
   { plan: 'Plan 6', target: 10, reward: 30 },
 ];
-
 // =============================================
 // MOBILE MENU DRAWER
 // =============================================
@@ -131,6 +130,7 @@ const MobileMenuDrawer = ({ isOpen, onClose, activeTab, setActiveTab, walletAddr
     { id: 'plans', label: 'Plans', icon: Layers },
     { id: 'network', label: 'Network', icon: Network },
     { id: 'rewards', label: 'Rewards', icon: Gift },
+    { id: 'flushout-schedule', label: 'Flushout Schedule', icon: Timer },
   ];
 
   return (
@@ -606,8 +606,39 @@ const ComingSoonCard = ({ title, description, icon: Icon }: ComingSoonCardProps)
 // =============================================
 // REWARDS CARD
 // =============================================
+type ApiClubIncentive = {
+  id: number;
+  plan1Ids: number;
+  plan2Ids: number;
+  plan3Ids: number;
+  plan4Ids: number;
+  plan5Ids: number;
+  plan6Ids: number;
+  reward: number;
+  rank: string;
+};
+type ApiIndividualIncentive = { planId: number; target: number; reward: number };
+
 const RewardsIncentivesCard = () => {
   const [tab, setTab] = useState<'club' | 'individual'>('club');
+  const [clubData, setClubData] = useState<ApiClubIncentive[]>([]);
+  const [individualData, setIndividualData] = useState<ApiIndividualIncentive[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    incentivesApi.getTiers()
+      .then((res) => {
+        setClubData(res.clubIncentives);
+        setIndividualData(res.individualIncentives);
+      })
+      .catch(() => {
+        // fall back to static defaults
+        setClubData(clubIncentives.map((c) => ({ ...c, rank: c.rank.toUpperCase() })));
+        setIndividualData(individualIncentives.map((c, i) => ({ planId: i + 1, target: c.target, reward: c.reward })));
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 backdrop-blur-xl" style={{ borderColor: 'rgba(244,63,94,0.2)', background: 'linear-gradient(135deg, rgba(244,63,94,0.06) 0%, rgba(236,72,153,0.03) 50%, rgba(0,0,0,0.2) 100%)' }}>
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-rose-400 via-pink-400 to-purple-400" />
@@ -625,14 +656,16 @@ const RewardsIncentivesCard = () => {
         <button onClick={() => setTab('club')} className={`rounded-lg px-3 py-2 text-xs font-semibold ${tab === 'club' ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white' : 'text-slate-500'}`}>Club</button>
         <button onClick={() => setTab('individual')} className={`rounded-lg px-3 py-2 text-xs font-semibold ${tab === 'individual' ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white' : 'text-slate-500'}`}>Individual</button>
       </div>
-      {tab === 'club' ? (
+      {isLoading ? (
+        <div className="py-6 text-center text-xs text-slate-500">Loading incentives…</div>
+      ) : tab === 'club' ? (
         <div className="overflow-x-auto -mx-4 px-4">
           <table className="w-full min-w-[400px]">
             <thead><tr className="border-b border-white/5"><th className="pb-2 text-left text-[9px] text-slate-500">Rank</th><th className="pb-2 text-center text-[9px] text-slate-500">P1</th><th className="pb-2 text-center text-[9px] text-slate-500">P2</th><th className="pb-2 text-center text-[9px] text-slate-500">P3</th><th className="pb-2 text-center text-[9px] text-slate-500">P4</th><th className="pb-2 text-center text-[9px] text-slate-500">P5</th><th className="pb-2 text-center text-[9px] text-slate-500">P6</th><th className="pb-2 text-right text-[9px] text-slate-500">Reward</th></tr></thead>
             <tbody>
-              {clubIncentives.map((inc) => (
+              {clubData.map((inc) => (
                 <tr key={inc.id} className="border-b border-white/5">
-                  <td className="py-2"><span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-300"><Medal className="h-2.5 w-2.5" />{inc.rank}</span></td>
+                  <td className="py-2"><span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-300"><Medal className="h-2.5 w-2.5" />{inc.rank.charAt(0).toUpperCase() + inc.rank.slice(1).toLowerCase()}</span></td>
                   <td className="py-2 text-center text-[10px] text-slate-300">{inc.plan1Ids}</td>
                   <td className="py-2 text-center text-[10px] text-slate-300">{inc.plan2Ids}</td>
                   <td className="py-2 text-center text-[10px] text-slate-300">{inc.plan3Ids}</td>
@@ -647,9 +680,9 @@ const RewardsIncentivesCard = () => {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          {individualIncentives.map((inc, i) => (
-            <div key={i} className="rounded-lg border border-white/5 bg-white/[0.03] p-3">
-              <p className="text-[9px] text-slate-500">{inc.plan}</p>
+          {individualData.map((inc) => (
+            <div key={inc.planId} className="rounded-lg border border-white/5 bg-white/[0.03] p-3">
+              <p className="text-[9px] text-slate-500">Plan {inc.planId}</p>
               <p className="text-xl font-bold text-white">{inc.target}</p>
               <p className="text-[10px] text-slate-400">Target IDs</p>
               <div className="mt-2 flex items-center gap-1"><Gift className="h-3.5 w-3.5 text-rose-400" /><span className="text-base font-bold text-emerald-400">${inc.reward}</span></div>
@@ -695,6 +728,158 @@ const FlushoutScheduleCard = ({ plans }: { plans: PlanData[] }) => (
     </div>
   </motion.div>
 );
+
+// =============================================
+// LIVE COUNTDOWN TIMER
+// =============================================
+const useCountdown = (targetIso: string | null): string => {
+  const [label, setLabel] = useState('');
+  useEffect(() => {
+    if (!targetIso) { setLabel('N/A'); return; }
+    const update = () => {
+      const diff = new Date(targetIso).getTime() - Date.now();
+      if (diff <= 0) { setLabel('Flushed'); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setLabel(d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m ${s}s`);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [targetIso]);
+  return label;
+};
+
+// =============================================
+// FLUSHOUT SCHEDULE PAGE
+// =============================================
+type MyEnrollmentPlan = {
+  planId: number;
+  planName: string;
+  memberProfit: number;
+  flushoutDays: number;
+  enrollments: Array<{ id: string; createdAt: string; flushoutAt: string | null }>;
+};
+
+const EnrollmentCountdownRow = ({ enrollment }: { enrollment: MyEnrollmentPlan['enrollments'][number] }) => {
+  const countdown = useCountdown(enrollment.flushoutAt);
+  const isDone = enrollment.flushoutAt && new Date(enrollment.flushoutAt).getTime() <= Date.now();
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
+      <div>
+        <p className="text-[10px] font-mono text-slate-400 truncate max-w-[140px]">{enrollment.id.slice(0, 16)}…</p>
+        <p className="text-[9px] text-slate-500">{new Date(enrollment.createdAt).toLocaleDateString()}</p>
+      </div>
+      <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${isDone ? 'bg-emerald-500/15 text-emerald-300' : 'bg-blue-500/15 text-blue-300'}`}>
+        <Timer className="h-3.5 w-3.5" />{countdown}
+      </div>
+    </div>
+  );
+};
+
+const FlushoutSchedulePage = ({ token }: { token: string | null }) => {
+  const [plans, setPlans] = useState<MyEnrollmentPlan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) { setIsLoading(false); return; }
+    plansApi.getMyEnrollments(token)
+      .then((res) => {
+        setPlans(res.plans);
+        if (res.plans.length > 0) setSelectedPlanId(res.plans[0].planId);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load enrollments'))
+      .finally(() => setIsLoading(false));
+  }, [token]);
+
+  const selectedPlan = plans.find((p) => p.planId === selectedPlanId) ?? null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+      <div>
+        <h1 className="text-xl font-bold text-white">Flushout Schedule</h1>
+        <p className="text-xs text-slate-400">Track your active enrollments and countdown to maturity</p>
+      </div>
+
+      {isLoading && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-slate-400">Loading your enrollments…</div>
+      )}
+
+      {!isLoading && error && (
+        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-xs text-rose-300">{error}</div>
+      )}
+
+      {!isLoading && !error && plans.length === 0 && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center">
+          <Timer className="mx-auto mb-3 h-10 w-10 text-slate-500" />
+          <p className="text-sm font-semibold text-slate-200">No Active Enrollments</p>
+          <p className="mt-1 text-xs text-slate-400">Enroll in a plan to see your flushout countdown here.</p>
+        </div>
+      )}
+
+      {!isLoading && !error && plans.length > 0 && (
+        <>
+          {/* Plan selector dropdown */}
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <p className="mb-2 text-xs text-slate-400">Select Plan</p>
+            <div className="flex flex-wrap gap-2">
+              {plans.map((p) => {
+                const theme = PLAN_THEMES[p.planId] || PLAN_THEMES[1];
+                return (
+                  <button
+                    key={p.planId}
+                    onClick={() => setSelectedPlanId(p.planId)}
+                    className={`rounded-xl px-4 py-2.5 text-xs font-semibold transition-all border ${selectedPlanId === p.planId ? 'text-white border-transparent' : 'border-white/10 text-slate-400 bg-white/[0.03] hover:bg-white/[0.06]'}`}
+                    style={selectedPlanId === p.planId ? { background: `linear-gradient(135deg, ${theme.glow}, ${theme.bgGlow})`, borderColor: `${theme.primary}40` } : {}}
+                  >
+                    P{p.planId} · {p.enrollments.length} ID{p.enrollments.length !== 1 ? 's' : ''}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Selected plan details */}
+          {selectedPlan && (
+            <motion.div key={selectedPlan.planId} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-2xl border p-4 backdrop-blur-xl" style={{ borderColor: `${(PLAN_THEMES[selectedPlan.planId] || PLAN_THEMES[1]).primary}30`, background: 'linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(0,0,0,0.2) 100%)' }}>
+              <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${(PLAN_THEMES[selectedPlan.planId] || PLAN_THEMES[1]).primary}, transparent)` }} />
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-400">Plan {selectedPlan.planId}</p>
+                  <h3 className="text-lg font-bold text-white">{selectedPlan.planName}</h3>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-slate-500">Flushout in</p>
+                  <p className="text-sm font-bold text-blue-300">{selectedPlan.flushoutDays} days</p>
+                </div>
+              </div>
+              <div className="mb-3 flex gap-3">
+                <div className="rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-center flex-1">
+                  <p className="text-[9px] text-slate-500">Member Profit</p>
+                  <p className="text-base font-bold text-emerald-400">${selectedPlan.memberProfit}</p>
+                </div>
+                <div className="rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-center flex-1">
+                  <p className="text-[9px] text-slate-500">Active IDs</p>
+                  <p className="text-base font-bold text-blue-300">{selectedPlan.enrollments.length}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-300">Your Enrollments</p>
+                {selectedPlan.enrollments.map((e) => (
+                  <EnrollmentCountdownRow key={e.id} enrollment={e} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </>
+      )}
+    </motion.div>
+  );
+};
 
 // =============================================
 // REDEEM GIFT CODE BUTTON
@@ -1235,20 +1420,46 @@ const ReferPageContent = ({
 // =============================================
 // DETAILS PAGE CONTENT
 // =============================================
-const DetailsPageContent = ({ transactions, plans }: { transactions: TransactionItem[]; plans: PlanData[] }) => (
+const DetailsPageContent = ({ transactions, plans, token }: { transactions: TransactionItem[]; plans: PlanData[]; token: string | null }) => {
+  const [portfolioBalance, setPortfolioBalance] = useState<{ totalEarned: number; totalWithdrawn: number; availableBalance: number } | null>(null);
+  const [directReferrals, setDirectReferrals] = useState<number | null>(null);
+  const [totalInvested, setTotalInvested] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    Promise.all([
+      usersApi.getBalance(token),
+      teamApi.getStats(token),
+    ]).then(([balRes, statsRes]) => {
+      setPortfolioBalance(balRes.balance);
+      setDirectReferrals(statsRes.stats.level1Count ?? statsRes.stats.totalMembers ?? null);
+    }).catch(() => {});
+
+    // Sum deposits from transactions as a proxy for total invested
+    usersApi.getTransactions(token, 50).then((res) => {
+      const invested = res.transactions
+        .filter((tx) => tx.type === 'DEPOSIT')
+        .reduce((sum, tx) => sum + tx.amount, 0);
+      setTotalInvested(invested);
+    }).catch(() => {});
+  }, [token]);
+
+  const fmt = (v: number | null) => (v === null ? '—' : `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+
+  return (
   <div className="max-w-lg mx-auto">
     <div className="relative">
       <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-orange-500/15 blur-lg" />
       <div className="relative rounded-2xl border p-5 backdrop-blur-xl" style={{ borderColor: 'rgba(245,158,11,0.25)', background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(234,179,8,0.04) 50%, rgba(0,0,0,0.3) 100%)' }}>
         <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400" />
         <div className="mb-5 grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4"><p className="text-[10px] text-slate-500">Total Balance</p><p className="text-2xl font-bold text-emerald-400">$2,580</p></div>
-          <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4"><p className="text-[10px] text-slate-500">Total Invested</p><p className="text-2xl font-bold text-white">$155</p></div>
-          <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4"><p className="text-[10px] text-slate-500">Total Earned</p><p className="text-2xl font-bold text-emerald-400">$420</p></div>
-          <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4"><p className="text-[10px] text-slate-500">Referrals</p><p className="text-2xl font-bold text-purple-400">12</p></div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4"><p className="text-[10px] text-slate-500">Available Balance</p><p className="text-2xl font-bold text-emerald-400">{fmt(portfolioBalance?.availableBalance ?? null)}</p></div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4"><p className="text-[10px] text-slate-500">Total Invested</p><p className="text-2xl font-bold text-white">{fmt(totalInvested)}</p></div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4"><p className="text-[10px] text-slate-500">Total Earned</p><p className="text-2xl font-bold text-emerald-400">{fmt(portfolioBalance?.totalEarned ?? null)}</p></div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4"><p className="text-[10px] text-slate-500">Direct Referrals</p><p className="text-2xl font-bold text-purple-400">{directReferrals === null ? '—' : directReferrals}</p></div>
         </div>
         <div className="mb-5">
-          <h4 className="mb-3 text-sm font-semibold text-white">Active Plans</h4>
+          <h4 className="mb-3 text-sm font-semibold text-white">Plan Options</h4>
           <div className="space-y-2">
             {plans.slice(0, 3).map((p, i) => (
               <div key={i} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
@@ -1274,24 +1485,29 @@ const DetailsPageContent = ({ transactions, plans }: { transactions: Transaction
               <Download className="h-3 w-3" /> Export All
             </button>
           </div>
-          <div className="space-y-2">
-            {transactions.slice(0, 3).map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tx.type === 'Withdrawal' ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`}>
-                    {tx.type === 'Withdrawal' ? <ArrowUpRight className="h-4 w-4 text-rose-400" /> : <ArrowDownLeft className="h-4 w-4 text-emerald-400" />}
+          {transactions.length === 0 ? (
+            <p className="text-xs text-slate-500 text-center py-2">No recent transactions.</p>
+          ) : (
+            <div className="space-y-2">
+              {transactions.slice(0, 3).map((tx) => (
+                <div key={tx.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tx.type === 'Withdrawal' ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`}>
+                      {tx.type === 'Withdrawal' ? <ArrowUpRight className="h-4 w-4 text-rose-400" /> : <ArrowDownLeft className="h-4 w-4 text-emerald-400" />}
+                    </div>
+                    <div><p className="text-sm text-slate-200">{tx.type}</p><p className="text-[10px] text-slate-500">{tx.time}</p></div>
                   </div>
-                  <div><p className="text-sm text-slate-200">{tx.type}</p><p className="text-[10px] text-slate-500">{tx.time}</p></div>
+                  <span className={`text-sm font-medium ${tx.amount.startsWith('+') ? 'text-emerald-400' : 'text-rose-400'}`}>{tx.amount}</span>
                 </div>
-                <span className={`text-sm font-medium ${tx.amount.startsWith('+') ? 'text-emerald-400' : 'text-rose-400'}`}>{tx.amount}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 
 // =============================================
@@ -1499,7 +1715,7 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
 
             {subView === 'details' && (
               <div className="overflow-x-auto -mx-3 px-3">
-                <DetailsPageContent transactions={activeTransactions} plans={activePlans} />
+                <DetailsPageContent transactions={activeTransactions} plans={activePlans} token={token} />
               </div>
             )}
             {subView === 'withdrawal' && <WithdrawalPageContent balance={balance} />}
@@ -1663,6 +1879,12 @@ const Dashboard = ({ onBack }: { onBack?: () => void }) => {
                   );
                 })}
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'flushout-schedule' && (
+            <motion.div key="flushout-schedule" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <FlushoutSchedulePage token={token} />
             </motion.div>
           )}
         </AnimatePresence>

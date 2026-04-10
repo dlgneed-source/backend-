@@ -3,8 +3,8 @@ import { roundMoney, sumMoney } from "./money";
 
 const COMMISSION_CHAIN = config.COMMISSION_LEVELS.map((item) => ({
   storedLevel: item.level,
-  displayLevel: item.level + 1,
-  label: `Level ${item.level + 1}`,
+  displayLevel: item.level,
+  label: `Level ${item.level}`,
   percentage: item.percentage,
 }));
 
@@ -37,7 +37,7 @@ export function buildCommissionLevelSummary({
   const levelAmountMap = new Map<number, number>();
 
   for (const row of levelAmounts ?? []) {
-    if (!row || typeof row.level !== "number" || !Number.isInteger(row.level) || row.level < 1) {
+    if (!row || typeof row.level !== "number" || !Number.isInteger(row.level) || row.level < 2) {
       continue;
     }
     const current = levelAmountMap.get(row.level) ?? 0;

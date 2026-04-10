@@ -46,15 +46,16 @@ const config = {
   // Admin
   ADMIN_WALLET: process.env.ADMIN_WALLET || "0x0000000000000000000000000000000000000001",
 
-  // Commission levels: 4%, 2%, 1%, 1%, 1%, 0.5%, 0.5%
+  // Commission levels: Level 2–8 each receive a percentage of joining fee (total 10%).
+  // Level 1 (direct upline) is handled separately via plan.uplineCommission.
   COMMISSION_LEVELS: [
-    { level: 1, percentage: 4 },
-    { level: 2, percentage: 2 },
-    { level: 3, percentage: 1 },
+    { level: 2, percentage: 4 },
+    { level: 3, percentage: 2 },
     { level: 4, percentage: 1 },
     { level: 5, percentage: 1 },
-    { level: 6, percentage: 0.5 },
+    { level: 6, percentage: 1 },
     { level: 7, percentage: 0.5 },
+    { level: 8, percentage: 0.5 },
   ],
 };
 

@@ -49,9 +49,9 @@ export function resolveCommissionRecipients(
 }
 
 /**
- * Get upline chain for a user (up to 7 levels)
+ * Get upline chain for a user (up to 8 levels)
  */
-export async function getUplineChain(userId: string, maxLevels = 7): Promise<string[]> {
+export async function getUplineChain(userId: string, maxLevels = 8): Promise<string[]> {
   const prisma = getPrisma();
   const chain: string[] = [];
   let currentId: string | null = userId;
@@ -84,9 +84,11 @@ export async function distributeCommissions(
   planId: number
 ): Promise<CommissionBreakdown[]> {
   const prisma = getPrisma();
-  const uplineChain = await getUplineChain(enrolleeId, COMMISSION_LEVELS.length);
+  // Get up to 8 uplines; level commissions go to uplines 2-8 (skip direct upline at index 0)
+  const uplineChain = await getUplineChain(enrolleeId, COMMISSION_LEVELS.length + 1);
+  const levelUplineChain = uplineChain.slice(1); // skip direct upline (handled via uplineCommission)
   const commissions = calculateCommissions(joiningFee);
-  const uplineCandidates = Array.from(new Set(uplineChain.slice(0, commissions.length)));
+  const uplineCandidates = Array.from(new Set(levelUplineChain.slice(0, commissions.length)));
   const uplineUsers = uplineCandidates.length
     ? await prisma.user.findMany({
         where: { id: { in: uplineCandidates } },
@@ -94,7 +96,7 @@ export async function distributeCommissions(
       })
     : [];
   const statusByUserId = new Map<string, UserStatus>(uplineUsers.map((user) => [user.id, user.status]));
-  const resolvedRecipients = resolveCommissionRecipients(uplineChain, statusByUserId);
+  const resolvedRecipients = resolveCommissionRecipients(levelUplineChain, statusByUserId);
   const results: CommissionBreakdown[] = [];
 
   for (let i = 0; i < commissions.length; i++) {

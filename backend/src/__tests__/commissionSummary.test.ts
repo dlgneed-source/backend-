@@ -5,7 +5,7 @@ describe("buildCommissionLevelSummary", () => {
   it("keeps direct upline separate from level chain", () => {
     const summary = buildCommissionLevelSummary({
       uplineAmount: 2,
-      levelAmounts: [{ level: 1, amount: 1 }],
+      levelAmounts: [{ level: 2, amount: 1 }],
     });
 
     expect(summary.levels[0]).toMatchObject({
@@ -48,7 +48,7 @@ describe("buildCommissionLevelSummary", () => {
   it("uses precision-safe rounding", () => {
     const summary = buildCommissionLevelSummary({
       uplineAmount: 0.123456789,
-      levelAmounts: [{ level: 1, amount: 0.333333335 }],
+      levelAmounts: [{ level: 2, amount: 0.333333335 }],
     });
 
     expect(summary.levels[0].amount).toBe(0.123457);
@@ -79,10 +79,9 @@ describe("buildCommissionLevelSummary", () => {
       ],
     });
 
-    expect(summary.levels[0].amount).toBe(0);
-    expect(summary.levels[1].amount).toBe(0);
-    expect(summary.levels[2].amount).toBe(4);
-    expect(summary.levels.slice(3).every((level) => level.amount === 0)).toBe(true);
+    expect(summary.levels[0].amount).toBe(0);   // Direct Upline: -4 sanitized to 0
+    expect(summary.levels[1].amount).toBe(4);   // Level 2 (stored 2): 1.5+2.5=4
+    expect(summary.levels.slice(2).every((level) => level.amount === 0)).toBe(true);
     expect(summary.totalEarned).toBe(4);
   });
 });
