@@ -766,11 +766,29 @@ type MyEnrollmentPlan = {
 const EnrollmentCountdownRow = ({ enrollment }: { enrollment: MyEnrollmentPlan['enrollments'][number] }) => {
   const countdown = useCountdown(enrollment.flushoutAt);
   const isDone = enrollment.flushoutAt && new Date(enrollment.flushoutAt).getTime() <= Date.now();
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(enrollment.id).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
   return (
     <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] p-3">
-      <div>
-        <p className="text-[10px] font-mono text-slate-400 truncate max-w-[140px]">{enrollment.id.slice(0, 16)}…</p>
-        <p className="text-[9px] text-slate-500">{new Date(enrollment.createdAt).toLocaleDateString()}</p>
+      <div className="flex items-center gap-2">
+        <div>
+          <p className="text-[10px] font-mono text-slate-400">{enrollment.id}</p>
+          <p className="text-[9px] text-slate-500">{new Date(enrollment.createdAt).toLocaleDateString()}</p>
+        </div>
+        <button
+          onClick={handleCopy}
+          title="Copy Enrollment ID"
+          className="flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-slate-400 hover:bg-white/[0.08] hover:text-slate-200 transition-colors"
+        >
+          {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+        </button>
       </div>
       <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${isDone ? 'bg-emerald-500/15 text-emerald-300' : 'bg-blue-500/15 text-blue-300'}`}>
         <Timer className="h-3.5 w-3.5" />{countdown}

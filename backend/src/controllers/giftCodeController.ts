@@ -9,6 +9,7 @@ import { AuthenticatedRequest } from "../middleware/auth";
 import { v4 as uuidv4 } from "uuid";
 import { getGiftCodeRedeemability } from "../utils/giftCodeRules";
 import { upsertActiveUserByWallet } from "../utils/upsertUserByWallet";
+import { generateUniqueEnrollmentId } from "../utils/enrollmentId";
 
 const prisma = new PrismaClient();
 
@@ -116,10 +117,12 @@ export async function redeemGiftCode(req: AuthenticatedRequest, res: Response): 
     const { distributeCommissions } = await import("../utils/commissionLogic");
 
     const flushoutAt = calculateFlushoutDate(new Date(), giftCode.plan.flushoutDays);
+    const enrollmentId = await generateUniqueEnrollmentId(prisma);
 
     // Create enrollment
     const enrollment = await prisma.enrollment.create({
       data: {
+        id: enrollmentId,
         userId,
         planId: giftCode.planId,
         status: "ACTIVE",
