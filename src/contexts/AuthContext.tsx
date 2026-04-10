@@ -45,7 +45,7 @@ const AUTH_TOKEN_KEY = 'ea_auth_token';
 const DEFAULT_BSC_CHAIN_ID = '0x38';
 const EXPECTED_CHAIN_ID = normalizeChainId(import.meta.env.VITE_CHAIN_ID || DEFAULT_BSC_CHAIN_ID);
 const METAMASK_MOBILE_APP_LINK_BASE = 'https://metamask.app.link/dapp/';
-const TRUST_WALLET_MOBILE_APP_LINK_BASE = 'https://link.trustwallet.com/open_url?url=';
+const TRUST_WALLET_MOBILE_APP_LINK_BASE = 'https://link.trustwallet.com/open_url?coin_id=60&url='; // Added coin_id parameter for stable routing
 const AuthContext = createContext<AuthContextType | null>(null);
 
 function getProvider(): EthereumProvider | null {
@@ -67,10 +67,12 @@ function buildDappUrlHostAndPath(): string {
 }
 
 function buildMetaMaskMobileAppLink(): string {
-  return `${METAMASK_MOBILE_APP_LINK_BASE}${encodeURIComponent(buildDappUrlHostAndPath())}`;
+  // FIX: Removed encodeURIComponent. MetaMask requires the raw host+path format to load the dapp correctly.
+  return `${METAMASK_MOBILE_APP_LINK_BASE}${buildDappUrlHostAndPath()}`;
 }
 
 function buildTrustWalletMobileAppLink(): string {
+  // FIX: Trust Wallet needs the full URL passed as a query parameter, so it remains encoded.
   return `${TRUST_WALLET_MOBILE_APP_LINK_BASE}${encodeURIComponent(window.location.href)}`;
 }
 
