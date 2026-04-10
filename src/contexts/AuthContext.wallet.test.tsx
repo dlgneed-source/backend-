@@ -15,6 +15,7 @@ vi.mock('sonner', () => ({
 // --- Wagmi + Web3Modal mocks ---
 
 const mockOpen = vi.fn<() => Promise<void>>();
+const mockClose = vi.fn<() => Promise<void>>();
 const mockSignMessageAsync = vi.fn<(args: { message: string }) => Promise<string>>();
 const mockDisconnect = vi.fn();
 
@@ -28,7 +29,7 @@ vi.mock('wagmi', () => ({
 }));
 
 vi.mock('@web3modal/wagmi/react', () => ({
-  useWeb3Modal: () => ({ open: mockOpen }),
+  useWeb3Modal: () => ({ open: mockOpen, close: mockClose }),
   useWeb3ModalEvents: () => ({ data: { event: '' } }),
 }));
 
@@ -65,6 +66,7 @@ describe('AuthContext wallet flow', () => {
     mockAddress = undefined;
     mockIsConnected = false;
     mockOpen.mockResolvedValue(undefined);
+    mockClose.mockResolvedValue(undefined);
     mockSignMessageAsync.mockResolvedValue('0xsignature');
     mockDisconnect.mockReturnValue(undefined);
   });
@@ -77,6 +79,65 @@ describe('AuthContext wallet flow', () => {
 
     await waitFor(() => expect(mockOpen).toHaveBeenCalledTimes(1));
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('runs auth flow directly when wallet is already connected (no modal)', async () => {
+    // Wallet already connected at Wagmi level, but no JWT session
+    mockAddress = ADDRESS_1;
+    mockIsConnected = true;
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/auth/nonce')) {
+        return jsonResponse(200, { success: true, nonce: 'nonce-1', message: 'sign-message' });
+      }
+      if (url.includes('/api/auth/verify')) {
+        return jsonResponse(200, {
+          success: true,
+          token: 'jwt-token',
+          user: { id: 'u1', walletAddress: ADDRESS_1, status: 'ACTIVE', referralCode: 'EA123' },
+        });
+      }
+      if (url.includes('/api/users/profile')) {
+        return jsonResponse(200, {
+          success: true,
+          user: { id: 'u1', walletAddress: ADDRESS_1, status: 'ACTIVE', _count: { referrals: 1 } },
+        });
+      }
+      if (url.includes('/api/users/balance')) {
+        return jsonResponse(200, {
+          success: true,
+          balance: { totalEarned: 10, totalWithdrawn: 2, availableBalance: 8 },
+        });
+      }
+      if (url.includes('/api/users/referral-link')) {
+        return jsonResponse(200, {
+          success: true,
+          referralCode: 'EA123',
+          referralLink: 'https://example.test/r/EA123',
+        });
+      }
+      if (url.includes('/api/team/stats')) {
+        return jsonResponse(200, { success: true, stats: { totalMembers: 2 } });
+      }
+      if (url.includes('/api/team/commissions')) {
+        return jsonResponse(200, { success: true, commissions: [], totalEarned: 5 });
+      }
+      return jsonResponse(404, { success: false, message: 'not found' });
+    }) as typeof fetch;
+
+    render(<AuthProvider><TestHarness /></AuthProvider>);
+
+    // Click login — wallet already connected, so modal should NOT open
+    fireEvent.click(screen.getByText('connect'));
+
+    expect(mockOpen).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('true');
+    });
+    expect(screen.getByTestId('wallet-address')).toHaveTextContent(ADDRESS_1.toLowerCase());
+    expect(sessionStorage.getItem('ea_auth_token')).toBe('jwt-token');
   });
 
   it('wallet connect success', async () => {
@@ -136,6 +197,7 @@ describe('AuthContext wallet flow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('true');
     });
+    expect(mockClose).toHaveBeenCalled();
     expect(screen.getByTestId('wallet-address')).toHaveTextContent(ADDRESS_1.toLowerCase());
     expect(sessionStorage.getItem('ea_auth_token')).toBe('jwt-token');
   });
