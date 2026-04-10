@@ -6,6 +6,7 @@
 import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
+import type { Server as SocketIOServer } from "socket.io";
 
 const prisma = new PrismaClient();
 
@@ -76,7 +77,7 @@ export async function sendDm(req: AuthenticatedRequest, res: Response): Promise<
   try {
     const sender = await prisma.user.findUnique({
       where: { id: currentUserId },
-      select: { name: true, walletAddress: true },
+      select: { id: true, name: true, walletAddress: true },
     });
 
     const receiver = await prisma.user.findUnique({
@@ -99,14 +100,31 @@ export async function sendDm(req: AuthenticatedRequest, res: Response): Promise<
       },
     });
 
+    const dmPayload = {
+      id: message.id,
+      senderId: message.senderId,
+      receiverId: message.receiverId,
+      text: message.text,
+      createdAt: message.createdAt.toISOString(),
+      sender: {
+        id: sender?.id || currentUserId,
+        name: sender?.name || sender?.walletAddress?.slice(0, 8) || "User",
+        walletAddress: sender?.walletAddress || undefined,
+      },
+    };
+
+    const io = req.app.get("io") as SocketIOServer | undefined;
+    io?.to(`user:${receiverId}`).emit("dm_created", dmPayload);
+    io?.to(`user:${currentUserId}`).emit("dm_created", dmPayload);
+
     res.json({
       success: true,
       message: {
-        id: message.id,
-        senderId: message.senderId,
-        receiverId: message.receiverId,
-        text: message.text,
-        createdAt: message.createdAt.toISOString(),
+        id: dmPayload.id,
+        senderId: dmPayload.senderId,
+        receiverId: dmPayload.receiverId,
+        text: dmPayload.text,
+        createdAt: dmPayload.createdAt,
         isOwn: true,
       },
     });
