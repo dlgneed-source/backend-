@@ -1,17 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { authApi, teamApi, usersApi } from '@/lib/api';
-
-interface EthereumProvider {
-  isMetaMask?: boolean;
-  request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
-  on: (event: string, listener: (...args: unknown[]) => void) => void;
-  removeListener: (event: string, listener: (...args: unknown[]) => void) => void;
-}
-
-type EthereumWindow = Window & {
-  ethereum?: EthereumProvider;
-};
+import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
+import { useWeb3Modal, useWeb3ModalEvents } from '@web3modal/wagmi/react';
 
 interface AuthUser {
   id: string;
@@ -42,73 +33,12 @@ interface AuthContextType {
 }
 
 const AUTH_TOKEN_KEY = 'ea_auth_token';
-const DEFAULT_BSC_CHAIN_ID = '0x38';
-const EXPECTED_CHAIN_ID = normalizeChainId(import.meta.env.VITE_CHAIN_ID || DEFAULT_BSC_CHAIN_ID);
-const METAMASK_MOBILE_APP_LINK_BASE = 'https://metamask.app.link/dapp/';
-const TRUST_WALLET_MOBILE_APP_LINK_BASE = 'https://link.trustwallet.com/open_url?coin_id=60&url='; // Added coin_id parameter for stable routing
 const AuthContext = createContext<AuthContextType | null>(null);
-
-function getProvider(): EthereumProvider | null {
-  return (window as EthereumWindow).ethereum || null;
-}
-
-function isMobileDevice(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
-  if (nav.userAgentData?.mobile) return true;
-  const userAgent = navigator.userAgent || '';
-  return /android|iphone|ipad|ipod|iemobile|opera mini|windows phone/i.test(userAgent);
-}
-
-function buildDappUrlHostAndPath(): string {
-  const currentUrl = new URL(window.location.href);
-  const pathWithQueryAndHash = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
-  return `${currentUrl.host}${pathWithQueryAndHash}`;
-}
-
-function buildMetaMaskMobileAppLink(): string {
-  // FIX: Removed encodeURIComponent. MetaMask requires the raw host+path format to load the dapp correctly.
-  return `${METAMASK_MOBILE_APP_LINK_BASE}${buildDappUrlHostAndPath()}`;
-}
-
-function buildTrustWalletMobileAppLink(): string {
-  // FIX: Trust Wallet needs the full URL passed as a query parameter, so it remains encoded.
-  return `${TRUST_WALLET_MOBILE_APP_LINK_BASE}${encodeURIComponent(window.location.href)}`;
-}
-
-function redirectToMetaMaskMobileApp(): void {
-  if (import.meta.env.MODE === 'test') return;
-  window.location.assign(buildMetaMaskMobileAppLink());
-}
-
-function redirectToTrustWalletMobileApp(): void {
-  if (import.meta.env.MODE === 'test') return;
-  window.location.assign(buildTrustWalletMobileAppLink());
-}
 
 function normalizeAddress(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const address = value.trim().toLowerCase();
   return /^0x[a-f0-9]{40}$/.test(address) ? address : null;
-}
-
-function normalizeChainId(chainId: string | undefined): string | null {
-  if (!chainId) return null;
-  if (chainId.startsWith('0x')) {
-    if (!/^0x[0-9a-f]+$/i.test(chainId)) {
-      return null;
-    }
-    return chainId.toLowerCase();
-  }
-
-  const asNumber = Number(chainId);
-  if (!Number.isFinite(asNumber) || asNumber < 0) return null;
-  return `0x${asNumber.toString(16)}`.toLowerCase();
-}
-
-function formatExpectedChain(chainId: string | null): string {
-  if (!chainId) return 'configured network';
-  return `${chainId} (decimal ${parseInt(chainId, 16)})`;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -118,8 +48,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
   const userRef = useRef<AuthUser | null>(user);
+  const loginPendingRef = useRef(false);
 
   useEffect(() => { userRef.current = user; }, [user]);
+
+  const { open } = useWeb3Modal();
+  const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const { disconnect } = useDisconnect();
+  const modalEvents = useWeb3ModalEvents();
+
+  // Reset pending flag if the modal is closed before the user connects
+  useEffect(() => {
+    if (modalEvents.data.event === 'MODAL_CLOSE' && loginPendingRef.current && !isConnected) {
+      loginPendingRef.current = false;
+    }
+  }, [modalEvents.data.event, isConnected]);
 
   const clearSession = useCallback(() => {
     setUser(null);
@@ -169,107 +113,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (): Promise<boolean> => {
-    const provider = getProvider();
-    if (!provider) {
-      if (isMobileDevice()) {
-        const message = 'Wallet not detected in this browser. Open in MetaMask or Trust Wallet.';
-        setWalletError(message);
-        toast.info(message, {
-          action: {
-            label: 'MetaMask',
-            onClick: redirectToMetaMaskMobileApp,
-          },
-          cancel: {
-            label: 'Trust Wallet',
-            onClick: redirectToTrustWalletMobileApp,
-          },
-        });
-        return false;
-      }
-
-      const message = 'MetaMask not detected. Please install MetaMask to continue.';
+    setWalletError(null);
+    loginPendingRef.current = true;
+    try {
+      await open();
+    } catch (error) {
+      loginPendingRef.current = false;
+      const message = (error as { message?: string })?.message || 'Failed to open wallet selector.';
       setWalletError(message);
       toast.error(message);
       return false;
+    }
+    return true;
+  }, [open]);
+
+  // Run auth flow when wallet connects after a pending login
+  useEffect(() => {
+    if (!loginPendingRef.current || !address || !isConnected) return;
+    loginPendingRef.current = false;
+
+    const normalizedAddress = normalizeAddress(address);
+    if (!normalizedAddress) {
+      setWalletError('Wallet connection failed. No valid account received.');
+      toast.error('Wallet connection failed. No valid account received.');
+      return;
     }
 
     setIsLoading(true);
     setWalletError(null);
 
-    try {
-      const currentChainRaw = await provider.request({ method: 'eth_chainId' });
-      const currentChain = normalizeChainId(typeof currentChainRaw === 'string' ? currentChainRaw : undefined);
-      if (EXPECTED_CHAIN_ID && currentChain && currentChain !== EXPECTED_CHAIN_ID) {
-        const message = `Wrong network. Switch to ${formatExpectedChain(EXPECTED_CHAIN_ID)}.`;
-        setWalletError(message);
-        toast.error(message);
-        return false;
-      }
+    // Capture the connected address so we can verify it hasn't changed by the time we commit
+    const addressAtStart = normalizedAddress;
 
-      const accounts = await provider.request({ method: 'eth_requestAccounts' }) as string[];
-      const connectedAddress = normalizeAddress(accounts?.[0]);
-      if (!connectedAddress) {
-        const message = 'Wallet connection failed. No valid account received.';
-        setWalletError(message);
-        toast.error(message);
-        return false;
-      }
-
-      const nonceResponse = await authApi.getNonce(connectedAddress);
-
-      let signature: string;
+    const runAuthFlow = async () => {
       try {
-        const signed = await provider.request({
-          method: 'personal_sign',
-          params: [nonceResponse.message, connectedAddress],
-        });
-        if (typeof signed !== 'string' || !signed) {
-          throw new Error('Empty signature received');
+        const nonceResponse = await authApi.getNonce(addressAtStart);
+
+        let signature: string;
+        try {
+          signature = await signMessageAsync({ message: nonceResponse.message });
+        } catch (error) {
+          const maybeError = error as { code?: number; message?: string };
+          const message = maybeError?.code === 4001
+            ? 'Signature request was rejected.'
+            : (maybeError?.message || 'Signature failed.');
+          setWalletError(message);
+          toast.error(message);
+          return;
         }
-        signature = signed;
+
+        const verifyResponse = await authApi.verify(addressAtStart, signature);
+        const authenticatedUser = await buildAuthenticatedUser(verifyResponse.token, verifyResponse.user);
+
+        // Guard: ensure the wallet is still connected with the same address before committing session
+        if (normalizeAddress(address) !== addressAtStart) {
+          return;
+        }
+
+        sessionStorage.setItem(AUTH_TOKEN_KEY, verifyResponse.token);
+        setToken(verifyResponse.token);
+        setUser(authenticatedUser);
+        setWalletAddress(authenticatedUser.walletAddress);
+        setWalletError(null);
+        toast.success('Wallet connected');
       } catch (error) {
         const maybeError = error as { code?: number; message?: string };
         const message = maybeError?.code === 4001
-          ? 'Signature request was rejected.'
-          : (maybeError?.message || 'Signature failed.');
+          ? 'Wallet connection request was rejected.'
+          : (maybeError?.message || 'Wallet login failed');
         setWalletError(message);
         toast.error(message);
-        return false;
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      const verifyResponse = await authApi.verify(connectedAddress, signature);
-      const authenticatedUser = await buildAuthenticatedUser(verifyResponse.token, verifyResponse.user);
-
-      sessionStorage.setItem(AUTH_TOKEN_KEY, verifyResponse.token);
-      setToken(verifyResponse.token);
-      setUser(authenticatedUser);
-      setWalletAddress(authenticatedUser.walletAddress);
-      setWalletError(null);
-      toast.success('Wallet connected');
-      return true;
-    } catch (error) {
-      const maybeError = error as { code?: number; message?: string };
-      const message = maybeError?.code === 4001
-        ? 'Wallet connection request was rejected.'
-        : (maybeError?.message || 'Wallet login failed');
-      setWalletError(message);
-      toast.error(message);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [buildAuthenticatedUser]);
+    void runAuthFlow();
+  }, [address, isConnected, signMessageAsync, buildAuthenticatedUser]);
 
   const logout = useCallback(() => {
+    disconnect();
     clearSession();
     setWalletError(null);
     toast.info('Disconnected');
-  }, [clearSession]);
+  }, [clearSession, disconnect]);
 
   const clearWalletError = useCallback(() => {
     setWalletError(null);
   }, []);
 
+  // Restore session from existing token on mount
   useEffect(() => {
     if (!token) {
       return;
@@ -300,81 +233,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [buildAuthenticatedUser, clearSession, token]);
 
+  // Track wallet address changes from Wagmi
   useEffect(() => {
-    const provider = getProvider();
-    if (!provider) {
+    const normalizedAddress = address ? normalizeAddress(address) : null;
+    setWalletAddress(normalizedAddress);
+
+    if (!normalizedAddress && !isConnected) {
+      // Wallet disconnected externally
+      if (userRef.current) {
+        clearSession();
+        setWalletError('Wallet disconnected.');
+      }
       return;
     }
 
-    let mounted = true;
-    void (async () => {
-      try {
-        const [accountsRaw, chainRaw] = await Promise.all([
-          provider.request({ method: 'eth_accounts' }),
-          provider.request({ method: 'eth_chainId' }),
-        ]);
-
-        if (!mounted) return;
-        const accounts = Array.isArray(accountsRaw) ? accountsRaw : [];
-        setWalletAddress(normalizeAddress(accounts[0]));
-
-        const chain = normalizeChainId(typeof chainRaw === 'string' ? chainRaw : undefined);
-        if (EXPECTED_CHAIN_ID && chain && chain !== EXPECTED_CHAIN_ID) {
-          setWalletError(`Wrong network. Switch to ${formatExpectedChain(EXPECTED_CHAIN_ID)}.`);
-        }
-      } catch {
-        if (import.meta.env.DEV) {
-          console.warn('Failed to read wallet provider state');
-        }
-      }
-    })();
-
-    const handleAccountsChanged = (accountsValue: unknown) => {
-      const accounts = Array.isArray(accountsValue) ? accountsValue : [];
-      const nextAddress = normalizeAddress(accounts[0]);
-      setWalletAddress(nextAddress);
-
-      if (!nextAddress) {
-        clearSession();
-        setWalletError('Wallet disconnected.');
-        return;
-      }
-
-      const activeUser = userRef.current;
-      if (activeUser && activeUser.walletAddress !== nextAddress) {
-        clearSession();
-        setWalletError('Wallet account changed. Please reconnect.');
-        toast.info('Wallet account changed. Please reconnect.');
-      }
-    };
-
-    const handleChainChanged = (chainValue: unknown) => {
-      const chain = normalizeChainId(typeof chainValue === 'string' ? chainValue : undefined);
-      if (EXPECTED_CHAIN_ID && chain && chain !== EXPECTED_CHAIN_ID) {
-        clearSession();
-        setWalletError(`Wrong network. Switch to ${formatExpectedChain(EXPECTED_CHAIN_ID)}.`);
-      } else {
-        setWalletError((prev) => (prev?.startsWith('Wrong network.') ? null : prev));
-      }
-    };
-
-    const handleDisconnect = () => {
+    const activeUser = userRef.current;
+    if (activeUser && normalizedAddress && activeUser.walletAddress !== normalizedAddress) {
       clearSession();
-      setWalletAddress(null);
-      setWalletError('Wallet disconnected.');
-    };
-
-    provider.on('accountsChanged', handleAccountsChanged);
-    provider.on('chainChanged', handleChainChanged);
-    provider.on('disconnect', handleDisconnect);
-
-    return () => {
-      mounted = false;
-      provider.removeListener('accountsChanged', handleAccountsChanged);
-      provider.removeListener('chainChanged', handleChainChanged);
-      provider.removeListener('disconnect', handleDisconnect);
-    };
-  }, [clearSession]);
+      setWalletError('Wallet account changed. Please reconnect.');
+      toast.info('Wallet account changed. Please reconnect.');
+    }
+  }, [address, isConnected, clearSession]);
 
   const value = useMemo<AuthContextType>(() => ({
     user,
