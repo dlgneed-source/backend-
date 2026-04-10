@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Camera, Users, Award, Wallet, Copy, Check, 
@@ -6,6 +6,7 @@ import {
   Link, ArrowUpRight, History, LockKeyhole, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usersApi } from '@/lib/api';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 15 },
@@ -13,34 +14,54 @@ const fadeUp = {
 };
 
 const ProfilePanel: React.FC = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [copiedWallet, setCopiedWallet] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [userName, setUserName] = useState(user?.name || 'Wallet User');
   const [userBio, setUserBio] = useState('Web3 enthusiast & crypto trader. Building the decentralized future.');
   const [editingBio, setEditingBio] = useState(false);
-  const userId = user?.id || 'N/A';
+  const userId = user?.memberId || user?.id || 'N/A';
 
   useEffect(() => {
     if (user?.name) setUserName(user.name);
   }, [user?.name]);
 
-  const handleProfilePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => setProfilePic(ev.target?.result as string);
-      reader.readAsDataURL(file);
+  // Load saved avatar from user profile
+  useEffect(() => {
+    if (user?.avatarUrl) {
+      setProfilePic(user.avatarUrl);
     }
-  };
+  }, [user?.avatarUrl]);
 
-  const copyToClipboard = (text: string, type: 'wallet' | 'link') => {
+  const handleProfilePicChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setProfilePic(dataUrl);
+      if (token) {
+        try {
+          await usersApi.updateProfile(token, { avatarUrl: dataUrl });
+        } catch {
+          // silently ignore save errors; picture is still shown in session
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  }, [token]);
+
+  const copyToClipboard = (text: string, type: 'wallet' | 'link' | 'id') => {
     navigator.clipboard.writeText(text);
     if (type === 'wallet') {
       setCopiedWallet(true);
       setTimeout(() => setCopiedWallet(false), 2000);
+    } else if (type === 'id') {
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
     } else {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
@@ -88,7 +109,16 @@ const ProfilePanel: React.FC = () => {
               </div>
 
               {/* User ID */}
-              <p className="text-xs font-mono text-slate-400 mt-1">User ID: #{String(userId).slice(0, 10)}</p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <p className="text-xs font-mono text-slate-400">User ID: #{userId}</p>
+                <button
+                  onClick={() => copyToClipboard(String(userId), 'id')}
+                  className="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors"
+                  title="Copy User ID"
+                >
+                  {copiedId ? <Check className="w-3 h-3 text-sky-300" /> : <Copy className="w-3 h-3" />}
+                </button>
+              </div>
               
               {/* Bio */}
               <div className="mt-2 w-full">

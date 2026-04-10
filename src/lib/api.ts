@@ -83,14 +83,34 @@ export const usersApi = {
       success: boolean;
       user: {
         id: string;
+        memberId?: string | null;
         walletAddress: string;
         name?: string | null;
+        avatarUrl?: string | null;
         status: string;
         referralCode?: string;
         totalInvested?: number;
         _count?: { referrals?: number };
       };
     }>('/api/users/profile', { token }),
+
+  updateProfile: (token: string, data: { name?: string; email?: string; avatarUrl?: string }) =>
+    apiRequest<{
+      success: boolean;
+      user: {
+        id: string;
+        memberId?: string | null;
+        walletAddress: string;
+        name?: string | null;
+        email?: string | null;
+        avatarUrl?: string | null;
+        referralCode?: string;
+      };
+    }>('/api/users/profile', {
+      method: 'PATCH',
+      token,
+      body: data,
+    }),
 
   getBalance: (token: string) =>
     apiRequest<{

@@ -6,8 +6,10 @@ import { useWeb3Modal, useWeb3ModalEvents } from '@web3modal/wagmi/react';
 
 interface AuthUser {
   id: string;
+  memberId?: string | null;
   walletAddress: string;
   name?: string;
+  avatarUrl?: string | null;
   balance: string;
   totalEarned: string;
   totalInvested: string;
@@ -101,8 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return {
       id: profile?.id || fallbackUser?.id || '',
+      memberId: profile?.memberId ?? null,
       walletAddress: normalizedWalletAddress,
       name: profile?.name || fallbackUser?.name || undefined,
+      avatarUrl: profile?.avatarUrl ?? null,
       balance: String(balance?.availableBalance ?? 0),
       totalEarned: String(balance?.totalEarned ?? 0),
       totalInvested: String(profile?.totalInvested ?? 0),
