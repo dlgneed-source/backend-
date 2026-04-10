@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [walletError, setWalletError] = useState<string | null>(null);
   const userRef = useRef<AuthUser | null>(user);
   const loginPendingRef = useRef(false);
+  const walletRetryAfterRef = useRef(0);
 
   useEffect(() => { userRef.current = user; }, [user]);
 
@@ -177,9 +178,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.success('Wallet connected');
     } catch (error) {
       const maybeError = error as { code?: number; message?: string };
+      const rawMessage = maybeError?.message || 'Wallet login failed';
+      const isRateLimited = maybeError?.code === 429 || /too many requests|rate limit|try again later/i.test(rawMessage);
+      if (isRateLimited) {
+        walletRetryAfterRef.current = Date.now() + 15_000;
+      }
       const message = maybeError?.code === 4001
         ? 'Wallet connection request was rejected.'
-        : (maybeError?.message || 'Wallet login failed');
+        : isRateLimited
+          ? 'Too many wallet requests detected. Please wait a few seconds and try again.'
+          : rawMessage;
       console.error('[AuthFlow] Auth flow error:', maybeError);
       setWalletError(message);
       toast.error(message);
@@ -191,6 +199,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (): Promise<boolean> => {
     setWalletError(null);
+    if (isLoading || loginPendingRef.current) {
+      return false;
+    }
+
+    const retryAfterMs = walletRetryAfterRef.current - Date.now();
+    if (retryAfterMs > 0) {
+      const seconds = Math.ceil(retryAfterMs / 1000);
+      const message = `Please wait ${seconds}s before trying wallet connection again.`;
+      setWalletError(message);
+      toast.error(message);
+      return false;
+    }
 
     // If wallet is already connected at the Wagmi level but the JWT session is missing,
     // skip opening the modal and run the auth flow directly.
@@ -204,13 +224,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await open();
     } catch (error) {
       loginPendingRef.current = false;
-      const message = (error as { message?: string })?.message || 'Failed to open wallet selector.';
+      const rawMessage = (error as { code?: number; message?: string })?.message || 'Failed to open wallet selector.';
+      const isRateLimited = (error as { code?: number })?.code === 429 || /too many requests|rate limit|try again later/i.test(rawMessage);
+      if (isRateLimited) {
+        walletRetryAfterRef.current = Date.now() + 15_000;
+      }
+      const message = isRateLimited
+        ? 'Wallet connector is rate-limited right now. Please wait a few seconds and try again.'
+        : rawMessage;
       setWalletError(message);
       toast.error(message);
       return false;
     }
     return true;
-  }, [open, isConnected, address, runAuthFlow]);
+  }, [open, isConnected, address, runAuthFlow, isLoading]);
 
   // Run auth flow when wallet connects after a pending login
   useEffect(() => {
