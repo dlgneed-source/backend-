@@ -85,10 +85,12 @@ describe('AuthContext wallet flow', () => {
     // Wallet already connected at Wagmi level, but no JWT session
     mockAddress = ADDRESS_1;
     mockIsConnected = true;
+    let nonceCallCount = 0;
 
     global.fetch = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = String(input);
       if (url.includes('/api/auth/nonce')) {
+        nonceCallCount += 1;
         return jsonResponse(200, { success: true, nonce: 'nonce-1', message: 'sign-message' });
       }
       if (url.includes('/api/auth/verify')) {
@@ -136,6 +138,7 @@ describe('AuthContext wallet flow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('true');
     });
+    expect(nonceCallCount).toBe(1);
     expect(screen.getByTestId('wallet-address')).toHaveTextContent(ADDRESS_1.toLowerCase());
     expect(sessionStorage.getItem('ea_auth_token')).toBe('jwt-token');
   });

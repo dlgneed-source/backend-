@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [walletError, setWalletError] = useState<string | null>(null);
   const userRef = useRef<AuthUser | null>(user);
   const loginPendingRef = useRef(false);
+  const authFlowInFlightRef = useRef(false);
 
   useEffect(() => { userRef.current = user; }, [user]);
 
@@ -128,6 +129,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.error('Wallet connection failed. No valid account received.');
       return;
     }
+    if (authFlowInFlightRef.current) {
+      return;
+    }
+    authFlowInFlightRef.current = true;
 
     console.log('[AuthFlow] Starting auth flow for address:', normalizedAddress);
     setIsLoading(true);
@@ -186,6 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.error(message);
       disconnect();
     } finally {
+      authFlowInFlightRef.current = false;
       setIsLoading(false);
     }
   }, [signMessageAsync, buildAuthenticatedUser, disconnect]);
