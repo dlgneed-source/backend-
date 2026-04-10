@@ -97,6 +97,7 @@ const emojis = ['👍', '❤️', '🔥', '😂', '🎉', '👏', '😍', '🤔'
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════════════════ */
 const CommunityLounge: React.FC = () => {
+  const mobileLoungeBottomInset = 'calc(5.5rem + env(safe-area-inset-bottom, 0px))';
   const [isMobile, setIsMobile] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -508,7 +509,7 @@ const CommunityLounge: React.FC = () => {
      SIDEBAR COMPONENT
      ═══════════════════════════════════════════════════════════════════════════════ */
   const Sidebar = (
-    <div className="flex h-full w-full flex-col" style={{ backgroundColor: '#0a0c12' }}>
+    <div className="flex h-full w-full min-h-0 flex-col" style={{ backgroundColor: '#0a0c12' }}>
       {/* Premium Header */}
       <div className="flex items-center gap-3 p-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'linear-gradient(to right, rgba(139,92,246,0.1), rgba(217,70,239,0.1))' }}>
         <div className="relative">
@@ -829,7 +830,7 @@ const CommunityLounge: React.FC = () => {
      CHAT CANVAS COMPONENT
      ═══════════════════════════════════════════════════════════════════════════════ */
   const ChatCanvas = (
-    <div className="flex h-full w-full flex-col" style={{ backgroundColor: '#18181b' }}>
+    <div className="flex h-full w-full min-h-0 flex-col" style={{ backgroundColor: '#18181b' }}>
       {/* Premium Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)', backgroundColor: 'rgba(10,12,18,0.85)', backdropFilter: 'blur(20px)' }}>
         <div className="flex items-center gap-3 min-w-0">
@@ -925,7 +926,7 @@ const CommunityLounge: React.FC = () => {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-6 space-y-5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {/* Pinned Message */}
         {activeChannelMessages.some(m => m.isPinned) && (
           <div className="mb-4 rounded-xl border p-3" style={{ backgroundColor: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.3)' }}>
@@ -1114,7 +1115,7 @@ const CommunityLounge: React.FC = () => {
       </div>
 
       {/* Input Area */}
-      <div className="border-t px-4 pt-4 pb-safe" style={{ borderColor: 'rgba(255,255,255,0.06)', backgroundColor: '#0a0c12', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}>
+      <div className="shrink-0 border-t px-4 pt-4 pb-safe" style={{ borderColor: 'rgba(255,255,255,0.06)', backgroundColor: '#0a0c12', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}>
         {/* Reply Preview */}
         {replyTo && (
           <div className="mb-3 flex items-center justify-between rounded-xl border px-4 py-2.5"
@@ -1694,17 +1695,24 @@ const CommunityLounge: React.FC = () => {
      MAIN RENDER
      ═══════════════════════════════════════════════════════════════════════════════ */
   return (
-    <div className="flex w-full overflow-hidden" style={{ backgroundColor: '#05060a', color: 'white', height: '100dvh' }}>
+    <div
+      className="flex w-full min-h-0 overflow-hidden"
+      style={{
+        backgroundColor: '#05060a',
+        color: 'white',
+        height: isMobile ? `calc(100dvh - ${mobileLoungeBottomInset})` : '100dvh',
+      }}
+    >
       {isMobile ? (
         mobileShowChat ? (
-          <div className="flex-1 w-full">{ChatCanvas}</div>
+          <div className="flex-1 w-full min-h-0">{ChatCanvas}</div>
         ) : (
-          <div className="flex-1 w-full">{Sidebar}</div>
+          <div className="flex-1 w-full min-h-0">{Sidebar}</div>
         )
       ) : (
         <>
           <aside className="w-80 shrink-0 border-r" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>{Sidebar}</aside>
-          <main className="flex-1 min-w-0">{ChatCanvas}</main>
+          <main className="flex-1 min-w-0 min-h-0">{ChatCanvas}</main>
           {RightSidebar}
         </>
       )}
