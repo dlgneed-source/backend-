@@ -22,14 +22,25 @@ export class ApiError extends Error {
 }
 
 async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
-    },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: options.method || 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (err) {
+    if (err instanceof TypeError && err.message.toLowerCase().includes('failed to fetch')) {
+      console.error(`[api] Network error for ${options.method || 'GET'} ${API_BASE_URL}${path}:`, err.message, '-- check that the backend is running and CORS is configured correctly.');
+    } else {
+      console.error(`[api] Fetch error for ${options.method || 'GET'} ${API_BASE_URL}${path}:`, err);
+    }
+    throw err;
+  }
 
   const json = await response.json().catch(() => ({}));
 
