@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 
 import { useAuth } from '@/contexts/AuthContext';
-import NotificationPanel from '@/components/NotificationPanel';
+import NotificationPanel, { type NotificationItem } from '@/components/NotificationPanel';
 import { communityApi, messagesApi, usersApi } from '@/lib/api';
 import { communitySocket } from '@/lib/communitySocket';
 import {
@@ -28,6 +28,7 @@ type Room = {
 
 type Contact = { 
   id: string; 
+  memberId?: string | null;
   name: string; 
   initials: string; 
   online: boolean; 
@@ -93,6 +94,19 @@ const seedMessages: Msg[] = [];
 
 const emojis = ['👍', '❤️', '🔥', '😂', '🎉', '👏', '😍', '🤔', '👎', '😢'];
 
+function formatRelativeTime(input: string): string {
+  const then = new Date(input).getTime();
+  if (!Number.isFinite(then)) return 'recently';
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -102,11 +116,14 @@ const CommunityLounge: React.FC = () => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const socketStateInitializedRef = useRef(false);
 
   // Auth
   const socket = communitySocket;
   const { user, isAuthenticated, token } = useAuth();
   const [isSocketConnected, setIsSocketConnected] = useState(socket.isConnected);
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   // Check mobile on mount and resize
   useEffect(() => {
@@ -117,6 +134,7 @@ const CommunityLounge: React.FC = () => {
   }, []);
 
   useEffect(() => socket.onConnectionChange(setIsSocketConnected), [socket]);
+  useEffect(() => socket.onPresenceChange(setOnlineUserIds), [socket]);
 
   const [activeTab, setActiveTab] = useState<'community' | 'dms'>('community');
   const [mobileShowChat, setMobileShowChat] = useState(false);
@@ -155,6 +173,27 @@ const CommunityLounge: React.FC = () => {
   const [dmSearchError, setDmSearchError] = useState<string | null>(null);
   // Active DM user info (from backend when opening a DM)
   const [activeDMInfo, setActiveDMInfo] = useState<{ id: string; name: string | null; memberId: string | null; avatarUrl: string | null } | null>(null);
+  const pushNotification = useCallback((notification: NotificationItem) => {
+    setNotifications((prev) => [notification, ...prev].slice(0, 30));
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      socketStateInitializedRef.current = false;
+      return;
+    }
+    if (!socketStateInitializedRef.current) {
+      socketStateInitializedRef.current = true;
+      return;
+    }
+    pushNotification({
+      id: `socket-${Date.now()}`,
+      type: 'system',
+      title: isSocketConnected ? 'Realtime connected' : 'Realtime disconnected',
+      desc: isSocketConnected ? 'Live chat updates are active.' : 'You can still send DMs via API fallback.',
+      time: 'Just now',
+    });
+  }, [isAuthenticated, isSocketConnected, pushNotification]);
 
   useEffect(() => {
     let mounted = true;
@@ -210,7 +249,7 @@ const CommunityLounge: React.FC = () => {
   const activeDMName = activeDMInfo?.name || activeDMObj?.name || 'Direct Message';
   const activeTitle = selectedDM ? activeDMName : `#${activeRoom?.name ?? 'announcements'}`;
   const activeDescription = selectedDM
-    ? `Member #${activeDMInfo?.memberId || activeDMObj?.id?.slice(0, 6) || '—'}`
+    ? `Member #${activeDMInfo?.memberId || activeDMObj?.memberId || activeDMObj?.id?.slice(0, 6) || '—'}`
     : `${activeRoom?.memberCount?.toLocaleString() ?? '0'} members • ${activeRoom?.description ?? 'Community space'}`;
 
   const activeChannelMessages = useMemo(() => {
@@ -281,6 +320,22 @@ const CommunityLounge: React.FC = () => {
               name: res.otherUser.name,
               memberId: res.otherUser.memberId,
               avatarUrl: res.otherUser.avatarUrl,
+            });
+            setContacts((prev) => {
+              const already = prev.find((c) => c.id === res.otherUser!.id);
+              const nextContact: Contact = {
+                id: res.otherUser.id,
+                memberId: res.otherUser.memberId,
+                name: res.otherUser.name || res.otherUser.walletAddress.slice(0, 8),
+                initials: (res.otherUser.name || 'U?').slice(0, 2).toUpperCase(),
+                online: onlineUserIds.includes(res.otherUser.id),
+                role: 'Member',
+                wallet: res.otherUser.walletAddress,
+                lastMsg: 'Start chatting',
+                avatar: res.otherUser.avatarUrl || undefined,
+                lastSeen: socket.getLastSeen(res.otherUser.id),
+              };
+              return already ? prev.map((c) => (c.id === already.id ? { ...c, ...nextContact } : c)) : [nextContact, ...prev];
             });
           }
           if (res.messages?.length) {
@@ -385,6 +440,15 @@ const CommunityLounge: React.FC = () => {
 
     // Listen for new messages
     const offMessage = socket.onMessage((msg) => {
+      if (msg.userId !== user?.id) {
+        pushNotification({
+          id: `${msg.id}-room`,
+          type: 'message',
+          title: 'New community message',
+          desc: `${msg.user?.name || msg.user?.walletAddress?.slice(0, 8) || 'User'}: ${msg.text.slice(0, 80)}`,
+          time: 'Just now',
+        });
+      }
       setMessages((prev) => [...prev, {
         id: String(msg.id),
         roomId: msg.roomId,
@@ -399,6 +463,38 @@ const CommunityLounge: React.FC = () => {
     });
 
     const offDM = socket.onDM((dm) => {
+      const otherId = dm.senderId === user?.id ? dm.receiverId : dm.senderId;
+      const otherName = dm.sender?.name || dm.sender?.walletAddress?.slice(0, 8) || (dm.senderId === user?.id ? 'You' : 'Unknown');
+
+      setContacts((prev) => {
+        const existing = prev.find((c) => c.id === otherId);
+        const updated: Contact = {
+          id: otherId,
+          memberId: existing?.memberId ?? null,
+          name: otherName,
+          initials: otherName.slice(0, 2).toUpperCase(),
+          online: onlineUserIds.includes(otherId),
+          role: existing?.role || 'Member',
+          wallet: existing?.wallet || dm.sender?.walletAddress || '—',
+          lastMsg: dm.text,
+          badge: existing?.badge,
+          avatar: existing?.avatar,
+          isBlocked: existing?.isBlocked,
+          lastSeen: socket.getLastSeen(otherId),
+        };
+        return existing ? prev.map((c) => (c.id === otherId ? { ...c, ...updated } : c)) : [updated, ...prev];
+      });
+
+      if (dm.senderId !== user?.id) {
+        pushNotification({
+          id: `${dm.id}-dm`,
+          type: 'message',
+          title: 'New DM',
+          desc: `${otherName}: ${dm.text.slice(0, 80)}`,
+          time: 'Just now',
+        });
+      }
+
       setMessages((prev) => [...prev, {
         id: String(dm.id),
         roomId: `dm:${dm.senderId === user?.id ? dm.receiverId : dm.senderId}`,
@@ -428,7 +524,7 @@ const CommunityLounge: React.FC = () => {
       offDelete();
       offPin();
     };
-  }, [isSocketConnected, selectedRoomId, selectedDM, user?.id]);
+  }, [isSocketConnected, onlineUserIds, pushNotification, selectedRoomId, selectedDM, socket, user?.id]);
 
   // Typing indicator handler
   const handleInputChange = (value: string) => {
@@ -725,6 +821,22 @@ const CommunityLounge: React.FC = () => {
                   </div>
                   <button
                     onClick={() => {
+                      const contact: Contact = {
+                        id: dmSearchResult.id,
+                        memberId: dmSearchResult.memberId,
+                        name: dmSearchResult.name || dmSearchResult.walletAddress.slice(0, 8),
+                        initials: (dmSearchResult.name || 'U?').slice(0, 2).toUpperCase(),
+                        online: onlineUserIds.includes(dmSearchResult.id),
+                        role: 'Member',
+                        wallet: dmSearchResult.walletAddress,
+                        lastMsg: 'Start chatting',
+                        avatar: dmSearchResult.avatarUrl || undefined,
+                        lastSeen: socket.getLastSeen(dmSearchResult.id),
+                      };
+                      setContacts((prev) => {
+                        const exists = prev.find((c) => c.id === contact.id);
+                        return exists ? prev.map((c) => (c.id === contact.id ? { ...c, ...contact } : c)) : [contact, ...prev];
+                      });
                       openDM(dmSearchResult.id);
                       setDmSearchInput('');
                       setDmSearchResult(null);
@@ -871,8 +983,12 @@ const CommunityLounge: React.FC = () => {
                 </span>
               ) : selectedDM ? (
                 <>
-                  <span className={`w-2 h-2 rounded-full ${socket.isConnected && socket.onlineUsers.includes(selectedDM) ? 'bg-emerald-500' : activeDMObj?.online ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-                  {socket.isConnected && socket.onlineUsers.includes(selectedDM) ? 'Online' : activeDMObj?.online ? 'Online' : `Last seen ${activeDMObj?.lastSeen}`}
+                  <span className={`w-2 h-2 rounded-full ${onlineUserIds.includes(selectedDM) ? 'bg-emerald-500' : activeDMObj?.online ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                  {onlineUserIds.includes(selectedDM)
+                    ? 'Online'
+                    : activeDMObj?.online
+                      ? 'Online'
+                      : `Last seen ${activeDMObj?.lastSeen || formatRelativeTime(socket.getLastSeen(selectedDM) || '')}`}
                 </>
               ) : (
                 <>
@@ -1720,7 +1836,7 @@ const CommunityLounge: React.FC = () => {
       {CreateRoomModal}
       {ProfileModal}
       {SettingsModal}
-      <NotificationPanel open={showNotifPanel} onClose={() => setShowNotifPanel(false)} />
+      <NotificationPanel open={showNotifPanel} onClose={() => setShowNotifPanel(false)} notifications={notifications} />
     </div>
   );
 };

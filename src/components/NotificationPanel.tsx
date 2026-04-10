@@ -2,20 +2,40 @@ import React from 'react';
 import { X, Bell, MessageSquare, Users, Zap, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+export type NotificationItem = {
+  id: string | number;
+  type?: 'message' | 'user' | 'bonus' | 'reward' | 'system';
+  title: string;
+  desc: string;
+  time: string;
+};
+
 interface NotificationPanelProps {
   open: boolean;
   onClose: () => void;
+  notifications?: NotificationItem[];
 }
 
-const notifications = [
-  { id: 1, icon: Zap, title: 'AI Credits Bonus', desc: 'You received 50 bonus credits!', time: '2 min ago', color: '#8b5cf6' },
-  { id: 2, icon: Users, title: 'New Follower', desc: 'CryptoKing started following you', time: '15 min ago', color: '#10b981' },
-  { id: 3, icon: MessageSquare, title: 'New Message', desc: 'AIDevSara sent you a message', time: '1 hr ago', color: '#3b82f6' },
-  { id: 4, icon: TrendingUp, title: 'Referral Reward', desc: 'You earned $5 from a referral!', time: '3 hr ago', color: '#f59e0b' },
-  { id: 5, icon: Bell, title: 'System Update', desc: 'New features available in AI Tools', time: '5 hr ago', color: '#6366f1' },
+const fallbackNotifications: NotificationItem[] = [
+  { id: 1, title: 'AI Credits Bonus', desc: 'You received 50 bonus credits!', time: '2 min ago', type: 'bonus' },
+  { id: 2, title: 'New Follower', desc: 'CryptoKing started following you', time: '15 min ago', type: 'user' },
+  { id: 3, title: 'New Message', desc: 'AIDevSara sent you a message', time: '1 hr ago', type: 'message' },
+  { id: 4, title: 'Referral Reward', desc: 'You earned $5 from a referral!', time: '3 hr ago', type: 'reward' },
+  { id: 5, title: 'System Update', desc: 'New features available in AI Tools', time: '5 hr ago', type: 'system' },
 ];
 
-const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onClose }) => {
+const iconMap = {
+  message: { icon: MessageSquare, color: '#3b82f6' },
+  user: { icon: Users, color: '#10b981' },
+  bonus: { icon: Zap, color: '#8b5cf6' },
+  reward: { icon: TrendingUp, color: '#f59e0b' },
+  system: { icon: Bell, color: '#6366f1' },
+};
+
+const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onClose, notifications }) => {
+  const hasExternalNotifications = notifications !== undefined;
+  const items = hasExternalNotifications ? notifications : fallbackNotifications;
+
   return (
     <AnimatePresence>
       {open && (
@@ -42,7 +62,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onClose }) 
               <div className="flex items-center gap-2">
                 <Bell className="w-5 h-5 text-primary" />
                 <h2 className="text-sm font-bold text-white">Notifications</h2>
-                <span className="text-[10px] font-bold bg-primary/20 text-primary px-2 py-0.5 rounded-full">{notifications.length}</span>
+                <span className="text-[10px] font-bold bg-primary/20 text-primary px-2 py-0.5 rounded-full">{items.length}</span>
               </div>
               <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
                 <X className="w-4 h-4 text-slate-400" />
@@ -51,13 +71,18 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onClose }) 
 
             {/* Notification List */}
             <div className="flex-1 overflow-y-auto">
-              {notifications.map((n) => {
-                const Icon = n.icon;
+              {items.length === 0 && (
+                <div className="h-full flex items-center justify-center px-6 text-center">
+                  <p className="text-xs text-slate-400">No notifications yet.</p>
+                </div>
+              )}
+              {items.map((n) => {
+                const { icon: Icon, color } = iconMap[n.type || 'system'];
                 return (
                   <div key={n.id} className="px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${n.color}20` }}>
-                        <Icon className="w-4 h-4" style={{ color: n.color }} />
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}20` }}>
+                        <Icon className="w-4 h-4" style={{ color }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-white">{n.title}</p>

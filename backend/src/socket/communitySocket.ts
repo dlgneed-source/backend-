@@ -8,6 +8,26 @@ interface ConnectedUser {
 }
 
 const MAX_MESSAGE_LENGTH = 2000;
+const userSocketMap = new Map<string, Set<string>>();
+
+function markUserOnline(userId: string, socketId: string): string[] {
+  const userSockets = userSocketMap.get(userId) ?? new Set<string>();
+  userSockets.add(socketId);
+  userSocketMap.set(userId, userSockets);
+  return Array.from(userSocketMap.keys());
+}
+
+function markUserOffline(userId: string, socketId: string): { onlineUserIds: string[]; isNowOffline: boolean } {
+  const userSockets = userSocketMap.get(userId);
+  if (userSockets) {
+    userSockets.delete(socketId);
+    if (userSockets.size === 0) {
+      userSocketMap.delete(userId);
+      return { onlineUserIds: Array.from(userSocketMap.keys()), isNowOffline: true };
+    }
+  }
+  return { onlineUserIds: Array.from(userSocketMap.keys()), isNowOffline: false };
+}
 
 function getSocketUser(socket: Socket): ConnectedUser {
   const authUser = socket.handshake.auth?.user;
@@ -32,6 +52,9 @@ export function initCommunitySocket(io: Server): void {
 
     socket.join(DEFAULT_ROOM);
     socket.join(`user:${connectedUser.id}`);
+    const onlineUserIds = markUserOnline(connectedUser.id, socket.id);
+    socket.emit("presence_state", { onlineUserIds });
+    io.emit("presence_update", { userId: connectedUser.id, online: true });
 
     socket.on("join_room", async ({ roomId }: { roomId: string }) => {
       try {
@@ -136,6 +159,17 @@ export function initCommunitySocket(io: Server): void {
       } catch (err) {
         console.error("[communitySocket] pin_message error:", err);
         socket.emit("error", { message: "Failed to pin message" });
+      }
+    });
+
+    socket.on("disconnect", () => {
+      const { isNowOffline } = markUserOffline(connectedUser.id, socket.id);
+      if (isNowOffline) {
+        io.emit("presence_update", {
+          userId: connectedUser.id,
+          online: false,
+          lastSeen: new Date().toISOString(),
+        });
       }
     });
   });
