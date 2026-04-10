@@ -41,7 +41,7 @@ const config = {
 
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000"), // 15 min
-  RATE_LIMIT_MAX: parseInt(process.env.RATE_LIMIT_MAX || "100"),
+  RATE_LIMIT_MAX: parseInt(process.env.RATE_LIMIT_MAX || "5000"),
 
   // Admin
   ADMIN_WALLET: process.env.ADMIN_WALLET || "0x0000000000000000000000000000000000000001",

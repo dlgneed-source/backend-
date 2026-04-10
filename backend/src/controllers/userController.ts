@@ -43,10 +43,10 @@ export async function getProfile(req: AuthenticatedRequest, res: Response): Prom
 
 /**
  * PATCH /users/profile
- * Update user profile (name, email)
+ * Update user profile (name, email, avatarUrl)
  */
 export async function updateProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { name, email } = req.body;
+  const { name, email, avatarUrl } = req.body;
 
   try {
     const updated = await prisma.user.update({
@@ -54,8 +54,9 @@ export async function updateProfile(req: AuthenticatedRequest, res: Response): P
       data: {
         ...(name !== undefined ? { name } : {}),
         ...(email !== undefined ? { email } : {}),
+        ...(avatarUrl !== undefined ? { avatarUrl } : {}),
       },
-      select: { id: true, walletAddress: true, name: true, email: true, referralCode: true },
+      select: { id: true, memberId: true, walletAddress: true, name: true, email: true, avatarUrl: true, referralCode: true },
     });
 
     res.json({ success: true, user: updated });

@@ -31,12 +31,16 @@ export async function getNonce(req: Request, res: Response): Promise<void> {
     const message = generateSignInMessage(walletAddress, nonce);
 
     // Store nonce temporarily in user record (or create pending user)
+    const existingUser = await prisma.user.findUnique({ where: { walletAddress: walletAddress.toLowerCase() } });
+    const memberId = existingUser?.memberId ?? await generateUniqueMemberId();
+
     await prisma.user.upsert({
       where: { walletAddress: walletAddress.toLowerCase() },
       update: { nonce },
       create: {
         walletAddress: walletAddress.toLowerCase(),
         nonce,
+        memberId,
         referralCode: generateReferralCode(walletAddress),
       },
     });
@@ -135,9 +139,11 @@ export async function getMe(req: AuthenticatedRequest, res: Response): Promise<v
       where: { id: req.user!.id },
       select: {
         id: true,
+        memberId: true,
         walletAddress: true,
         name: true,
         email: true,
+        avatarUrl: true,
         referralCode: true,
         status: true,
         createdAt: true,
@@ -187,6 +193,9 @@ export async function devLogin(req: Request, res: Response): Promise<void> {
   }
 
   try {
+    const existingUserForDev = await prisma.user.findUnique({ where: { walletAddress } });
+    const memberIdForDev = existingUserForDev?.memberId ?? await generateUniqueMemberId();
+
     const user = await prisma.user.upsert({
       where: { walletAddress },
       update: {
@@ -196,6 +205,7 @@ export async function devLogin(req: Request, res: Response): Promise<void> {
       create: {
         walletAddress,
         name: name || null,
+        memberId: memberIdForDev,
         referralCode: generateReferralCode(walletAddress),
         lastLoginAt: new Date(),
       },
@@ -232,4 +242,14 @@ function generateReferralCode(walletAddress: string): string {
   const suffix = walletAddress.slice(-6).toUpperCase();
   const prefix = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `EA${prefix}${suffix}`;
+}
+
+async function generateUniqueMemberId(): Promise<string> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = String(Math.floor(100000 + Math.random() * 900000));
+    const existing = await prisma.user.findUnique({ where: { memberId: candidate } });
+    if (!existing) return candidate;
+  }
+  // Fallback: use timestamp-based 6-digit suffix
+  return String(Date.now()).slice(-6);
 }
