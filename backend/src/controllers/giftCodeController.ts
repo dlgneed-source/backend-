@@ -112,16 +112,6 @@ export async function redeemGiftCode(req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    // Check if user already enrolled in this plan
-    const existingEnrollment = await prisma.enrollment.findFirst({
-      where: { userId, planId: giftCode.planId, status: "ACTIVE" },
-    });
-
-    if (existingEnrollment) {
-      res.status(409).json({ success: false, message: "Already enrolled in this plan" });
-      return;
-    }
-
     const { calculateFlushoutDate } = await import("../utils/flushoutLogic");
     const { distributeCommissions } = await import("../utils/commissionLogic");
 

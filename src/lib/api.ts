@@ -221,6 +221,23 @@ export const plansApi = {
         }>;
       }>;
     }>('/api/plans/my-enrollments', { token }),
+
+  redeemGiftCode: (token: string, code: string) =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      enrollment: {
+        id: string;
+        planId: number;
+        planName: string;
+        flushoutAt: string;
+        memberProfit: number;
+      };
+    }>('/api/gift-codes/redeem', {
+      method: 'POST',
+      token,
+      body: { code },
+    }),
 };
 
 export const incentivesApi = {
