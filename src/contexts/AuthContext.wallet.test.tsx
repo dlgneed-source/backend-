@@ -12,43 +12,30 @@ vi.mock('sonner', () => ({
   },
 }));
 
+// --- Wagmi + Web3Modal mocks ---
+
+const mockOpen = vi.fn<() => Promise<void>>();
+const mockSignMessageAsync = vi.fn<(args: { message: string }) => Promise<string>>();
+const mockDisconnect = vi.fn();
+
+let mockAddress: string | undefined = undefined;
+let mockIsConnected = false;
+
+vi.mock('wagmi', () => ({
+  useAccount: () => ({ address: mockAddress, isConnected: mockIsConnected }),
+  useSignMessage: () => ({ signMessageAsync: mockSignMessageAsync }),
+  useDisconnect: () => ({ disconnect: mockDisconnect }),
+}));
+
+vi.mock('@web3modal/wagmi/react', () => ({
+  useWeb3Modal: () => ({ open: mockOpen }),
+  useWeb3ModalEvents: () => ({ data: { event: '' } }),
+}));
+
+// --- Helpers ---
+
 const ADDRESS_1 = '0x1111111111111111111111111111111111111111';
 const ADDRESS_2 = '0x2222222222222222222222222222222222222222';
-const DEFAULT_USER_AGENT = window.navigator.userAgent;
-
-type Listener = (...args: unknown[]) => void;
-type ProviderEvents = Record<string, Listener[]>;
-
-class ProviderRejectedError extends Error {
-  code = 4001;
-
-  constructor(message: string) {
-    super(message);
-    this.name = 'ProviderRejectedError';
-  }
-}
-
-function createProvider(requestHandler: (method: string, params?: unknown[] | object) => unknown) {
-  const events: ProviderEvents = {};
-
-  return {
-    request: vi.fn(({ method, params }: { method: string; params?: unknown[] | object }) =>
-      Promise.resolve(requestHandler(method, params))
-    ),
-    on: (event: string, listener: Listener) => {
-      events[event] = events[event] || [];
-      events[event].push(listener);
-    },
-    removeListener: (event: string, listener: Listener) => {
-      events[event] = (events[event] || []).filter((entry) => entry !== listener);
-    },
-    emit: (event: string, ...args: unknown[]) => {
-      for (const listener of events[event] || []) {
-        listener(...args);
-      }
-    },
-  };
-}
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -75,49 +62,25 @@ describe('AuthContext wallet flow', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     sessionStorage.clear();
-    Object.defineProperty(window.navigator, 'userAgent', {
-      configurable: true,
-      value: DEFAULT_USER_AGENT,
-    });
-    Object.defineProperty(window, 'ethereum', {
-      configurable: true,
-      writable: true,
-      value: undefined,
-    });
+    mockAddress = undefined;
+    mockIsConnected = false;
+    mockOpen.mockResolvedValue(undefined);
+    mockSignMessageAsync.mockResolvedValue('0xsignature');
+    mockDisconnect.mockReturnValue(undefined);
   });
 
-  it('redirects mobile users to MetaMask app when provider is missing', async () => {
-    Object.defineProperty(window.navigator, 'userAgent', {
-      configurable: true,
-      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
-    });
+  it('opens Web3Modal when login is called', async () => {
     global.fetch = vi.fn() as typeof fetch;
 
     render(<AuthProvider><TestHarness /></AuthProvider>);
     fireEvent.click(screen.getByText('connect'));
 
-    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(
-      'Wallet not detected in this browser. Open in MetaMask or Trust Wallet.',
-      expect.objectContaining({
-        action: expect.objectContaining({ label: 'MetaMask' }),
-        cancel: expect.objectContaining({ label: 'Trust Wallet' }),
-      })
-    ));
-    expect(screen.getByTestId('wallet-error')).toHaveTextContent('Wallet not detected in this browser. Open in MetaMask or Trust Wallet.');
+    await waitFor(() => expect(mockOpen).toHaveBeenCalledTimes(1));
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('wallet connect success', async () => {
-    const provider = createProvider((method) => {
-      if (method === 'eth_accounts') return [];
-      if (method === 'eth_chainId') return '0x38';
-      if (method === 'eth_requestAccounts') return [ADDRESS_1];
-      if (method === 'personal_sign') return '0xsignature';
-      return null;
-    });
-    Object.defineProperty(window, 'ethereum', { configurable: true, value: provider });
-
-    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    global.fetch = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = String(input);
       if (url.includes('/api/auth/nonce')) {
         return jsonResponse(200, { success: true, nonce: 'nonce-1', message: 'sign-message' });
@@ -157,8 +120,18 @@ describe('AuthContext wallet flow', () => {
       return jsonResponse(404, { success: false, message: 'not found' });
     }) as typeof fetch;
 
-    render(<AuthProvider><TestHarness /></AuthProvider>);
+    const { rerender } = render(<AuthProvider><TestHarness /></AuthProvider>);
+
+    // Click login — opens the modal
     fireEvent.click(screen.getByText('connect'));
+    await waitFor(() => expect(mockOpen).toHaveBeenCalledTimes(1));
+
+    // Simulate user selecting wallet and connecting
+    await act(async () => {
+      mockAddress = ADDRESS_1;
+      mockIsConnected = true;
+      rerender(<AuthProvider><TestHarness /></AuthProvider>);
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('true');
@@ -167,53 +140,36 @@ describe('AuthContext wallet flow', () => {
     expect(sessionStorage.getItem('ea_auth_token')).toBe('jwt-token');
   });
 
-  it('user reject flow', async () => {
-    const provider = createProvider((method) => {
-      if (method === 'eth_accounts') return [];
-      if (method === 'eth_chainId') return '0x38';
-      if (method === 'eth_requestAccounts') throw new ProviderRejectedError('Rejected');
-      return null;
-    });
-    Object.defineProperty(window, 'ethereum', { configurable: true, value: provider });
-    global.fetch = vi.fn() as typeof fetch;
+  it('user rejects signature', async () => {
+    const rejectedError = Object.assign(new Error('User rejected'), { code: 4001 });
+    mockSignMessageAsync.mockRejectedValue(rejectedError);
 
-    render(<AuthProvider><TestHarness /></AuthProvider>);
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/auth/nonce')) {
+        return jsonResponse(200, { success: true, nonce: 'nonce-1', message: 'sign-message' });
+      }
+      return jsonResponse(404, { success: false, message: 'not found' });
+    }) as typeof fetch;
+
+    const { rerender } = render(<AuthProvider><TestHarness /></AuthProvider>);
+
     fireEvent.click(screen.getByText('connect'));
+    await waitFor(() => expect(mockOpen).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      mockAddress = ADDRESS_1;
+      mockIsConnected = true;
+      rerender(<AuthProvider><TestHarness /></AuthProvider>);
+    });
 
     await waitFor(() => {
-      expect(screen.getByTestId('authenticated')).toHaveTextContent('false');
       expect(screen.getByTestId('wallet-error').textContent).toContain('rejected');
     });
-  });
-
-  it('wrong network', async () => {
-    const provider = createProvider((method) => {
-      if (method === 'eth_accounts') return [];
-      if (method === 'eth_chainId') return '0x1';
-      return null;
-    });
-    Object.defineProperty(window, 'ethereum', { configurable: true, value: provider });
-    global.fetch = vi.fn() as typeof fetch;
-
-    render(<AuthProvider><TestHarness /></AuthProvider>);
-    fireEvent.click(screen.getByText('connect'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('wallet-error').textContent).toContain('Wrong network');
-    });
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(screen.getByTestId('authenticated')).toHaveTextContent('false');
   });
 
   it('signature verification fail', async () => {
-    const provider = createProvider((method) => {
-      if (method === 'eth_accounts') return [];
-      if (method === 'eth_chainId') return '0x38';
-      if (method === 'eth_requestAccounts') return [ADDRESS_1];
-      if (method === 'personal_sign') return '0xbadsignature';
-      return null;
-    });
-    Object.defineProperty(window, 'ethereum', { configurable: true, value: provider });
-
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('/api/auth/nonce')) {
@@ -225,8 +181,16 @@ describe('AuthContext wallet flow', () => {
       return jsonResponse(404, { success: false, message: 'not found' });
     }) as typeof fetch;
 
-    render(<AuthProvider><TestHarness /></AuthProvider>);
+    const { rerender } = render(<AuthProvider><TestHarness /></AuthProvider>);
+
     fireEvent.click(screen.getByText('connect'));
+    await waitFor(() => expect(mockOpen).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      mockAddress = ADDRESS_1;
+      mockIsConnected = true;
+      rerender(<AuthProvider><TestHarness /></AuthProvider>);
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId('wallet-error')).toHaveTextContent('Invalid signature');
@@ -235,15 +199,6 @@ describe('AuthContext wallet flow', () => {
   });
 
   it('logout and account change handling', async () => {
-    const provider = createProvider((method) => {
-      if (method === 'eth_accounts') return [];
-      if (method === 'eth_chainId') return '0x38';
-      if (method === 'eth_requestAccounts') return [ADDRESS_1];
-      if (method === 'personal_sign') return '0xsignature';
-      return null;
-    });
-    Object.defineProperty(window, 'ethereum', { configurable: true, value: provider });
-
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('/api/auth/nonce')) {
@@ -284,21 +239,36 @@ describe('AuthContext wallet flow', () => {
       return jsonResponse(404, { success: false, message: 'not found' });
     }) as typeof fetch;
 
-    render(<AuthProvider><TestHarness /></AuthProvider>);
+    const { rerender } = render(<AuthProvider><TestHarness /></AuthProvider>);
+
     fireEvent.click(screen.getByText('connect'));
-    await waitFor(() => expect(screen.getByTestId('authenticated')).toHaveTextContent('true'));
+    await waitFor(() => expect(mockOpen).toHaveBeenCalledTimes(1));
 
     await act(async () => {
-      provider.emit('accountsChanged', [ADDRESS_2]);
+      mockAddress = ADDRESS_1;
+      mockIsConnected = true;
+      rerender(<AuthProvider><TestHarness /></AuthProvider>);
     });
+
+    await waitFor(() => expect(screen.getByTestId('authenticated')).toHaveTextContent('true'));
+
+    // Simulate account change to a different address
+    await act(async () => {
+      mockAddress = ADDRESS_2;
+      mockIsConnected = true;
+      rerender(<AuthProvider><TestHarness /></AuthProvider>);
+    });
+
     await waitFor(() => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('false');
       expect(screen.getByTestId('wallet-error')).toHaveTextContent('account changed');
     });
 
+    // Logout clears session
     fireEvent.click(screen.getByText('logout'));
     await waitFor(() => {
       expect(sessionStorage.getItem('ea_auth_token')).toBeNull();
     });
+    expect(mockDisconnect).toHaveBeenCalled();
   });
 });
