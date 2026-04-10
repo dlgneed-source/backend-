@@ -168,7 +168,7 @@ model Plan {
 }
 
 model Enrollment {
-  id               String           @id @default(cuid())
+  id               String           @id
   userId           String
   user             User             @relation(fields: [userId], references: [id])
   planId           Int

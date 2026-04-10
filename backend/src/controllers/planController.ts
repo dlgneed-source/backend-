@@ -6,6 +6,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "../middleware/auth";
+import { generateUniqueEnrollmentId } from "../utils/enrollmentId";
 
 const prisma = new PrismaClient();
 
@@ -91,10 +92,12 @@ export async function enrollInPlan(req: AuthenticatedRequest, res: Response): Pr
     const { calculateFlushoutDate } = await import("../utils/flushoutLogic");
 
     const flushoutAt = calculateFlushoutDate(new Date(), plan.flushoutDays);
+    const enrollmentId = await generateUniqueEnrollmentId(prisma);
 
     // Create enrollment
     const enrollment = await prisma.enrollment.create({
       data: {
+        id: enrollmentId,
         userId,
         planId,
         status: "ACTIVE",
