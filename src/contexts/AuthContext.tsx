@@ -52,11 +52,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { userRef.current = user; }, [user]);
 
-  const { open } = useWeb3Modal();
+  const { open, close } = useWeb3Modal();
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const { disconnect } = useDisconnect();
   const modalEvents = useWeb3ModalEvents();
+
+  // Keep a ref to the latest Wagmi address for use inside async callbacks
+  const addressRef = useRef<string | undefined>(address);
+  useEffect(() => { addressRef.current = address; }, [address]);
 
   // Reset pending flag if the modal is closed before the user connects
   useEffect(() => {
@@ -112,27 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(async (): Promise<boolean> => {
-    setWalletError(null);
-    loginPendingRef.current = true;
-    try {
-      await open();
-    } catch (error) {
-      loginPendingRef.current = false;
-      const message = (error as { message?: string })?.message || 'Failed to open wallet selector.';
-      setWalletError(message);
-      toast.error(message);
-      return false;
-    }
-    return true;
-  }, [open]);
-
-  // Run auth flow when wallet connects after a pending login
-  useEffect(() => {
-    if (!loginPendingRef.current || !address || !isConnected) return;
-    loginPendingRef.current = false;
-
-    const normalizedAddress = normalizeAddress(address);
+  const runAuthFlow = useCallback(async (walletAddr: string) => {
+    const normalizedAddress = normalizeAddress(walletAddr);
     if (!normalizedAddress) {
       setWalletError('Wallet connection failed. No valid account received.');
       toast.error('Wallet connection failed. No valid account received.');
@@ -145,51 +130,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Capture the connected address so we can verify it hasn't changed by the time we commit
     const addressAtStart = normalizedAddress;
 
-    const runAuthFlow = async () => {
+    try {
+      const nonceResponse = await authApi.getNonce(addressAtStart);
+
+      let signature: string;
       try {
-        const nonceResponse = await authApi.getNonce(addressAtStart);
-
-        let signature: string;
-        try {
-          signature = await signMessageAsync({ message: nonceResponse.message });
-        } catch (error) {
-          const maybeError = error as { code?: number; message?: string };
-          const message = maybeError?.code === 4001
-            ? 'Signature request was rejected.'
-            : (maybeError?.message || 'Signature failed.');
-          setWalletError(message);
-          toast.error(message);
-          return;
-        }
-
-        const verifyResponse = await authApi.verify(addressAtStart, signature);
-        const authenticatedUser = await buildAuthenticatedUser(verifyResponse.token, verifyResponse.user);
-
-        // Guard: ensure the wallet is still connected with the same address before committing session
-        if (normalizeAddress(address) !== addressAtStart) {
-          return;
-        }
-
-        sessionStorage.setItem(AUTH_TOKEN_KEY, verifyResponse.token);
-        setToken(verifyResponse.token);
-        setUser(authenticatedUser);
-        setWalletAddress(authenticatedUser.walletAddress);
-        setWalletError(null);
-        toast.success('Wallet connected');
+        signature = await signMessageAsync({ message: nonceResponse.message });
       } catch (error) {
         const maybeError = error as { code?: number; message?: string };
         const message = maybeError?.code === 4001
-          ? 'Wallet connection request was rejected.'
-          : (maybeError?.message || 'Wallet login failed');
+          ? 'Signature request was rejected.'
+          : (maybeError?.message || 'Signature failed.');
         setWalletError(message);
         toast.error(message);
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
 
-    void runAuthFlow();
-  }, [address, isConnected, signMessageAsync, buildAuthenticatedUser]);
+      const verifyResponse = await authApi.verify(addressAtStart, signature);
+      const authenticatedUser = await buildAuthenticatedUser(verifyResponse.token, verifyResponse.user);
+
+      // Guard: ensure the wallet is still connected with the same address before committing session
+      if (normalizeAddress(addressRef.current) !== addressAtStart) {
+        return;
+      }
+
+      sessionStorage.setItem(AUTH_TOKEN_KEY, verifyResponse.token);
+      setToken(verifyResponse.token);
+      setUser(authenticatedUser);
+      setWalletAddress(authenticatedUser.walletAddress);
+      setWalletError(null);
+      toast.success('Wallet connected');
+    } catch (error) {
+      const maybeError = error as { code?: number; message?: string };
+      const message = maybeError?.code === 4001
+        ? 'Wallet connection request was rejected.'
+        : (maybeError?.message || 'Wallet login failed');
+      setWalletError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [signMessageAsync, buildAuthenticatedUser]);
+
+  const login = useCallback(async (): Promise<boolean> => {
+    setWalletError(null);
+
+    // If wallet is already connected at the Wagmi level but the JWT session is missing,
+    // skip opening the modal and run the auth flow directly.
+    if (isConnected && address) {
+      void runAuthFlow(address);
+      return true;
+    }
+
+    loginPendingRef.current = true;
+    try {
+      await open();
+    } catch (error) {
+      loginPendingRef.current = false;
+      const message = (error as { message?: string })?.message || 'Failed to open wallet selector.';
+      setWalletError(message);
+      toast.error(message);
+      return false;
+    }
+    return true;
+  }, [open, isConnected, address, runAuthFlow]);
+
+  // Run auth flow when wallet connects after a pending login
+  useEffect(() => {
+    if (!loginPendingRef.current || !address || !isConnected) return;
+    loginPendingRef.current = false;
+
+    // Close the modal so the wallet signature prompt is clearly visible
+    void close();
+
+    void runAuthFlow(address);
+  }, [address, isConnected, close, runAuthFlow]);
 
   const logout = useCallback(() => {
     disconnect();
