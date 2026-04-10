@@ -28,9 +28,9 @@ describe("Commission Logic", () => {
     });
   });
 
-  it("should have correct level numbers 1-7", () => {
+  it("should have correct level numbers 2-8", () => {
     COMMISSION_LEVELS.forEach((level, i) => {
-      expect(level.level).toBe(i + 1);
+      expect(level.level).toBe(i + 2);
     });
   });
 

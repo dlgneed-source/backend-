@@ -238,6 +238,58 @@ export async function getPlanStats(req: Request, res: Response): Promise<void> {
 }
 
 /**
+ * GET /plans/my-enrollments
+ * Get the current user's active enrollments grouped by plan
+ */
+export async function getMyEnrollments(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const userId = req.user!.id;
+
+  try {
+    const enrollments = await prisma.enrollment.findMany({
+      where: { userId, status: "ACTIVE" },
+      include: { plan: { select: { id: true, name: true, memberProfit: true, flushoutDays: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Group by plan
+    const byPlan: Record<
+      number,
+      {
+        planId: number;
+        planName: string;
+        memberProfit: number;
+        flushoutDays: number;
+        enrollments: Array<{ id: string; createdAt: string; flushoutAt: string | null }>;
+      }
+    > = {};
+
+    for (const e of enrollments) {
+      if (!byPlan[e.planId]) {
+        byPlan[e.planId] = {
+          planId: e.planId,
+          planName: e.plan.name,
+          memberProfit: e.plan.memberProfit,
+          flushoutDays: e.plan.flushoutDays,
+          enrollments: [],
+        };
+      }
+      byPlan[e.planId].enrollments.push({
+        id: e.id,
+        createdAt: e.createdAt.toISOString(),
+        flushoutAt: e.flushoutAt ? e.flushoutAt.toISOString() : null,
+      });
+    }
+
+    res.json({
+      success: true,
+      plans: Object.values(byPlan).sort((a, b) => a.planId - b.planId),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to fetch enrollments" });
+  }
+}
+
+/**
  * GET /plans/members
  * Enrollment-based member counts by plan
  */

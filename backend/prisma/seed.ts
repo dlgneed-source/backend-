@@ -156,15 +156,15 @@ async function main() {
     {
       key: "COMMISSION_LEVELS",
       value: JSON.stringify([
-        { level: 1, percentage: 4 },
-        { level: 2, percentage: 2 },
-        { level: 3, percentage: 1 },
+        { level: 2, percentage: 4 },
+        { level: 3, percentage: 2 },
         { level: 4, percentage: 1 },
         { level: 5, percentage: 1 },
-        { level: 6, percentage: 0.5 },
+        { level: 6, percentage: 1 },
         { level: 7, percentage: 0.5 },
+        { level: 8, percentage: 0.5 },
       ]),
-      description: "Multi-level commission percentages (7 levels)",
+      description: "Multi-level commission percentages (levels 2-8, 7 levels total)",
     },
     {
       key: "CLUB_INCENTIVES",

@@ -205,6 +205,45 @@ export const plansApi = {
         totalEnrollments?: number | null;
       };
     }>('/api/plans/members'),
+
+  getMyEnrollments: (token: string) =>
+    apiRequest<{
+      success: boolean;
+      plans: Array<{
+        planId: number;
+        planName: string;
+        memberProfit: number;
+        flushoutDays: number;
+        enrollments: Array<{
+          id: string;
+          createdAt: string;
+          flushoutAt: string | null;
+        }>;
+      }>;
+    }>('/api/plans/my-enrollments', { token }),
+};
+
+export const incentivesApi = {
+  getTiers: () =>
+    apiRequest<{
+      success: boolean;
+      clubIncentives: Array<{
+        id: number;
+        plan1Ids: number;
+        plan2Ids: number;
+        plan3Ids: number;
+        plan4Ids: number;
+        plan5Ids: number;
+        plan6Ids: number;
+        reward: number;
+        rank: string;
+      }>;
+      individualIncentives: Array<{
+        planId: number;
+        target: number;
+        reward: number;
+      }>;
+    }>('/api/incentives/tiers'),
 };
 
 export const systemApi = {
