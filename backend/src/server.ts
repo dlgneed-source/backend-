@@ -36,6 +36,7 @@ import { seedRoomsIfNeeded } from "./services/communityStore";
 
 const app = express();
 const httpServer = createServer(app);
+app.set("trust proxy", config.TRUST_PROXY);
 const io = new SocketIOServer(httpServer, {
   cors: {
     origin: config.NODE_ENV === "development" ? true : config.CORS_ORIGINS,

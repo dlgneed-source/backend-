@@ -8,10 +8,21 @@ function parseIntEnv(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parseTrustProxyEnv(value: string | undefined): boolean | number | string {
+  const raw = (value || "").trim();
+  if (!raw) return false;
+  const normalized = raw.toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+  return raw;
+}
+
 const config = {
   // Server
   PORT: parseInt(process.env.PORT || "3001"),
   NODE_ENV: process.env.NODE_ENV || "development",
+  TRUST_PROXY: parseTrustProxyEnv(process.env.TRUST_PROXY || (process.env.NODE_ENV === "production" ? "1" : "false")),
 
   // Database
   DATABASE_URL: process.env.DATABASE_URL || "postgresql://localhost:5432/eakhuwat",
