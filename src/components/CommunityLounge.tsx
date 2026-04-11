@@ -288,12 +288,30 @@ const CommunityLounge: React.FC = () => {
     });
   };
 
+  /** Shared click handler for the DM chat header (avatar + title). Opens the
+   *  remote user's profile card once their data has loaded. */
+  const handleDMHeaderClick = () => {
+    if (!selectedDM || dmInfoLoading) return;
+    if (activeDMObj) {
+      openMemberProfile(activeDMObj);
+    } else if (activeDMInfo) {
+      openProfile({
+        id: activeDMInfo.id,
+        name: activeDMInfo.name || 'Unknown',
+        initials: (activeDMInfo.name || 'U?').slice(0, 2).toUpperCase(),
+        role: 'Member',
+        wallet: '—',
+        avatar: activeDMInfo.avatarUrl || undefined,
+      });
+    }
+  };
+
   const openMessageProfile = (msg: Msg) => {
     // Use only the backend-provided userId; never fall back to the display name
     // (a name string is not a valid user ID and would cause "User not found" errors)
     if (!msg.userId || msg.userId === PLACEHOLDER_USER_ID) return;
     openProfile({ 
-      id: msg.userId, 
+      id: msg.userId!, 
       name: msg.user, 
       initials: msg.initials, 
       role: msg.role ?? 'Member', 
@@ -970,21 +988,7 @@ const CommunityLounge: React.FC = () => {
             </button>
           )}
           <div 
-            onClick={() => {
-              if (!selectedDM || dmInfoLoading) return;
-              if (activeDMObj) {
-                openMemberProfile(activeDMObj);
-              } else if (activeDMInfo) {
-                openProfile({
-                  id: activeDMInfo.id,
-                  name: activeDMInfo.name || 'Unknown',
-                  initials: (activeDMInfo.name || 'U?').slice(0, 2).toUpperCase(),
-                  role: 'Member',
-                  wallet: '—',
-                  avatar: activeDMInfo.avatarUrl || undefined,
-                });
-              }
-            }}
+            onClick={handleDMHeaderClick}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl cursor-pointer transition-transform hover:scale-105 overflow-hidden"
             style={selectedDM 
               ? { background: 'linear-gradient(135deg, #10b981, #14b8a6)', boxShadow: '0 10px 25px -5px rgba(16,185,129,0.4)' }
@@ -1007,21 +1011,7 @@ const CommunityLounge: React.FC = () => {
           </div>
           <div 
             className="min-w-0 cursor-pointer"
-            onClick={() => {
-              if (!selectedDM || dmInfoLoading) return;
-              if (activeDMObj) {
-                openMemberProfile(activeDMObj);
-              } else if (activeDMInfo) {
-                openProfile({
-                  id: activeDMInfo.id,
-                  name: activeDMInfo.name || 'Unknown',
-                  initials: (activeDMInfo.name || 'U?').slice(0, 2).toUpperCase(),
-                  role: 'Member',
-                  wallet: '—',
-                  avatar: activeDMInfo.avatarUrl || undefined,
-                });
-              }
-            }}
+            onClick={handleDMHeaderClick}
           >
             <h1 className="truncate text-base font-bold text-white flex items-center gap-2">
               {activeTitle}
