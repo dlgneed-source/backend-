@@ -291,6 +291,7 @@ const CommunityLounge: React.FC = () => {
   /** Shared click handler for the DM chat header (avatar + title). Opens the
    *  remote user's profile card once their data has loaded. */
   const handleDMHeaderClick = () => {
+    // selectedDM being null means we're in a community room – nothing to open
     if (!selectedDM || dmInfoLoading) return;
     if (activeDMObj) {
       openMemberProfile(activeDMObj);
@@ -311,7 +312,7 @@ const CommunityLounge: React.FC = () => {
     // (a name string is not a valid user ID and would cause "User not found" errors)
     if (!msg.userId || msg.userId === PLACEHOLDER_USER_ID) return;
     openProfile({ 
-      id: msg.userId!, 
+      id: msg.userId, 
       name: msg.user, 
       initials: msg.initials, 
       role: msg.role ?? 'Member', 
