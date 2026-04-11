@@ -173,6 +173,7 @@ const CommunityLounge: React.FC = () => {
   const [dmSearchError, setDmSearchError] = useState<string | null>(null);
   // Active DM user info (from backend when opening a DM)
   const [activeDMInfo, setActiveDMInfo] = useState<{ id: string; name: string | null; memberId: string | null; avatarUrl: string | null } | null>(null);
+  const [dmInfoLoading, setDmInfoLoading] = useState(false);
   const pushNotification = useCallback((notification: NotificationItem) => {
     setNotifications((prev) => [notification, ...prev].slice(0, 30));
   }, []);
@@ -305,13 +306,17 @@ const CommunityLounge: React.FC = () => {
     if (isMobile) setMobileShowChat(true); 
   };
 
-  const openDM = (contactId: string) => { 
-    setSelectedDM(contactId); 
-    setSelectedRoomId('announcements'); 
-    setReplyTo(null); 
+  const openDM = (contactId: string) => {
+    if (!contactId) return;
+    setSelectedDM(contactId);
+    setSelectedRoomId('announcements');
+    setReplyTo(null);
+    // Reset stale user info so header doesn't show previous DM's data
+    setActiveDMInfo(null);
     if (isMobile) setMobileShowChat(true);
     // Load DM history from backend
     if (token) {
+      setDmInfoLoading(true);
       messagesApi.getDmHistory(token, contactId)
         .then((res) => {
           if (res.otherUser) {
@@ -359,7 +364,8 @@ const CommunityLounge: React.FC = () => {
             });
           }
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => setDmInfoLoading(false));
     }
   };
 
@@ -961,7 +967,7 @@ const CommunityLounge: React.FC = () => {
           )}
           <div 
             onClick={() => selectedDM && activeDMObj && openMemberProfile(activeDMObj)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl cursor-pointer transition-transform hover:scale-105"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl cursor-pointer transition-transform hover:scale-105 overflow-hidden"
             style={selectedDM 
               ? { background: 'linear-gradient(135deg, #10b981, #14b8a6)', boxShadow: '0 10px 25px -5px rgba(16,185,129,0.4)' }
               : activeRoom?.isVip 
@@ -969,7 +975,17 @@ const CommunityLounge: React.FC = () => {
                 : { background: 'linear-gradient(135deg, #8b5cf6, #d946ef)', boxShadow: '0 10px 25px -5px rgba(139,92,246,0.4)' }
             }
           >
-            {selectedDM ? <User className="h-5 w-5 text-white" /> : activeRoom?.isVip ? <Crown className="h-5 w-5 text-white" /> : <Hash className="h-5 w-5 text-white" />}
+            {selectedDM ? (
+              dmInfoLoading ? (
+                <div className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+              ) : (activeDMInfo?.avatarUrl || activeDMObj?.avatar) ? (
+                <img src={activeDMInfo?.avatarUrl || activeDMObj?.avatar} alt={activeDMInfo?.name || activeDMObj?.name || ''} className="w-full h-full object-cover rounded-2xl" />
+              ) : (
+                <span className="text-xs font-bold text-white">
+                  {(activeDMInfo?.name || activeDMObj?.name || 'U').slice(0, 2).toUpperCase()}
+                </span>
+              )
+            ) : activeRoom?.isVip ? <Crown className="h-5 w-5 text-white" /> : <Hash className="h-5 w-5 text-white" />}
           </div>
           <div 
             className="min-w-0 cursor-pointer"
@@ -986,14 +1002,18 @@ const CommunityLounge: React.FC = () => {
                   {typingCount === 1 ? 'Someone is typing...' : `${typingCount} people typing...`}
                 </span>
               ) : selectedDM ? (
-                <>
-                  <span className={`w-2 h-2 rounded-full ${onlineUserIds.includes(selectedDM) ? 'bg-emerald-500' : activeDMObj?.online ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-                  {onlineUserIds.includes(selectedDM)
-                    ? 'Online'
-                    : activeDMObj?.online
+                dmInfoLoading ? (
+                  <span style={{ color: '#64748b' }}>Loading…</span>
+                ) : (
+                  <>
+                    <span className={`w-2 h-2 rounded-full ${onlineUserIds.includes(selectedDM) ? 'bg-emerald-500' : activeDMObj?.online ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                    {onlineUserIds.includes(selectedDM)
                       ? 'Online'
-                      : `Last seen ${activeDMObj?.lastSeen || formatRelativeTime(socket.getLastSeen(selectedDM) || '')}`}
-                </>
+                      : activeDMObj?.online
+                        ? 'Online'
+                        : `Last seen ${activeDMObj?.lastSeen || formatRelativeTime(socket.getLastSeen(selectedDM) || '')}`}
+                  </>
+                )
               ) : (
                 <>
                   <Users className="w-3 h-3" /> {activeRoom?.memberCount?.toLocaleString()} members
@@ -1652,9 +1672,8 @@ const CommunityLounge: React.FC = () => {
                 <button 
                   onClick={() => { 
                     setShowUserProfileModal(false); 
-                    setSelectedDM(profileTarget.id); 
-                    setActiveTab('dms'); 
-                    if(isMobile) setMobileShowChat(true); 
+                    setActiveTab('dms');
+                    openDM(profileTarget.id);
                   }} 
                   className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all flex items-center justify-center gap-2"
                   style={{ background: 'linear-gradient(to right, #7c3aed, #d946ef)', boxShadow: '0 0 20px rgba(139,92,246,0.4)' }}
@@ -1831,8 +1850,8 @@ const CommunityLounge: React.FC = () => {
         )
       ) : (
         <>
-          <aside className="w-80 shrink-0 border-r" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>{Sidebar}</aside>
-          <main className="flex-1 min-w-0 min-h-0">{ChatCanvas}</main>
+          <aside className="h-full w-80 shrink-0 border-r" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>{Sidebar}</aside>
+          <main className="flex-1 h-full min-w-0 min-h-0">{ChatCanvas}</main>
           {RightSidebar}
         </>
       )}
