@@ -110,6 +110,9 @@ function formatRelativeTime(input: string): string {
 /* ═══════════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════════════════ */
+/** Placeholder userId assigned to locally-composed messages when no real ID is available */
+const PLACEHOLDER_USER_ID = 'you';
+
 const CommunityLounge: React.FC = () => {
   const mobileLoungeBottomInset = 'calc(5.5rem + env(safe-area-inset-bottom, 0px))';
   const [isMobile, setIsMobile] = useState(false);
@@ -288,7 +291,7 @@ const CommunityLounge: React.FC = () => {
   const openMessageProfile = (msg: Msg) => {
     // Use only the backend-provided userId; never fall back to the display name
     // (a name string is not a valid user ID and would cause "User not found" errors)
-    if (!msg.userId || msg.userId === 'you') return;
+    if (!msg.userId || msg.userId === PLACEHOLDER_USER_ID) return;
     openProfile({ 
       id: msg.userId, 
       name: msg.user, 
@@ -430,7 +433,7 @@ const CommunityLounge: React.FC = () => {
         text: msgText, 
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
         isOwn: true, 
-        userId: user?.id || 'you', 
+        userId: user?.id || PLACEHOLDER_USER_ID, 
         role: 'You', 
         wallet: user?.walletAddress || '—', 
         replyToId: replyTo?.id 
@@ -920,7 +923,7 @@ const CommunityLounge: React.FC = () => {
       <div className="p-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
         <button 
           onClick={() => openProfile({
-            id: user?.id || 'you',
+            id: user?.id || PLACEHOLDER_USER_ID,
             name: user?.name || 'You',
             initials: (user?.name || 'YO').slice(0, 2).toUpperCase(),
             online: true,
@@ -1624,7 +1627,7 @@ const CommunityLounge: React.FC = () => {
               {profileTarget.role === 'VIP Member' && <Star className="w-3 h-3" />}
               {profileTarget.role}
             </p>
-            {profileTarget.id === 'you' ? (
+            {profileTarget.id === PLACEHOLDER_USER_ID || profileTarget.id === user?.id ? (
               <div className="mt-3">
                 {editingMyBio ? (
                   <div className="flex gap-2">
@@ -1696,7 +1699,7 @@ const CommunityLounge: React.FC = () => {
           
           {/* Actions */}
           <div className="mt-5 space-y-2">
-            {profileTarget.id && profileTarget.id !== 'you' && profileTarget.id !== user?.id && (
+            {profileTarget.id && profileTarget.id !== PLACEHOLDER_USER_ID && profileTarget.id !== user?.id && (
               <>
                 <button 
                   onClick={() => { 
