@@ -286,14 +286,15 @@ const CommunityLounge: React.FC = () => {
   };
 
   const openMessageProfile = (msg: Msg) => {
-    const matched = communityMembers.find((m) => m.name === msg.user);
+    // Use only the backend-provided userId; never fall back to the display name
+    // (a name string is not a valid user ID and would cause "User not found" errors)
+    if (!msg.userId || msg.userId === 'you') return;
     openProfile({ 
-      id: msg.userId ?? matched?.id ?? msg.user, 
+      id: msg.userId, 
       name: msg.user, 
       initials: msg.initials, 
-      online: matched?.online, 
-      role: msg.role ?? matched?.role ?? 'Member', 
-      wallet: msg.wallet ?? matched?.wallet ?? '—',
+      role: msg.role ?? 'Member', 
+      wallet: msg.wallet ?? '—',
       bio: 'Active community member',
       joinedDate: '2024'
     });
@@ -966,7 +967,21 @@ const CommunityLounge: React.FC = () => {
             </button>
           )}
           <div 
-            onClick={() => selectedDM && activeDMObj && openMemberProfile(activeDMObj)}
+            onClick={() => {
+              if (!selectedDM || dmInfoLoading) return;
+              if (activeDMObj) {
+                openMemberProfile(activeDMObj);
+              } else if (activeDMInfo) {
+                openProfile({
+                  id: activeDMInfo.id,
+                  name: activeDMInfo.name || 'Unknown',
+                  initials: (activeDMInfo.name || 'U?').slice(0, 2).toUpperCase(),
+                  role: 'Member',
+                  wallet: '—',
+                  avatar: activeDMInfo.avatarUrl || undefined,
+                });
+              }
+            }}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl cursor-pointer transition-transform hover:scale-105 overflow-hidden"
             style={selectedDM 
               ? { background: 'linear-gradient(135deg, #10b981, #14b8a6)', boxShadow: '0 10px 25px -5px rgba(16,185,129,0.4)' }
@@ -989,7 +1004,21 @@ const CommunityLounge: React.FC = () => {
           </div>
           <div 
             className="min-w-0 cursor-pointer"
-            onClick={() => selectedDM && activeDMObj && openMemberProfile(activeDMObj)}
+            onClick={() => {
+              if (!selectedDM || dmInfoLoading) return;
+              if (activeDMObj) {
+                openMemberProfile(activeDMObj);
+              } else if (activeDMInfo) {
+                openProfile({
+                  id: activeDMInfo.id,
+                  name: activeDMInfo.name || 'Unknown',
+                  initials: (activeDMInfo.name || 'U?').slice(0, 2).toUpperCase(),
+                  role: 'Member',
+                  wallet: '—',
+                  avatar: activeDMInfo.avatarUrl || undefined,
+                });
+              }
+            }}
           >
             <h1 className="truncate text-base font-bold text-white flex items-center gap-2">
               {activeTitle}
@@ -1667,7 +1696,7 @@ const CommunityLounge: React.FC = () => {
           
           {/* Actions */}
           <div className="mt-5 space-y-2">
-            {profileTarget.id !== 'you' && (
+            {profileTarget.id && profileTarget.id !== 'you' && profileTarget.id !== user?.id && (
               <>
                 <button 
                   onClick={() => { 
